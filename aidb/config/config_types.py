@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 from typing import Dict, List
 
-
-def _get_normalized_column_name(table: str, column: str) -> str:
-  return f'{table}.{column}'.lower()
+import sqlalchemy
 
 
 # TODO: Unclear if there's a way to do this with sqlalchemy types
@@ -28,22 +27,31 @@ class ColumnType(Enum):
       raise ValueError(f'Unknown column type {col_type}')
 
 
-@dataclass
-class Column:
-  table: str
-  name: str
-  type: ColumnType
-  is_primary_key: bool
-
-  @property
-  def full_name(self) -> str:
-    return _get_normalized_column_name(self.table, self.name)
-
+Column = sqlalchemy.schema.Column
 
 # TODO: think about this architecture
 @dataclass
 class Table:
-  name: str
-  columns: Dict[str, Column] # name -> type
-  primary_key: List[str]
-  foreign_keys: Dict[str, str] # name -> table.col
+  _table: sqlalchemy.Table
+
+  @cached_property
+  def name(self) -> str:
+    return self._table.name.lower()
+
+  @cached_property
+  def primary_key(self) -> List[str]:
+    return self._table.primary_key.columns.keys()
+
+  # Name -> Column
+  @cached_property
+  def columns(self) -> Dict[str, Column]:
+    # Note: this is not actually a dict but I think this is fine
+    return self._table.columns
+
+  @cached_property
+  def foreign_keys(self) -> Dict[str, str]:
+    fkeys = {}
+    for col in self._table.columns:
+      for fk in col.foreign_keys:
+        fkeys[col.name] = fk.target_fullname
+    return fkeys
