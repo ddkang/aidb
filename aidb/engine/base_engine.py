@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from typing import Dict
 
 import sqlalchemy
@@ -113,9 +114,15 @@ class BaseEngine():
 
       blob_metadata_table = sqlalchemy.Table(BLOB_TABLE_NAMES_TABLE, metadata, autoload=True, autoload_with=conn)
       try:
-        blob_keys = conn.execute(blob_metadata_table.select()).fetchall()
-        blob_tables = list(set([row['table_name'] for row in blob_keys]))
-        blob_keys = [f'{row["table_name"]}.{row["blob_key"]}' for row in blob_keys]
+        blob_keys_flat = conn.execute(blob_metadata_table.select()).fetchall()
+        blob_tables = list(set([row['table_name'] for row in blob_keys_flat]))
+        blob_tables.sort()
+        blob_keys = defaultdict(list)
+        for row in blob_keys_flat:
+          full_name = f'{row["table_name"]}.{row["blob_key"]}'
+          blob_keys[row['table_name']].append(full_name)
+        for table in blob_keys:
+          blob_keys[table].sort()
       except:
         raise ValueError(f'Could not find blob metadata table {BLOB_TABLE_NAMES_TABLE} or table is malformed')
 

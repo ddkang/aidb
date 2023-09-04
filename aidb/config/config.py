@@ -14,7 +14,8 @@ class Config:
   # Metadata
   db_uri: str = ''
   blob_tables: List[str] = field(default_factory=list)
-  blob_keys: List[str] = field(default_factory=list)
+  # table name -> blob key (possibly composite)
+  blob_keys: Dict[str, List[str]] = field(default_factory=dict)
 
   # Schema
   tables: Dict[str, Table] = field(default_factory=dict)
