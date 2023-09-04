@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Dict, List, Tuple
 
 from aidb.config.config_types import Column, Table
@@ -30,9 +31,10 @@ class Config:
   # TODO: inference engine type
   column_by_engine: Dict[str, str] = field(default_factory=dict)
 
-  # Derived
-  table_graph: Dict[str, str] = field(default_factory=dict)
-
+  # TODO: figure out the type
+  @cached_property
+  def table_graph(self) -> Dict[str, str]:
+    raise NotImplementedError()
 
   # TODO: actually check validity
   def check_validity(self):

@@ -140,7 +140,6 @@ class BaseEngine():
         {},
         {},
         {},
-        {},
       )
       return config
 
