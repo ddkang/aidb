@@ -35,3 +35,11 @@ class InferenceService(abc.ABC):
 
   def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
     return [self.infer_one(row) for _, row in inputs.iterrows()]
+
+
+  async def infer_one_async(self, input: pd.Series) -> pd.DataFrame:
+    return self.infer_one(input)
+
+
+  async def infer_batch_async(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
+    return self.infer_batch(inputs)
