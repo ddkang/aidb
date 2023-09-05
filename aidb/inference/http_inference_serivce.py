@@ -1,4 +1,4 @@
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 import requests
@@ -29,11 +29,17 @@ class HTTPInferenceService(CachedInferenceService):
     self._batch_supported = batch_supported
 
 
+  def signature(self) -> Tuple[List, List]:
+    raise NotImplementedError()
+
+
   def infer_one(self, input: pd.Series):
-    body = input.to_json(orient='records')
+    # TODO: index or columns?
+    body = input.to_json(orient='columns')
     response = requests.post(self._url, data=body, headers=self._headers)
     response.raise_for_status()
-    output = pd.read_json(response.text, orient='records')
+    response = response.json()
+    output = pd.DataFrame(response)
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
       output = output.assign(**input)
