@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Dict, List, Tuple
 
 from aidb.config.config_types import Column, Table
+from aidb.inference.inference_service import InferenceService
 
 
 @dataclass
@@ -14,7 +16,8 @@ class Config:
   # Metadata
   db_uri: str = ''
   blob_tables: List[str] = field(default_factory=list)
-  blob_keys: List[str] = field(default_factory=list)
+  # table name -> blob key (possibly composite)
+  blob_keys: Dict[str, List[str]] = field(default_factory=dict)
 
   # Schema
   tables: Dict[str, Table] = field(default_factory=dict)
@@ -22,15 +25,21 @@ class Config:
   relations: Dict[str, str] = field(default_factory=dict) # left -> right
 
   # Inference engines
-  # TODO: inference engine type
-  engine_by_name: Dict[str, str] = field(default_factory=dict)
+  engine_by_name: Dict[str, InferenceService] = field(default_factory=dict)
   # engine name -> (inputs, outputs)
   engine_bindings: Dict[str, Tuple[List[str], List[str]]] = field(default_factory=dict)
-  # TODO: inference engine type
-  column_by_engine: Dict[str, str] = field(default_factory=dict)
+  column_by_engine: Dict[str, InferenceService] = field(default_factory=dict)
 
-  # Derived
-  table_graph: Dict[str, str] = field(default_factory=dict)
+
+  # TODO: figure out the type
+  @cached_property
+  def table_graph(self) -> Dict[str, str]:
+    raise NotImplementedError()
+
+
+  @cached_property
+  def engine_graph(self) -> Dict[str, str]:
+    raise NotImplementedError()
 
 
   # TODO: actually check validity
