@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import networkx as nx
 import sqlalchemy
@@ -10,6 +10,7 @@ from aidb.config.config_types import Column, Graph, InferenceBinding, Table
 from aidb.inference.inference_service import InferenceService
 from aidb.utils.constants import (BLOB_TABLE_NAMES_TABLE, CACHE_PREFIX,
                                   CONFIG_PREFIX)
+from aidb.utils.logger import logger
 
 
 @dataclass
@@ -23,7 +24,7 @@ class Config:
 
   '''
   # Inference services. Required
-  inference_services: Graph
+  inference_services: Dict[str, InferenceService] = field(default_factory=dict)
 
   # Metadata
   db_uri: str = ''
@@ -40,6 +41,23 @@ class Config:
   inference_bindings: Dict[str, List[InferenceBinding]] = field(default_factory=dict)
 
 
+  @cached_property
+  def inference_graph(self) -> Graph:
+    '''
+    The inference graph _nodes_ are columns. The _edges_ are inference services.
+    '''
+    graph = nx.DiGraph()
+    for column_name in self.columns.keys():
+      graph.add_node(column_name)
+
+    for service_name, binding_list in self.inference_bindings.items():
+      for binding in binding_list:
+        for inp in binding.input_columns:
+          for out in binding.output_columns:
+            graph.add_edge(inp, out, service_name=service_name, binding=binding)
+    return graph
+
+
   # TODO: figure out the type
   @cached_property
   def table_graph(self) -> Dict[str, str]:
@@ -47,18 +65,38 @@ class Config:
 
 
   @cached_property
-  def inference_topological_order(self) -> List[str]:
+  def inference_topological_order(self) -> List[Tuple[InferenceService, InferenceBinding]]:
     '''
     Returns a topological ordering of the inference services.  Note that this is
     not necessarily the same as the order in which AIDB runs the inference
     services depending on the query.
     '''
-    topo = nx.topological_sort(self.inference_services)
+    graph = self.inference_graph
+    column_order = nx.topological_sort(graph)
+    binding_order = []
+    seen_binding_idxes = set()
+    for node in column_order:
+      edges = graph.in_edges(node)
+      for edge in edges:
+        properties = graph.get_edge_data(*edge)
+        service_name = properties['service_name']
+        service = self.inference_services[service_name]
+        binding: InferenceBinding = properties['binding']
+        if binding.index in seen_binding_idxes:
+          continue
+        binding_order.append((service, properties['binding']))
+        seen_binding_idxes.add(binding.index)
+
+    return binding_order
+
+
+  @cached_property
+  def column_by_service(self) -> Dict[str, Tuple[InferenceBinding, InferenceService]]:
     raise NotImplementedError()
 
 
   @cached_property
-  def column_by_service(self) -> Dict[str, InferenceService]:
+  def relations_by_table(self) -> Dict[str, List[str]]:
     raise NotImplementedError()
 
 
@@ -71,6 +109,7 @@ class Config:
     # TODO: is there some way to automatically find the cached properties?
     # Need the keys because the cached properties are only created when they are accessed.
     keys = [
+      'inference_graph',
       'table_graph',
       'inference_topological_order',
       'column_by_service',
@@ -106,7 +145,7 @@ class Config:
       table_cols = {}
       for column in sqlalchemy_table.columns:
         aidb_cols[str(column)] = column
-        table_cols[column.name] = column
+        table_cols[str(column)] = column
         for fk in column.foreign_keys:
           aidb_relations[str(fk.column)] = str(column)
           aidb_relations[str(column)] = str(fk.column)
@@ -142,14 +181,17 @@ class Config:
 
   def add_inference_service(self, service_name: str, service: InferenceService):
     self.clear_cached_properties()
-    self.inference_services.add_node(service_name, service=service)
+    logger.info(f'Adding inference service {service_name}')
+    self.inference_services[service_name] = service
 
 
-  def bind_inference_service(self, service_name: str, inputs: List[str], outputs: List[str]):
+  def bind_inference_service(self, service_name: str, binding: InferenceBinding):
     '''
     Both the inputs and outputs are lists of column names. The ordering is critical.
 
     The cached properties are cleared, so the toplogical sort and columns by service are updated.
     '''
     self.clear_cached_properties()
-    self.inference_bindings[service_name].append(InferenceBinding(inputs, outputs))
+    if service_name not in self.inference_bindings:
+      self.inference_bindings[service_name] = []
+    self.inference_bindings[service_name].append(binding)

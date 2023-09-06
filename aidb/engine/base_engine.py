@@ -1,11 +1,14 @@
 import asyncio
+from typing import List, Tuple
 
+import pandas as pd
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
-from aidb.config.config_types import Graph
+from aidb.config.config_types import Graph, InferenceBinding
+from aidb.inference.inference_service import InferenceService
 from aidb.utils.logger import logger
 
 
@@ -32,6 +35,9 @@ class BaseEngine():
     self._loop.close()
 
 
+  # ---------------------
+  # Setup
+  # ---------------------
   def _infer_dialect(self, connection_uri: str):
     # Conection URIs have the following format:
     # dialect+driver://username:password@host:port/database
@@ -83,7 +89,7 @@ class BaseEngine():
     # We use an async engine, so we need a function that takes in a synchrnous connection
     def config_from_conn(conn):
       config = Config(
-        Graph(),
+        {},
         self._connection_uri,
         None,
         None,
@@ -106,6 +112,48 @@ class BaseEngine():
       print(config.blob_tables)
 
     return config
+
+
+  def register_inference_service(self, service: InferenceService):
+    self._config.add_inference_service(service.name, service)
+
+
+  def bind_inference_service(self, service_name: str, binding: InferenceBinding):
+    self._config.bind_inference_service(service_name, binding)
+
+
+  # ---------------------
+  # Inference
+  # ---------------------
+  def prepare_multitable_inputs(self, raw_inputs: List[Tuple[str, pd.DataFrame]]) -> pd.DataFrame:
+    '''
+    Prepare the inputs for inference.
+    '''
+    assert len(raw_inputs) >= 1
+    final_df = raw_inputs[0][1]
+    for idx, (table_name, df) in enumerate(raw_inputs[1:]):
+      last_table_name = raw_inputs[idx][0]
+      table_relations = self._config.relations_by_table[table_name]
+      join_keys = [fk for fk in table_relations if fk.startswith(last_table_name)]
+      final_df = final_df.merge(df, on=join_keys, how='inner')
+
+    return final_df
+
+
+  def process_inference_outputs(self, binding: InferenceBinding, joined_outputs: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Process the outputs of inference by renaming the columns and selecting the
+    output columns.
+    '''
+    df_cols = list(joined_outputs.columns)
+    for idx, col in enumerate(binding.output_columns):
+      joined_outputs.rename(columns={df_cols[idx]: col}, inplace=True)
+    res = joined_outputs[binding.output_columns]
+    return res
+
+
+  def inference(self, inputs: pd.DataFrame, service: InferenceService):
+    return service.infer_batch(inputs)
 
 
   def execute(self, query: str):

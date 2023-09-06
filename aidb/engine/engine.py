@@ -7,4 +7,5 @@ class Engine(FullScanEngine):
     Executes a query and returns the results.
     '''
     # TODO: branch based on query type
-    return super().execute(query, **kwargs)
+    res = self._loop.run_until_complete(self.execute_full_scan(query, **kwargs))
+    return res
