@@ -17,11 +17,11 @@ class HTTPInferenceService(CachedInferenceService):
             **kwargs
     ):
         '''
-    :param str url: The URL to send the request to. The request will be a POST request.
-    :param dict headers: The headers to send with the request.
-    :param bool copy_input: Whether to copy the input _after_ receiving the request from the server.
-    :param bool batch_supported: Whether the server supports batch requests.
-    '''
+        :param str url: The URL to send the request to. The request will be a POST request.
+        :param dict headers: The headers to send with the request.
+        :param bool copy_input: Whether to copy the input _after_ receiving the request from the server.
+        :param bool batch_supported: Whether the server supports batch requests.
+        '''
         super().__init__(*args, **kwargs)
         self._url = url
         self._headers = headers
