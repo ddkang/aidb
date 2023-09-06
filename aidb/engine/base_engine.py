@@ -136,7 +136,6 @@ class BaseEngine():
         blob_keys,
         aidb_tables,
         aidb_cols,
-        aidb_relations,
         {},
         {},
         {},
