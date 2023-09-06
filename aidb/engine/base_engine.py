@@ -1,15 +1,11 @@
 import asyncio
-from collections import defaultdict
-from typing import Dict
 
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
-from aidb.config.config_types import Table
-from aidb.utils.constants import (BLOB_TABLE_NAMES_TABLE, CACHE_PREFIX,
-                                  CONFIG_PREFIX)
+from aidb.config.config_types import Graph
 from aidb.utils.logger import logger
 
 
@@ -86,61 +82,17 @@ class BaseEngine():
     '''
     # We use an async engine, so we need a function that takes in a synchrnous connection
     def config_from_conn(conn):
-      inspector = sqlalchemy.inspect(conn)
-      metadata = sqlalchemy.MetaData()
-      # TODO: should base go into config?
-      Base = sqlalchemy.ext.automap.automap_base()
-      Base.prepare(conn, reflect=True)
-
-      aidb_tables: Dict[str, Table] = {}
-      aidb_cols = {}
-      aidb_relations = {}
-
-      for table_name in Base.classes.keys():
-        if table_name.startswith(CONFIG_PREFIX):
-          continue
-        if table_name.startswith(CACHE_PREFIX):
-          continue
-
-        sqlalchemy_table = sqlalchemy.Table(table_name, metadata, autoload=True, autoload_with=conn)
-        table_cols = {}
-        for column in sqlalchemy_table.columns:
-          aidb_cols[str(column)] = column
-          table_cols[column.name] = column
-
-        aidb_tables[table_name] = Table(
-          sqlalchemy.Table(table_name, metadata, autoload=True, autoload_with=conn),
-        )
-
-      blob_metadata_table = sqlalchemy.Table(BLOB_TABLE_NAMES_TABLE, metadata, autoload=True, autoload_with=conn)
-      try:
-        blob_keys_flat = conn.execute(blob_metadata_table.select()).fetchall()
-        blob_tables = list(set([row['table_name'] for row in blob_keys_flat]))
-        blob_tables.sort()
-        blob_keys = defaultdict(list)
-        for row in blob_keys_flat:
-          full_name = f'{row["table_name"]}.{row["blob_key"]}'
-          blob_keys[row['table_name']].append(full_name)
-        for table in blob_keys:
-          blob_keys[table].sort()
-      except:
-        raise ValueError(f'Could not find blob metadata table {BLOB_TABLE_NAMES_TABLE} or table is malformed')
-
-      # TODO: load metadata columns
-      # TODO: check the engines
-      # TODO: check that the cache tables are valid
-
       config = Config(
+        Graph(),
         self._connection_uri,
-        blob_tables,
-        blob_keys,
-        aidb_tables,
-        aidb_cols,
-        aidb_relations,
-        {},
-        {},
+        None,
+        None,
+        None,
+        None,
+        None,
         {},
       )
+      config.load_from_sqlalchemy(conn)
       return config
 
 
@@ -154,3 +106,7 @@ class BaseEngine():
       print(config.blob_tables)
 
     return config
+
+
+  def execute(self, query: str):
+    raise NotImplementedError()
