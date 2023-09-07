@@ -49,8 +49,6 @@ class Config:
       table_graph[table_name] = list(parent_table_set)
     return table_graph
 
-    # raise NotImplementedError()
-
   @cached_property
   def engine_graph(self) -> Dict[str, str]:
     raise NotImplementedError()
@@ -92,15 +90,6 @@ class Config:
               f'{table_name} foreign key relation doesn\'t refer to all primary key columns in {parent_table_name}'
             )
 
-
-  # TODO: actually check validity
   def check_validity(self):
-
     self._check_blob_table()
     self._check_foreign_key_refers_to_primary_key()
-
-    g = Graph(self.table_graph)
-    if g.isCyclic():
-      raise Exception('Invalid Table Schema: Table relations can not have cycle')
-
-
