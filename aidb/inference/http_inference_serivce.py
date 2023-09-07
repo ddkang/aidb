@@ -33,9 +33,9 @@ class HTTPInferenceService(CachedInferenceService):
     raise NotImplementedError()
 
 
-  def infer_one(self, input: pd.Series):
-    # TODO: index or columns?
-    body = input.to_json(orient='columns')
+  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    # Turns the input into a list
+    body = input.to_json(orient='records')
     response = requests.post(self._url, data=body, headers=self._headers)
     response.raise_for_status()
     response = response.json()

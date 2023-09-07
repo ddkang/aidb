@@ -13,6 +13,12 @@ class InferenceService(abc.ABC):
   If inputs span multiple tables, the caller will join the data into the Series.
   The output is a single pandas DataFrame with zero or more rows.
 
+  Even though the input is a series, the inference service type signature is a
+  _list_ of arguments. The series column order is assumed to be the same as the
+  list order.
+
+  Because the input is assumed to be a list, THE COLUMN ORDER MATTERS.
+
   The batch inference also takes in a single pandas DataFrame, but with multiple
   rows. The output is a list of DataFrames.
 
