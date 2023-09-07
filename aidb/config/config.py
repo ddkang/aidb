@@ -37,7 +37,6 @@ class Config:
         relations[col] = fk.target_fullname
     return relations
 
-  # TODO: figure out the type
   @cached_property
   def table_graph(self) -> Dict[str, List[str]]:
     table_graph = {}
@@ -71,11 +70,10 @@ class Config:
           f'{blob_table} doesn\'t exist in database schema'
         )
 
-      for primary_key in self.tables[blob_table].primary_key:
-        if primary_key not in self.blob_keys[blob_table]:
-          raise Exception(
-            f'All primary keys of blob table must exist in blob keys'
-          )
+      if set(self.blob_keys[blob_table]) != set(self.tables[blob_table].primary_key):
+        raise Exception(
+          f'The actual primary key of {blob_table} doesn\'t match the blob keys in the metadata table'
+        )
 
   def _check_foreign_key_refers_to_primary_key(self):
     for table_name in self.table_graph:
