@@ -32,7 +32,6 @@ Column = sqlalchemy.schema.Column
 Graph = nx.DiGraph
 
 class InferenceBinding(NamedTuple):
-  index: int
   input_columns: List[str]
   output_columns: List[str]
 

@@ -82,10 +82,10 @@ class Config:
         service_name = properties['service_name']
         service = self.inference_services[service_name]
         binding: InferenceBinding = properties['binding']
-        if binding.index in seen_binding_idxes:
+        if binding in seen_binding_idxes:
           continue
         binding_order.append((service, properties['binding']))
-        seen_binding_idxes.add(binding.index)
+        seen_binding_idxes.add(binding)
 
     return binding_order
 
