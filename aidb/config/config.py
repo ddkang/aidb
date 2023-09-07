@@ -106,14 +106,8 @@ class Config:
 
 
   def clear_cached_properties(self):
-    # TODO: is there some way to automatically find the cached properties?
     # Need the keys because the cached properties are only created when they are accessed.
-    keys = [
-      'inference_graph',
-      'table_graph',
-      'inference_topological_order',
-      'column_by_service',
-    ]
+    keys = [key for key, value in vars(Config).items() if isinstance(value, cached_property)]
     for key in keys:
       if key in self.__dict__:
         del self.__dict__[key]
