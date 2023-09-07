@@ -70,9 +70,13 @@ class Config:
           f'{blob_table} doesn\'t exist in database schema'
         )
 
-      if set(self.blob_keys[blob_table]) != set(self.tables[blob_table].primary_key):
+      metadata_blob_key_set = set(self.blob_keys[blob_table])
+      primary_key_set = set(self.tables[blob_table].primary_key)
+      if metadata_blob_key_set != primary_key_set:
         raise Exception(
-          f'The actual primary key of {blob_table} doesn\'t match the blob keys in the metadata table'
+          f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata'
+          f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}'
+          f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}'
         )
 
   def _check_foreign_key_refers_to_primary_key(self):
