@@ -57,24 +57,15 @@ class Config:
             graph.add_edge(inp, out, service_name=service_name, binding=binding)
     return graph
 
-  @cached_property
-  def relations(self) -> Dict[str, str]:
-    relations = {}
-    for col in self.columns:
-      for fk in self.columns[col].foreign_keys:
-        relations[col] = fk.target_fullname
-    return relations
 
   # TODO: figure out the type
   @cached_property
-  def table_graph(self) -> Dict[str, List[str]]:
-    table_graph = {}
+  def table_graph(self) -> Graph:
+    table_graph = nx.DiGraph()
     for table_name in self.tables:
-      parent_table_set = set()
       for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
         parent_table = pk_other_table.split('.')[0]
-        parent_table_set.add(parent_table)
-      table_graph[table_name] = list(parent_table_set)
+        table_graph.add_edge(table_name, parent_table)
     return table_graph
 
   @cached_property
@@ -153,8 +144,7 @@ class Config:
     self._check_blob_table()
     self._check_foreign_key_refers_to_primary_key()
 
-    g = Graph(self.table_graph)
-    if g.isCyclic():
+    if nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
 
   def clear_cached_properties(self):
