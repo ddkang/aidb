@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Dict, List
+from typing import Dict, List, NamedTuple, Tuple
 
+import networkx as nx
 import sqlalchemy
 
 
@@ -28,6 +29,12 @@ class ColumnType(Enum):
 
 
 Column = sqlalchemy.schema.Column
+Graph = nx.DiGraph
+
+class InferenceBinding(NamedTuple):
+  index: int
+  input_columns: List[str]
+  output_columns: List[str]
 
 # TODO: think about this architecture
 @dataclass
