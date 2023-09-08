@@ -8,6 +8,7 @@ import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
 from aidb.config.config_types import Graph, InferenceBinding
+from aidb.inference.bound_inference_service import BoundInferenceService, CachedBoundInferenceService
 from aidb.inference.inference_service import InferenceService
 from aidb.utils.logger import logger
 
@@ -90,13 +91,13 @@ class BaseEngine():
     def config_from_conn(conn):
       config = Config(
         {},
+        [],
         self._connection_uri,
         None,
         None,
         None,
         None,
         None,
-        {},
       )
       config.load_from_sqlalchemy(conn)
       return config
@@ -119,7 +120,24 @@ class BaseEngine():
 
 
   def bind_inference_service(self, service_name: str, binding: InferenceBinding):
-    self._config.bind_inference_service(service_name, binding)
+    bound_service = CachedBoundInferenceService(
+      self._config.inference_services[service_name],
+      binding,
+      self._loop,
+      self._sql_engine,
+      self._config.columns,
+      self._config.tables,
+      self._dialect,
+    )
+    self._config.bind_inference_service(bound_service)
+
+
+  # ---------------------
+  # Properties
+  # ---------------------
+  @property
+  def dialect(self):
+    return self._dialect
 
 
   # ---------------------
@@ -148,12 +166,12 @@ class BaseEngine():
     df_cols = list(joined_outputs.columns)
     for idx, col in enumerate(binding.output_columns):
       joined_outputs.rename(columns={df_cols[idx]: col}, inplace=True)
-    res = joined_outputs[binding.output_columns]
+    res = joined_outputs[list(binding.output_columns)]
     return res
 
 
-  def inference(self, inputs: pd.DataFrame, service: InferenceService):
-    return service.infer_batch(inputs)
+  def inference(self, inputs: pd.DataFrame, bound_service: BoundInferenceService) -> List[pd.DataFrame]:
+    return bound_service.batch(inputs)
 
 
   def execute(self, query: str):
