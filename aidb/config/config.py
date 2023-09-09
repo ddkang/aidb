@@ -118,11 +118,14 @@ class Config:
           f'{blob_table} doesn\'t exist in database schema'
         )
 
-      for primary_key in self.tables[blob_table].primary_key:
-        if primary_key not in self.blob_keys[blob_table]:
-          raise Exception(
-            f'All primary keys of blob table must exist in blob keys'
-          )
+      metadata_blob_key_set = set(self.blob_keys[blob_table])
+      primary_key_set = set(self.tables[blob_table].primary_key)
+      if metadata_blob_key_set != primary_key_set:
+        raise Exception(
+          f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata'
+          f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}'
+          f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}'
+        )
 
   def _check_foreign_key_refers_to_primary_key(self):
     for table_name in self.table_graph:
@@ -138,13 +141,12 @@ class Config:
             )
 
 
-  # TODO: actually check validity
   def check_validity(self):
 
     self._check_blob_table()
     self._check_foreign_key_refers_to_primary_key()
 
-    if nx.is_directed_acyclic_graph(self.table_graph):
+    if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
 
   def clear_cached_properties(self):
