@@ -108,14 +108,14 @@ class Config:
       )
 
     for blob_table in self.blob_tables:
-      if len(self.table_graph[blob_table]) != 0:
-        raise Exception(
-          f'{blob_table} shouldn\'t have parent table'
-        )
-
       if blob_table not in self.tables:
         raise Exception(
           f'{blob_table} doesn\'t exist in database schema'
+        )
+
+      if len(self.table_graph[blob_table]) != 0:
+        raise Exception(
+          f'{blob_table} shouldn\'t have parent table'
         )
 
       metadata_blob_key_set = set(self.blob_keys[blob_table])
