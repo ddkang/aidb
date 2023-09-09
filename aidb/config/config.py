@@ -108,23 +108,23 @@ class Config:
       )
 
     for blob_table in self.blob_tables:
-      if len(self.table_graph[blob_table]) != 0:
-        raise Exception(
-          f'{blob_table} shouldn\'t have parent table'
-        )
-
       if blob_table not in self.tables:
         raise Exception(
           f'{blob_table} doesn\'t exist in database schema'
         )
 
+      if len(self.table_graph[blob_table]) != 0:
+        raise Exception(
+          f'{blob_table} shouldn\'t have parent table'
+        )
+
       metadata_blob_key_set = set(self.blob_keys[blob_table])
-      primary_key_set = set(self.tables[blob_table].primary_key)
+      primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
       if metadata_blob_key_set != primary_key_set:
         raise Exception(
-          f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata'
-          f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}'
-          f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}'
+          f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata.\n'
+          f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}.\n'
+          f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}.'
         )
 
   def _check_foreign_key_refers_to_primary_key(self):
