@@ -146,7 +146,7 @@ class Config:
     self._check_blob_table()
     self._check_foreign_key_refers_to_primary_key()
 
-    if nx.is_directed_acyclic_graph(self.table_graph):
+    if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
 
   def clear_cached_properties(self):
