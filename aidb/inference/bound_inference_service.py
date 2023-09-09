@@ -133,6 +133,10 @@ class CachedBoundInferenceService(BoundInferenceService):
       is_in_cache = [len(result.fetchall()) > 0 for result in query_futures]
 
     results = []
+    # TODO
+    # - Batch the service inference
+    # - Batch the inserts for new data
+    # - Batch the selection for cached results... How to do this?
     async with self._engine.begin() as conn:
       for idx, (_, row) in enumerate(inputs.iterrows()):
         if is_in_cache[idx]:
@@ -163,9 +167,24 @@ class CachedBoundInferenceService(BoundInferenceService):
               values[k] = v
 
             insert = self.get_insert()(self._tables[table]._table).values(**values)
-            insert = insert.on_duplicate_key_update(
-              **values
-            )
+            # FIXME: does this need to be used anywhere else?
+            # FIXME: needs to be tested for sqlite and postgresql
+            if self._dialect == 'mysql':
+              insert = insert.on_duplicate_key_update(
+                **values
+              )
+            elif self._dialect == 'sqlite':
+              insert = insert.on_conflict_do_update(
+                index_elements=[self._tables[table].primary_key],
+                set_=values,
+              )
+            elif self._dialect == 'postgresql':
+              insert = insert.on_conflict_do_update(
+                index_elements=[self._tables[table].primary_key],
+                set_=values,
+              )
+            else:
+              raise NotImplementedError(f'Unknown dialect {self._dialect}')
             await conn.execute(insert)
           results.append(row_results)
 
