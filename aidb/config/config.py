@@ -119,7 +119,7 @@ class Config:
         )
 
       metadata_blob_key_set = set(self.blob_keys[blob_table])
-      primary_key_set = set(self.tables[blob_table].primary_key)
+      primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
       if metadata_blob_key_set != primary_key_set:
         raise Exception(
           f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata.\n'
