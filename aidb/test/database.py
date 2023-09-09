@@ -20,9 +20,10 @@ class Database():
         self._connection_uri = self._config['db_url']
         self._debug = debug
 
-        self._loop = asyncio.new_event_loop()
         self._dialect = self._infer_dialect(self._connection_uri)
         self._sql_engine = self._create_sql_engine()
+        self._loop = asyncio.new_event_loop()
+        self._loop.run_until_complete(self._create_table())
 
     def __del__(self):
         self._loop.run_until_complete(self._sql_engine.dispose())
@@ -73,6 +74,8 @@ class Database():
             sql_list = []
             col_list = []
             for col_name, col_type in tables[table_name]['columns'].items():
+                if col_type == 'str':
+                    col_type = 'TEXT'
                 col_type = col_type.upper()
                 col_list.append(f'{col_name} {col_type}')
             sql_list.append(', '.join(col_list))
@@ -96,18 +99,31 @@ class Database():
 
             sql = ', '.join(sql_list)
 
+            drop_query = f'''DROP TABLE IF EXISTS {table_name};'''
             create_query = f'''CREATE TABLE {table_name} ({sql});'''
+            query_list.insert(0, drop_query)
             query_list.append(create_query)
+
+        # Create metadata table
+        metadata_table_drop_query = '''DROP TABLE IF EXISTS aidb.__config_blob_tables;'''
+        metadata_table_create_query = '''CREATE TABLE aidb.__config_blob_tables ( table_name TEXT, blob_key TEXT );'''
+        query_list.append(metadata_table_drop_query)
+        query_list.append(metadata_table_create_query)
+        for blob_table in self._config['blob_tables']:
+            for blob_key in self._config['blob_tables'][blob_table]:
+                insert_query = f'''INSERT INTO aidb.__config_blob_tables (table_name, blob_key) VALUES ('{blob_table}', '{blob_key}');'''
+                query_list.append(insert_query)
+
         return query_list
 
-    async def create_table(self):
+    async def _create_table(self):
         query_list = self.create_table_sql()
         async with self._sql_engine.begin() as conn:
             for query in query_list:
                 await conn.execute(text(query))
 
     # TODO: Should we support to insert table without some columns?
-    async def insert_value(self, filename, table_name):
+    async def insert_value(self, df, table_name):
         def read_cols(conn):
             metadata = sqlalchemy.MetaData()
             sqlalchemy_table = sqlalchemy.Table(table_name, metadata , autoload=True , autoload_with=conn)
@@ -118,7 +134,6 @@ class Database():
 
         async with self._sql_engine.begin() as conn:
             cols = await conn.run_sync(read_cols)
-            df = pd.read_csv(filename)
             values = [':' + col for col in cols]
             col_sql = ', '.join(cols)
             value_sql = ', '.join(values)
