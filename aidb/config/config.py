@@ -103,20 +103,14 @@ class Config:
 
   def _check_blob_table(self):
     if len(self.blob_tables) == 0:
-      raise Exception(
-        'No blob table defined'
-      )
+      raise Exception('No blob table defined')
 
     for blob_table in self.blob_tables:
       if blob_table not in self.tables:
-        raise Exception(
-          f'{blob_table} doesn\'t exist in database schema'
-        )
+        raise Exception(f'{blob_table} doesn\'t exist in database schema')
 
       if len(self.table_graph[blob_table]) != 0:
-        raise Exception(
-          f'{blob_table} shouldn\'t have parent table'
-        )
+        raise Exception(f'{blob_table} shouldn\'t have parent table')
 
       metadata_blob_key_set = set(self.blob_keys[blob_table])
       primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
