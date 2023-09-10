@@ -68,6 +68,7 @@ class Config:
         table_graph.add_edge(table_name, parent_table)
     return table_graph
 
+
   @cached_property
   def inference_topological_order(self) -> List[Tuple[InferenceService, InferenceBinding]]:
     '''
@@ -93,13 +94,16 @@ class Config:
 
     return binding_order
 
+
   @cached_property
   def column_by_service(self) -> Dict[str, Tuple[InferenceBinding, InferenceService]]:
     raise NotImplementedError()
 
+
   @cached_property
   def relations_by_table(self) -> Dict[str, List[str]]:
     raise NotImplementedError()
+
 
   def _check_blob_table(self):
     if len(self.blob_tables) == 0:
@@ -120,6 +124,7 @@ class Config:
           f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}.\n'
           f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}.'
         )
+
 
   def _check_foreign_key_refers_to_primary_key(self):
     for table_name in self.table_graph:
@@ -142,6 +147,7 @@ class Config:
 
     if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
+
 
   def clear_cached_properties(self):
     # TODO: is there some way to automatically find the cached properties?
