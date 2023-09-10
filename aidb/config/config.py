@@ -58,9 +58,13 @@ class Config:
     return graph
 
 
-  # TODO: figure out the type
   @cached_property
   def table_graph(self) -> Graph:
+    '''
+    Directed graph of foreign key relationship between tables.
+    The table graph _nodes_ are tables. The _edges_ are foreign key relations.
+    If A -> B, then A has a foreign key that refers to B's primary key.
+    '''
     table_graph = nx.DiGraph()
     for table_name in self.tables:
       for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
@@ -106,6 +110,13 @@ class Config:
 
 
   def _check_blob_table(self):
+    '''
+    Check if the blob table is valid. It must satisfy the following conditions:
+    1. There must be at least one blob table.
+    2. The blob table must exist in the database schema.
+    3. The blob table must not have any parent table.
+    4. The blob table's primary key must match the blob keys in metadata.
+    '''
     if len(self.blob_tables) == 0:
       raise Exception('No blob table defined')
 
@@ -127,6 +138,9 @@ class Config:
 
 
   def _check_foreign_key_refers_to_primary_key(self):
+    '''
+    If Table A references Table B, then Table A must refer to all primary key columns in Table B.
+    '''
     for table_name in self.table_graph:
       foreign_key_columns = set()
       for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
@@ -141,6 +155,10 @@ class Config:
 
 
   def check_validity(self):
+    '''
+    Check config schema, including blob table and foreign key relations.
+    It also checks if the table relations form a DAG.
+    '''
 
     self._check_blob_table()
     self._check_foreign_key_refers_to_primary_key()
