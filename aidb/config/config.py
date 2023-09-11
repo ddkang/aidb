@@ -114,8 +114,7 @@ class Config:
     Check if the blob table is valid. It must satisfy the following conditions:
     1. There must be at least one blob table.
     2. The blob table must exist in the database schema.
-    3. The blob table must not have any parent table.
-    4. The blob table's primary key must match the blob keys in metadata.
+    3. The blob table's primary key must match the blob keys in metadata.
     '''
     if len(self.blob_tables) == 0:
       raise Exception('No blob table defined')
@@ -124,8 +123,6 @@ class Config:
       if blob_table not in self.tables:
         raise Exception(f'{blob_table} doesn\'t exist in database schema')
 
-      if len(self.table_graph[blob_table]) != 0:
-        raise Exception(f'{blob_table} shouldn\'t have parent table')
 
       metadata_blob_key_set = set(self.blob_keys[blob_table])
       primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
@@ -161,7 +158,6 @@ class Config:
     '''
 
     self._check_blob_table()
-    self._check_foreign_key_refers_to_primary_key()
 
     if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
