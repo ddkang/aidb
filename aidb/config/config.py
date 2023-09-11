@@ -154,7 +154,7 @@ class Config:
             )
 
 
-  def check_validity(self):
+  def check_schema_validity(self):
     '''
     Check config schema, including blob table and foreign key relations.
     It also checks if the table relations form a DAG.
@@ -165,6 +165,7 @@ class Config:
 
     if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
+    # TODO: check inference service validity
 
 
   def clear_cached_properties(self):
