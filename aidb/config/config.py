@@ -135,8 +135,7 @@ class Config:
 
   def check_schema_validity(self):
     '''
-    Check config schema, including blob table and foreign key relations.
-    It also checks if the table relations form a DAG.
+    Check config schema, including checking blob table and checking if the table relations form a DAG.
     '''
     self._check_blob_table()
 
@@ -145,7 +144,7 @@ class Config:
 
     # TODO: check inference service validity
 
-      
+
   def clear_cached_properties(self):
     # TODO: is there some way to automatically find the cached properties?
     # Need the keys because the cached properties are only created when they are accessed.
