@@ -165,6 +165,7 @@ class Config:
 
     if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
+
     # TODO: check inference service validity
 
 
