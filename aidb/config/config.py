@@ -123,7 +123,6 @@ class Config:
       if blob_table not in self.tables:
         raise Exception(f'{blob_table} doesn\'t exist in database schema')
 
-
       metadata_blob_key_set = set(self.blob_keys[blob_table])
       primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
       if metadata_blob_key_set != primary_key_set:
@@ -134,29 +133,11 @@ class Config:
         )
 
 
-  def _check_foreign_key_refers_to_primary_key(self):
-    '''
-    If Table A references Table B, then Table A must refer to all primary key columns in Table B.
-    '''
-    for table_name in self.table_graph:
-      foreign_key_columns = set()
-      for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
-        foreign_key_columns.add(pk_other_table)
-      for parent_table_name in self.table_graph[table_name]:
-        for pk_col in self.tables[parent_table_name].primary_key:
-          normalized_column_name = f'{parent_table_name}.{pk_col}'
-          if normalized_column_name not in foreign_key_columns:
-            raise Exception(
-              f'{table_name} foreign key relation doesn\'t refer to all primary key columns in {parent_table_name}'
-            )
-
-
   def check_schema_validity(self):
     '''
     Check config schema, including blob table and foreign key relations.
     It also checks if the table relations form a DAG.
     '''
-
     self._check_blob_table()
 
     if not nx.is_directed_acyclic_graph(self.table_graph):
@@ -164,7 +145,7 @@ class Config:
 
     # TODO: check inference service validity
 
-
+      
   def clear_cached_properties(self):
     # TODO: is there some way to automatically find the cached properties?
     # Need the keys because the cached properties are only created when they are accessed.
