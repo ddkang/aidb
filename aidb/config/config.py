@@ -7,6 +7,8 @@ import networkx as nx
 import sqlalchemy
 
 from aidb.config.config_types import Column, Graph, InferenceBinding, Table
+from aidb.inference.bound_inference_service import (
+    BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
 from aidb.utils.constants import (BLOB_TABLE_NAMES_TABLE, CACHE_PREFIX,
                                   CONFIG_PREFIX)
@@ -25,6 +27,7 @@ class Config:
   '''
   # Inference services. Required
   inference_services: Dict[str, InferenceService] = field(default_factory=dict)
+  inference_bindings: List[BoundInferenceService] = field(default_factory=list)
 
   # Metadata
   db_uri: str = ''
@@ -37,8 +40,6 @@ class Config:
   columns: Dict[str, Column] = field(default_factory=dict)
   relations: Dict[str, str] = field(default_factory=dict) # left -> right
 
-  # inference service name -> List[(inputs, outputs)]
-  inference_bindings: Dict[str, List[InferenceBinding]] = field(default_factory=dict)
 
 
   @cached_property
@@ -50,11 +51,11 @@ class Config:
     for column_name in self.columns.keys():
       graph.add_node(column_name)
 
-    for service_name, binding_list in self.inference_bindings.items():
-      for binding in binding_list:
-        for inp in binding.input_columns:
-          for out in binding.output_columns:
-            graph.add_edge(inp, out, service_name=service_name, binding=binding)
+    for bound_service in self.inference_bindings:
+      binding = bound_service.binding
+      for inp in binding.input_columns:
+        for out in binding.output_columns:
+          graph.add_edge(inp, out, bound_service=bound_service)
     return graph
 
 
@@ -65,7 +66,7 @@ class Config:
 
 
   @cached_property
-  def inference_topological_order(self) -> List[Tuple[InferenceService, InferenceBinding]]:
+  def inference_topological_order(self) -> List[BoundInferenceService]:
     '''
     Returns a topological ordering of the inference services.  Note that this is
     not necessarily the same as the order in which AIDB runs the inference
@@ -79,15 +80,22 @@ class Config:
       edges = graph.in_edges(node)
       for edge in edges:
         properties = graph.get_edge_data(*edge)
-        service_name = properties['service_name']
-        service = self.inference_services[service_name]
-        binding: InferenceBinding = properties['binding']
-        if binding.index in seen_binding_idxes:
+        bound_service = properties['bound_service']
+        if bound_service in seen_binding_idxes:
           continue
-        binding_order.append((service, properties['binding']))
-        seen_binding_idxes.add(binding.index)
+        binding_order.append(bound_service)
+        seen_binding_idxes.add(bound_service)
 
     return binding_order
+
+
+  @cached_property
+  def dialect(self):
+    # TODO: fix this, copied from base_engine
+    dialect = self.db_uri.split(':')[0]
+    if '+' in dialect:
+      dialect = dialect.split('+')[0]
+    return dialect
 
 
   @cached_property
@@ -106,14 +114,8 @@ class Config:
 
 
   def clear_cached_properties(self):
-    # TODO: is there some way to automatically find the cached properties?
     # Need the keys because the cached properties are only created when they are accessed.
-    keys = [
-      'inference_graph',
-      'table_graph',
-      'inference_topological_order',
-      'column_by_service',
-    ]
+    keys = [key for key, value in vars(Config).items() if isinstance(value, cached_property)]
     for key in keys:
       if key in self.__dict__:
         del self.__dict__[key]
@@ -185,13 +187,11 @@ class Config:
     self.inference_services[service_name] = service
 
 
-  def bind_inference_service(self, service_name: str, binding: InferenceBinding):
+  def bind_inference_service(self, bound_service: BoundInferenceService):
     '''
     Both the inputs and outputs are lists of column names. The ordering is critical.
 
     The cached properties are cleared, so the toplogical sort and columns by service are updated.
     '''
     self.clear_cached_properties()
-    if service_name not in self.inference_bindings:
-      self.inference_bindings[service_name] = []
-    self.inference_bindings[service_name].append(binding)
+    self.inference_bindings.append(bound_service)
