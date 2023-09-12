@@ -59,10 +59,19 @@ class Config:
     return graph
 
 
-  # TODO: figure out the type
   @cached_property
-  def table_graph(self) -> Dict[str, str]:
-    raise NotImplementedError()
+  def table_graph(self) -> Graph:
+    '''
+    Directed graph of foreign key relationship between tables.
+    The table graph _nodes_ are tables. The _edges_ are foreign key relations.
+    If A -> B, then A has a foreign key that refers to B's primary key.
+    '''
+    table_graph = nx.DiGraph()
+    for table_name in self.tables:
+      for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
+        parent_table = pk_other_table.split('.')[0]
+        table_graph.add_edge(table_name, parent_table)
+    return table_graph
 
 
   @cached_property
@@ -108,9 +117,40 @@ class Config:
     raise NotImplementedError()
 
 
-  # TODO: actually check validity
-  def check_validity(self):
-    return True
+  def _check_blob_table(self):
+    '''
+    Check if the blob table is valid. It must satisfy the following conditions:
+    1. There must be at least one blob table.
+    2. The blob table must exist in the database schema.
+    3. The blob table's primary key must match the blob keys in metadata.
+    '''
+    if len(self.blob_tables) == 0:
+      raise Exception('No blob table defined')
+
+    for blob_table in self.blob_tables:
+      if blob_table not in self.tables:
+        raise Exception(f'{blob_table} doesn\'t exist in database schema')
+
+      metadata_blob_key_set = set(self.blob_keys[blob_table])
+      primary_key_set = set([f'{blob_table}.{k}' for k in self.tables[blob_table].primary_key])
+      if metadata_blob_key_set != primary_key_set:
+        raise Exception(
+          f'The actual primary key of {blob_table} doesn\'t match the blob keys in metadata.\n'
+          f'Keys present in metadata but missing in primary key: {metadata_blob_key_set - primary_key_set}.\n'
+          f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}.'
+        )
+
+
+  def check_schema_validity(self):
+    '''
+    Check config schema, including checking blob table and checking if the table relations form a DAG.
+    '''
+    self._check_blob_table()
+
+    if not nx.is_directed_acyclic_graph(self.table_graph):
+      raise Exception('Invalid Table Schema: Table relations can not have cycle')
+
+    # TODO: check inference service validity
 
 
   def clear_cached_properties(self):
@@ -179,6 +219,8 @@ class Config:
     self.relations = aidb_relations
     self.blob_tables = blob_tables
     self.blob_keys = blob_keys
+
+    self.check_schema_validity()
 
 
   def add_inference_service(self, service_name: str, service: InferenceService):
