@@ -34,7 +34,8 @@ class FullScanEngine(BaseEngine):
 
     # The query is irrelevant since we do a full scan anyway
     service_ordering = self._config.inference_topological_order
-    for service, binding in service_ordering:
+    for bound_service in service_ordering:
+      binding = bound_service.binding
       inp_cols = binding.input_columns
       inp_cols_str = ', '.join(inp_cols)
       inp_tables = get_tables(inp_cols)
@@ -48,23 +49,8 @@ class FullScanEngine(BaseEngine):
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
 
-      out_dfs = self.inference(inp_df, service)
-      # We do not need to know the per-row information for a full scan
-      out_df = pd.concat(out_dfs, ignore_index=True)
-      out_df = self.process_inference_outputs(binding, out_df)
-      out_cols = binding.output_columns
-      out_tables = get_tables(out_cols)
-
-      async with self._sql_engine.begin() as conn:
-        out_df_cols = list(out_df.columns)
-        for out_table in out_tables:
-          insert_cols = [col for col in out_df_cols if col.startswith(out_table + '.')]
-          insert_df = out_df[insert_cols]
-          # At this point, the columns are fully qualified names (table_name.col_name). We need to remove the table name
-          insert_df.columns = [col.split('.')[1] for col in insert_df.columns]
-          await conn.run_sync(
-            lambda conn: insert_df.to_sql(out_table, conn, if_exists='append', index=False)
-          )
+      # The bound inference service is responsible for populating the database
+      await bound_service.infer(inp_df)
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
