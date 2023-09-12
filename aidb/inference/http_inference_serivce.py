@@ -49,7 +49,7 @@ class HTTPInferenceService(CachedInferenceService):
   def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
     if not self._batch_supported:
       return super().infer_batch(inputs)
-
+    
     body = inputs.to_json(orient='records')
     response = requests.post(self._url, data=body, headers=self._headers)
     response.raise_for_status()
