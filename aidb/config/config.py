@@ -220,6 +220,8 @@ class Config:
     self.blob_tables = blob_tables
     self.blob_keys = blob_keys
 
+    self.check_schema_validity()
+
 
   def add_inference_service(self, service_name: str, service: InferenceService):
     self.clear_cached_properties()
