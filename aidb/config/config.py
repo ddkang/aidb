@@ -115,17 +115,10 @@ class Config:
     column_service = dict()
     for bound_service in self.inference_bindings:
       for output_col in bound_service.binding.output_columns:
-        output_table = output_col.split('.')[0]
-        output_col_name = output_col.split('.')[1]
-        if output_col_name not in self.tables[output_table].primary_key:
-          if output_col in column_service:
-            raise Exception(f'Column {output_col} is bound to multiple services')
-          else:
-            column_service[output_col] = (bound_service.binding, bound_service.service)
+        if output_col in column_service:
+          raise Exception(f'Column {output_col} is bound to multiple services')
         else:
-          # TODO: how to handle primary key columns occur in multiple services?
-          if output_col not in column_service:
-            column_service[output_col] = (bound_service.binding, bound_service.service)
+          column_service[output_col] = (bound_service.binding, bound_service.service)
     return column_service
 
 
