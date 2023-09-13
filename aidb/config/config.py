@@ -191,52 +191,49 @@ class Config:
           raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
 
 
-  def check_inference_service_validity(self):
+  def check_inference_service_validity(self, bound_inference: BoundInferenceService):
     '''
-    Check if the inference service is valid. It must satisfy the following conditions:
+    Check if the inference service is valid whenever adding a bound inference.
+    It must satisfy the following conditions:
     1. The inference service must be defined in config.
-    2. The input columns and output columns must be non-empty.
-    3. The input columns and output columns must exist in the database schema.
-    4. The output table must not be a blob table.
-    5. The input table must include the minimal set of primary key columns from the output table.
+    2. The input columns and output columns must exist in the database schema.
+    3. The output table must not be a blob table.
+    4. The input table must include the minimal set of primary key columns from the output table.
        And to ensure that no primary key column in the output table is null, any column in the output table.
-    6. The output column must be bound to only one inference service.
-    7.  The table relations of the input tables and output tables must form a DAG.
+    5. The output column must be bound to only one inference service.
+    6. The table relations of the input tables and output tables must form a DAG.
     '''
-    for bound_inference in self.inference_bindings:
-      if bound_inference.service_name not in self.inference_services:
-        raise Exception(f'Inference service {binding.service_name} is not defined in config')
+    if bound_inference.service_name not in self.inference_services:
+      raise Exception(f'Inference service {binding.service_name} is not defined in config')
 
-      input_tables = set()
-      output_tables = set()
-      binding = bound_inference.binding
+    input_tables = set()
+    output_tables = set()
+    binding = bound_inference.binding
 
-      if not binding.input_columns or not binding.output_columns:
-        raise Exception(f'Inference service {binding.service_name} has no input columns or output columns')
+    if not binding.input_columns or not binding.output_columns:
+      raise Exception(f'Inference service {binding.service_name} has no input columns or output columns')
 
-      for column in binding.input_columns:
-        if column not in self.columns:
-          raise Exception(f'Input column {column} doesn\'t exist in database')
-        input_tables.add(column.split('.')[0])
+    for column in binding.input_columns:
+      if column not in self.columns:
+        raise Exception(f'Input column {column} doesn\'t exist in database')
+      input_tables.add(column.split('.')[0])
 
-      for column in binding.output_columns:
-        if column not in self.columns:
-          raise Exception(f'Output column {column} doesn\'t exist in database')
-        output_table = column.split('.')[0]
-        if output_table in self.blob_tables:
-          raise Exception(f'Output table {output_table} shouldn\'t be a blob table')
-        output_tables.add(output_table)
+    for column in binding.output_columns:
+      if column not in self.columns:
+        raise Exception(f'Output column {column} doesn\'t exist in database')
+      output_table = column.split('.')[0]
+      if output_table in self.blob_tables:
+        raise Exception(f'Output table {output_table} shouldn\'t be a blob table')
+      output_tables.add(output_table)
 
-      self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
+    self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
-      column_by_service = self.column_by_service
-
-      table_graph = self.table_graph
-      for input_table in input_tables:
-        for output_table in output_tables:
-          table_graph.add_edge(output_table, input_table)
-      if not nx.is_directed_acyclic_graph(table_graph):
-        raise Exception(f'Inference service {binding.service_name} will result in cycle in table relations')
+    table_graph = self.table_graph
+    for input_table in input_tables:
+      for output_table in output_tables:
+        table_graph.add_edge(output_table, input_table)
+    if not nx.is_directed_acyclic_graph(table_graph):
+      raise Exception(f'Inference service {binding.service_name} will result in cycle in table relations')
 
 
   def clear_cached_properties(self):
@@ -322,4 +319,5 @@ class Config:
     The cached properties are cleared, so the toplogical sort and columns by service are updated.
     '''
     self.clear_cached_properties()
+    self.check_inference_service_validity(bound_service)
     self.inference_bindings.append(bound_service)
