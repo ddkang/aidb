@@ -1,6 +1,7 @@
 ## AIDB
 # Data
 data
+*.sqlite
 
 # VSCode
 .vscode

@@ -7,6 +7,7 @@ import sqlalchemy.ext.asyncio
 
 from aidb.config.config_types import Column, InferenceBinding, Table
 from aidb.inference.inference_service import InferenceService
+from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import cache_table_name_from_inputs
 from aidb.utils.logger import logger
 
@@ -26,7 +27,6 @@ class BoundInferenceService():
 
 @dataclass
 class CachedBoundInferenceService(BoundInferenceService):
-  _loop: asyncio.AbstractEventLoop
   _engine: sqlalchemy.ext.asyncio.AsyncEngine
   _columns: Dict[str, Column]
   _tables: Dict[str, Table]
@@ -67,7 +67,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
 
-    self._cache_table, self._cache_columns = self._loop.run_until_complete(tmp())
+    self._cache_table, self._cache_columns = asyncio_run(tmp())
 
     # Query the table to see if it works
     async def query_table():
@@ -76,7 +76,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         tmp.fetchall()
 
     try:
-      self._loop.run_until_complete(query_table())
+      asyncio_run(query_table())
     except:
       raise ValueError(f'Could not query table {self._cache_table_name}')
 

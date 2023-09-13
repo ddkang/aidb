@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Tuple
 
 import pandas as pd
@@ -8,8 +7,10 @@ import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
 from aidb.config.config_types import Graph, InferenceBinding
-from aidb.inference.bound_inference_service import BoundInferenceService, CachedBoundInferenceService
+from aidb.inference.bound_inference_service import (
+    BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
+from aidb.utils.asyncio import asyncio_run
 from aidb.utils.logger import logger
 
 
@@ -23,17 +24,15 @@ class BaseEngine():
     self._connection_uri = connection_uri
     self._debug = debug
 
-    self._loop = asyncio.new_event_loop()
     self._dialect = self._infer_dialect(connection_uri)
     self._sql_engine = self._create_sql_engine()
 
     if infer_config:
-      self._config = self._loop.run_until_complete(self._infer_config())
+      self._config = asyncio_run(self._infer_config())
 
 
   def __del__(self):
-    self._loop.run_until_complete(self._sql_engine.dispose())
-    self._loop.close()
+    asyncio_run(self._sql_engine.dispose())
 
 
   # ---------------------
@@ -123,7 +122,6 @@ class BaseEngine():
     bound_service = CachedBoundInferenceService(
       self._config.inference_services[service_name],
       binding,
-      self._loop,
       self._sql_engine,
       self._config.columns,
       self._config.tables,
