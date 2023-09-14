@@ -28,6 +28,19 @@ class ColumnType(Enum):
       raise ValueError(f'Unknown column type {col_type}')
 
 
+def python_type_to_sqlalchemy_type(python_type):
+  if python_type == int:
+    return sqlalchemy.Integer
+  elif python_type == float:
+    return sqlalchemy.Float
+  elif python_type == str:
+    return sqlalchemy.String
+  elif python_type == bool:
+    return sqlalchemy.Boolean
+  else:
+    raise ValueError(f'Unknown python type {python_type}')
+
+
 Column = sqlalchemy.schema.Column
 Graph = nx.DiGraph
 
