@@ -202,15 +202,15 @@ class Config:
     4. The output column must be bound to only one inference service.
     5. The table relations of the input tables and output tables must form a DAG.
     '''
-    if bound_inference.service_name not in self.inference_services:
-      raise Exception(f'Inference service {binding.service_name} is not defined in config')
+    if bound_inference.service.name not in self.inference_services:
+      raise Exception(f'Inference service {bound_inference.service.name} is not defined in config')
 
     input_tables = set()
     output_tables = set()
     binding = bound_inference.binding
 
     if not binding.input_columns or not binding.output_columns:
-      raise Exception(f'Inference service {binding.service_name} has no input columns or output columns')
+      raise Exception(f'Inference service {bound_inference.service.name} has no input columns or output columns')
 
     for column in binding.input_columns:
       if column not in self.columns:
@@ -232,7 +232,7 @@ class Config:
       for output_table in output_tables:
         table_graph.add_edge(output_table, input_table)
     if not nx.is_directed_acyclic_graph(table_graph):
-      raise Exception(f'Inference service {binding.service_name} will result in cycle in table relations')
+      raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in table relations')
 
 
   def clear_cached_properties(self):
