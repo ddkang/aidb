@@ -33,7 +33,7 @@ def python_type_to_sqlalchemy_type(python_type):
     return sqlalchemy.Integer
   elif python_type == float:
     return sqlalchemy.Float
-  elif python_type == str:
+  elif python_type == str or python_type == object:
     return sqlalchemy.String
   elif python_type == bool:
     return sqlalchemy.Boolean
