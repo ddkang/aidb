@@ -197,11 +197,10 @@ class Config:
     It must satisfy the following conditions:
     1. The inference service must be defined in config.
     2. The input columns and output columns must exist in the database schema.
-    3. The output table must not be a blob table.
-    4. The input table must include the minimal set of primary key columns from the output table.
+    3. The input table must include the minimal set of primary key columns from the output table.
        And to ensure that no primary key column in the output table is null, any column in the output table.
-    5. The output column must be bound to only one inference service.
-    6. The table relations of the input tables and output tables must form a DAG.
+    4. The output column must be bound to only one inference service.
+    5. The table relations of the input tables and output tables must form a DAG.
     '''
     if bound_inference.service_name not in self.inference_services:
       raise Exception(f'Inference service {binding.service_name} is not defined in config')
@@ -222,8 +221,6 @@ class Config:
       if column not in self.columns:
         raise Exception(f'Output column {column} doesn\'t exist in database')
       output_table = column.split('.')[0]
-      if output_table in self.blob_tables:
-        raise Exception(f'Output table {output_table} shouldn\'t be a blob table')
       output_tables.add(output_table)
 
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
