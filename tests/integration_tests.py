@@ -1,7 +1,7 @@
 import asyncio
 import glob
 import os
-
+import networkx as nx
 import pandas as pd
 import sqlalchemy
 import sqlalchemy.ext.asyncio
@@ -96,13 +96,43 @@ async def setup_db(data_dir: str, db_name: str):
   return engine
 
 
-async def insert_data_in_tables(data_dir: str, db_fname: str, only_blob_data: bool):
+def table_graph():
+  '''
+  Directed graph of foreign key relationship between tables.
+  The table graph _nodes_ are tables. The _edges_ are foreign key relations.
+  If A -> B, then A has a foreign key that refers to B's primary key.
+  '''
+  table_graph = nx.DiGraph()
+  for table_name in self.tables:
+    for fk_col, pk_other_table in table.foreign_keys.items():
+      parent_table = pk_other_table.split('.')[0]
+      table_graph.add_edge(table_name, parent_table)
+  return table_graph
+
+
+async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
+  def get_insertion_order(conn, gt_csv_files):
+    metadata = MetaData()
+    metadata.reflect(conn)
+    table_graph = nx.DiGraph()
+    for table in metadata.sorted_tables:
+      for fk_col in table.foreign_keys:
+        parent_table = str(fk_col.column).split('.')[0]
+        table_graph.add_edge(parent_table, table.name)
+    table_order = nx.topological_sort(table_graph)
+    ordered_csv_files = []
+    for table_name in table_order:
+      csv_file_name = f"{table_name}.csv"
+      for f in gt_csv_files:
+        if csv_file_name in f:
+          ordered_csv_files.append(csv_file_name)
+          break
+    return ordered_csv_files
+
   gt_dir = f'{data_dir}/ground_truth'
   gt_csv_fnames = glob.glob(f'{gt_dir}/*.csv')
-  gt_csv_fnames.sort()
-  db_uri = f'{DB_URL}/{db_fname}'
-  engine = sqlalchemy.ext.asyncio.create_async_engine(db_uri)
   async with engine.begin() as conn:
+    gt_csv_fnames = await conn.run_sync(get_insertion_order, (gt_csv_fnames,))
     # Create tables
     for csv_fname in gt_csv_fnames:
       base_fname = os.path.basename(csv_fname)
@@ -169,17 +199,17 @@ async def main():
   # Set up the ground truth database
   gt_db_fname = 'aidb_gt'
   await create_db(gt_db_fname)
-  await setup_db(data_dir, gt_db_fname)
-  await insert_data_in_tables(data_dir, gt_db_fname, False)
+  gt_engine = await setup_db(data_dir, gt_db_fname)
+  await insert_data_in_tables(gt_engine, data_dir, False)
 
   # Set up the aidb database
   aidb_db_fname = 'aidb_test'
   await create_db(aidb_db_fname)
   tmp_engine = await setup_db(data_dir, aidb_db_fname)
-  await insert_data_in_tables(data_dir, aidb_db_fname, True)
+  await clear_all_tables(tmp_engine)
+  await insert_data_in_tables(tmp_engine, aidb_db_fname, True)
   await setup_config_tables(tmp_engine)
   del tmp_engine
-
 
 if __name__ == '__main__':
   asyncio.run(main())
