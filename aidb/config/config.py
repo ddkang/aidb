@@ -115,7 +115,10 @@ class Config:
     column_service = dict()
     for bound_service in self.inference_bindings:
       for output_col in bound_service.binding.output_columns:
-        column_service[output_col] = bound_service
+        if output_col in column_service:
+          raise Exception(f'Column {output_col} is bound to multiple services')
+        else:
+          column_service[output_col] = bound_service
     return column_service
 
 
@@ -197,7 +200,7 @@ class Config:
     3. The output column must be bound to only one inference service.
     4. The input table must include the minimal set of primary key columns from the output table.
        And to ensure that no primary key column in the output table is null, any column in the output table.
-    5. The table relations of the input tables and output tables must form a DAG.
+    5. The graphs of table relations and column relations must form DAGs.
     '''
     if bound_inference.service.name not in self.inference_services:
       raise Exception(f'Inference service {bound_inference.service.name} is not defined in config')
@@ -217,10 +220,10 @@ class Config:
     for column in binding.output_columns:
       if column not in self.columns:
         raise Exception(f'Output column {column} doesn\'t exist in database')
-      if column in self.column_by_service:
-        raise Exception(f'Column {column} is bound to multiple services')
       output_table = column.split('.')[0]
       output_tables.add(output_table)
+
+    self.column_by_service  # Check if the output column is bound to only one inference service
 
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
@@ -229,8 +232,8 @@ class Config:
       for output_table in output_tables:
         if input_table != output_table:
           table_graph.add_edge(output_table, input_table)
-    if not nx.is_directed_acyclic_graph(table_graph):
-      raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in table relations')
+    if not nx.is_directed_acyclic_graph(table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
+      raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in relations')
 
 
   def clear_cached_properties(self):
@@ -316,5 +319,9 @@ class Config:
     The cached properties are cleared, so the toplogical sort and columns by service are updated.
     '''
     self.clear_cached_properties()
-    self.check_inference_service_validity(bound_service)
     self.inference_bindings.append(bound_service)
+    try:
+      self.check_inference_service_validity(bound_service)
+    except Exception:
+      self.inference_bindings.remove(bound_service)
+      raise
