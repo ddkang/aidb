@@ -28,7 +28,7 @@ class BaseEngine():
     self._sql_engine = self._create_sql_engine()
 
     if infer_config:
-      self._config = asyncio_run(self._infer_config())
+      self._config: Config = asyncio_run(self._infer_config())
 
 
   def __del__(self):
