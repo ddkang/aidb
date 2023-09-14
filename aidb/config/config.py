@@ -225,7 +225,7 @@ class Config:
 
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
-    column_by_service = self.column_by_service
+    self.column_by_service # Check if the output column is bound to only one inference service
 
     table_graph = self.table_graph
     for input_table in input_tables:
