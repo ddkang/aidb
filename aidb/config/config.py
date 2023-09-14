@@ -227,7 +227,8 @@ class Config:
     table_graph = self.table_graph
     for input_table in input_tables:
       for output_table in output_tables:
-        table_graph.add_edge(output_table, input_table)
+        if input_table != output_table:
+          table_graph.add_edge(output_table, input_table)
     if not nx.is_directed_acyclic_graph(table_graph):
       raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in table relations')
 
