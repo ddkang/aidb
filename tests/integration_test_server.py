@@ -1,7 +1,5 @@
-import argparse
 import glob
 import os
-import sys
 
 import pandas as pd
 from fastapi import FastAPI, Request
@@ -13,8 +11,8 @@ from fastapi import FastAPI, Request
 # 
 # data_dir = args.data_dir
 # TODO: uvicorn doesn't work with argparse
-data_dir = '/home/ubuntu/aidb/aidb-new/tests/data/jackson'
-
+# data_dir = '/home/ubuntu/aidb/aidb-new/tests/data/jackson'
+data_dir = "/home/akash/Documents/aidb-new/data/jackson"
 app = FastAPI()
 
 inference_dir = f'{data_dir}/inference'

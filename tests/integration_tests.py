@@ -1,10 +1,7 @@
 import asyncio
 import glob
 import os
-import time
-from multiprocessing import Process
 
-import nest_asyncio
 import pandas as pd
 import sqlalchemy
 import sqlalchemy.ext.asyncio
@@ -12,7 +9,6 @@ import uvicorn
 from fastapi import FastAPI, Request
 from sqlalchemy import MetaData
 from sqlalchemy.ext.declarative import declarative_base
-from uvicorn import Config, Server
 
 from aidb.config.config_types import (InferenceBinding,
                                       python_type_to_sqlalchemy_type)
@@ -38,7 +34,7 @@ async def setup_db(data_dir: str, db_fname: str):
     # Create tables
     for csv_fname in gt_csv_fnames:
       base_fname = os.path.basename(csv_fname)
-      table_name  = base_fname.split('.')[0]
+      table_name = base_fname.split('.')[0]
       df = pd.read_csv(csv_fname)
       # TODO: need to assign foreign keys based on the table names
       for column in df.columns:
@@ -82,6 +78,7 @@ async def clear_all_tables(engine):
 async def setup_config_tables(engine):
   def create_blob_metadata_table(conn):
     Base = declarative_base()
+
     class BlobTables(Base):
       __tablename__ = BLOB_TABLE_NAMES_TABLE
       table_name = sqlalchemy.Column(sqlalchemy.String, primary_key=True)
@@ -128,6 +125,7 @@ def run_server(data_dir: str):
     df = pd.read_csv(csv_fname)
     name_to_df[service_name] = df
     print('Creating service', service_name)
+
     @app.post(f'/{service_name}')
     async def inference(inp: Request):
       service_name = inp.url.path.split('/')[-1]
@@ -152,7 +150,7 @@ def run_server(data_dir: str):
 
 def register_inference_services(engine: Engine, data_dir: str):
   csv_fnames = glob.glob(f'{data_dir}/inference/*.csv')
-  csv_fnames.sort() # TODO: sort by number
+  csv_fnames.sort()  # TODO: sort by number
   for csv_fname in csv_fnames:
     base_fname = os.path.basename(csv_fname)
     service_name = base_fname.split('.')[0]
@@ -222,7 +220,6 @@ async def main():
     # TODO: check that the results are the same
     print(gt_res[0])
     print(aidb_res[0])
-
 
 
 if __name__ == '__main__':
