@@ -108,7 +108,7 @@ class Config:
 
 
   @cached_property
-  def column_by_service(self) -> Dict[str, Tuple[InferenceBinding, InferenceService]]:
+  def column_by_service(self) -> Dict[str, BoundInferenceService]:
     '''
     Returns a dictionary mapping output column names to the inference service that produces them.
     '''
@@ -118,7 +118,7 @@ class Config:
         if output_col in column_service:
           raise Exception(f'Column {output_col} is bound to multiple services')
         else:
-          column_service[output_col] = (bound_service.binding, bound_service.service)
+          column_service[output_col] = bound_service
     return column_service
 
 
