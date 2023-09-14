@@ -176,7 +176,6 @@ class CachedBoundInferenceService(BoundInferenceService):
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
                 values.append(sqlalchemy_row)
-              print(values)
               insert = self.get_insert()(self._tables[table]._table).values(values)
 
             # FIXME: does this need to be used anywhere else?
