@@ -115,10 +115,7 @@ class Config:
     column_service = dict()
     for bound_service in self.inference_bindings:
       for output_col in bound_service.binding.output_columns:
-        if output_col in column_service:
-          raise Exception(f'Column {output_col} is bound to multiple services')
-        else:
-          column_service[output_col] = bound_service
+        column_service[output_col] = bound_service
     return column_service
 
 
@@ -197,9 +194,9 @@ class Config:
     It must satisfy the following conditions:
     1. The inference service must be defined in config.
     2. The input columns and output columns must exist in the database schema.
-    3. The input table must include the minimal set of primary key columns from the output table.
+    3. The output column must be bound to only one inference service.
+    4. The input table must include the minimal set of primary key columns from the output table.
        And to ensure that no primary key column in the output table is null, any column in the output table.
-    4. The output column must be bound to only one inference service.
     5. The table relations of the input tables and output tables must form a DAG.
     '''
     if bound_inference.service.name not in self.inference_services:
@@ -220,12 +217,12 @@ class Config:
     for column in binding.output_columns:
       if column not in self.columns:
         raise Exception(f'Output column {column} doesn\'t exist in database')
+      if column in self.column_by_service:
+        raise Exception(f'Column {column} is bound to multiple services')
       output_table = column.split('.')[0]
       output_tables.add(output_table)
 
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
-
-    self.column_by_service # Check if the output column is bound to only one inference service
 
     table_graph = self.table_graph
     for input_table in input_tables:
