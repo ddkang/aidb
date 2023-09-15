@@ -14,7 +14,7 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
   async def test_positive_object_detection(self):
     data_dir = './tests/data/jackson'
     # Set up the aidb database
-    aidb_db_fname = 'aidb_test'
+    aidb_db_fname = 'aidb_test.sqlite'
     await create_db(DB_URL, aidb_db_fname)
 
     tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
