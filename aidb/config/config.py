@@ -113,8 +113,25 @@ class Config:
     Returns a dictionary mapping output column names to the inference service that produces them.
     '''
     column_service = dict()
+
     for bound_service in self.inference_bindings:
+      primary_key_columns = set()
+      for input_table in bound_service.binding.input_columns:
+        for pk_col in self.tables[input_table].primary_key:
+          primary_key_columns.add(pk_col)
+
       for output_col in bound_service.binding.output_columns:
+        if output_col in primary_key_columns:
+          continue
+        output_table = output_col.split('.')[0]
+        output_col_name = output_col.split('.')[1]
+        if output_col_name not in self.tables[output_table].primary_key:
+          if output_col in column_service:
+            raise Exception(f'Column {output_col} is bound to multiple services')
+          else:
+            column_service[output_col] = (bound_service.binding, bound_service.service)
+
+
         if output_col in column_service:
           raise Exception(f'Column {output_col} is bound to multiple services')
         else:
