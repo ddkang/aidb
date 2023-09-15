@@ -2,7 +2,7 @@ import os
 import unittest
 
 from unittest import IsolatedAsyncioTestCase
-from tests.db_utils.db_setup import create_db, setup_db, clear_all_tables, setup_config_tables
+from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from aidb.engine import Engine
 
