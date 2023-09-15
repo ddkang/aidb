@@ -4,6 +4,7 @@ from typing import Dict, List
 
 import pandas as pd
 import sqlalchemy.ext.asyncio
+from sqlalchemy.schema import ForeignKeyConstraint
 
 from aidb.config.config_types import Column, InferenceBinding, Table
 from aidb.inference.inference_service import InferenceService
@@ -38,7 +39,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
 
   def __post_init__(self):
-    self._cache_table_name = cache_table_name_from_inputs(self.binding.input_columns)
+    self._cache_table_name = cache_table_name_from_inputs(self.service.name, self.binding.input_columns)
     logger.debug('Cache table name', self._cache_table_name)
 
     # Get table takes a synchronous connection
@@ -47,16 +48,25 @@ class CachedBoundInferenceService(BoundInferenceService):
       metadata = sqlalchemy.MetaData()
 
       columns = []
+      fk_constraints = {}
       for column_name in self.binding.input_columns:
         column = self._columns[column_name]
         new_table_col_name = self.convert_column_name(column_name)
         logger.debug('New table col name', new_table_col_name)
         logger.debug('Ref column', str(column))
-        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type, sqlalchemy.ForeignKey(column)))
-        # TODO: should this be grouped by table?
+        fk_ref_table_name = str(column).split('.')[0]
+        if fk_ref_table_name not in fk_constraints:
+          fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
+        # both tables will have same column name
+        fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
+        fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
+        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
 
+      multi_table_fk_constraints = []
+      for _, fk_cons in fk_constraints.items():
+        multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
 
-      table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns)
+      table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns, *multi_table_fk_constraints)
       # Create the table if it doesn't exist
       if not self._cache_table_name in inspector.get_table_names():
         metadata.create_all(conn)
