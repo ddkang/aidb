@@ -64,7 +64,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         # TODO: should this be grouped by table?
 
       multi_table_fk_constraints = []
-      for tbl, fk_cons in fk_constraints.items():
+      for _, fk_cons in fk_constraints.items():
         multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
 
       table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns, *multi_table_fk_constraints)

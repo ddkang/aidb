@@ -18,7 +18,7 @@ def cache_table_name_from_inputs(service_name: str, columns: List[str]):
     # Special characters are not allowed in table names
     column = column.replace('.', '__')
     cache_table_postfix += f'__{idx}_{column}__'
-  # limit to 10 characters to avoid long names in the table namesq
+  # limit to 10 characters to avoid long names in the table names
   hash_length = 10
   column_input_hash = hashlib.sha1(cache_table_postfix.encode()).hexdigest()[:hash_length]
   return f"{CACHE_PREFIX}__{service_name}__{column_input_hash}"
