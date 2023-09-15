@@ -8,7 +8,7 @@ import sqlalchemy
 
 from aidb.config.config_types import Column, Graph, InferenceBinding, Table
 from aidb.inference.bound_inference_service import (
-    BoundInferenceService, CachedBoundInferenceService)
+  BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
 from aidb.utils.constants import (BLOB_TABLE_NAMES_TABLE, CACHE_PREFIX,
                                   CONFIG_PREFIX)
@@ -38,9 +38,7 @@ class Config:
   # Schema
   tables: Dict[str, Table] = field(default_factory=dict)
   columns: Dict[str, Column] = field(default_factory=dict)
-  relations: Dict[str, str] = field(default_factory=dict) # left -> right
-
-
+  relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
   @cached_property
   def inference_graph(self) -> Graph:
@@ -58,7 +56,6 @@ class Config:
           graph.add_edge(inp, out, bound_service=bound_service)
     return graph
 
-
   @cached_property
   def table_graph(self) -> Graph:
     '''
@@ -72,7 +69,6 @@ class Config:
         parent_table = pk_other_table.split('.')[0]
         table_graph.add_edge(table_name, parent_table)
     return table_graph
-
 
   @cached_property
   def inference_topological_order(self) -> List[BoundInferenceService]:
@@ -97,7 +93,6 @@ class Config:
 
     return binding_order
 
-
   @cached_property
   def dialect(self):
     # TODO: fix this, copied from base_engine
@@ -105,7 +100,6 @@ class Config:
     if '+' in dialect:
       dialect = dialect.split('+')[0]
     return dialect
-
 
   @cached_property
   def column_by_service(self) -> Dict[str, BoundInferenceService]:
@@ -116,33 +110,32 @@ class Config:
 
     for bound_service in self.inference_bindings:
       primary_key_columns = set()
-      for input_table in bound_service.binding.input_columns:
-        for pk_col in self.tables[input_table].primary_key:
-          primary_key_columns.add(pk_col)
+      for input_col in bound_service.binding.input_columns:
+        input_table = input_col.split('.')[0]
+        col_name = input_col.split('.')[1]
+        if col_name in self.tables[input_table].primary_key:
+          primary_key_columns.add(f"{input_table}.{col_name}")
 
       for output_col in bound_service.binding.output_columns:
-        if output_col in primary_key_columns:
-          continue
         output_table = output_col.split('.')[0]
         output_col_name = output_col.split('.')[1]
-        if output_col_name not in self.tables[output_table].primary_key:
+        if output_col in primary_key_columns and output_col_name in self.tables[output_table].primary_key:
+          continue
+        if output_col_name in self.tables[output_table].foreign_keys:
+          if self.tables[output_table].foreign_keys[output_col_name] not in primary_key_columns:
+            raise Exception(f"Column {output_col} refers to key not the primary key of input columns")
+          else:
+            continue
+        else:
           if output_col in column_service:
             raise Exception(f'Column {output_col} is bound to multiple services')
           else:
             column_service[output_col] = (bound_service.binding, bound_service.service)
-
-
-        if output_col in column_service:
-          raise Exception(f'Column {output_col} is bound to multiple services')
-        else:
-          column_service[output_col] = bound_service
     return column_service
-
 
   @cached_property
   def relations_by_table(self) -> Dict[str, List[str]]:
     raise NotImplementedError()
-
 
   def _check_blob_table(self):
     '''
@@ -167,7 +160,6 @@ class Config:
           f'Keys present in primary key but missing in metadata: {primary_key_set - metadata_blob_key_set}.'
         )
 
-
   def check_schema_validity(self):
     '''
     Check config schema, including checking blob table and checking if the table relations form a DAG.
@@ -178,7 +170,6 @@ class Config:
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
 
     # TODO: check inference service validity
-
 
   def _check_foreign_key_refers_to_primary_key(self, input_tables, output_tables):
     '''
@@ -206,7 +197,6 @@ class Config:
       for pk_col in primary_key_columns:
         if pk_col not in foreign_key_columns:
           raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
-
 
   def check_inference_service_validity(self, bound_inference: BoundInferenceService):
     '''
@@ -252,14 +242,12 @@ class Config:
     if not nx.is_directed_acyclic_graph(table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
       raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in relations')
 
-
   def clear_cached_properties(self):
     # Need the keys because the cached properties are only created when they are accessed.
     keys = [key for key, value in vars(Config).items() if isinstance(value, cached_property)]
     for key in keys:
       if key in self.__dict__:
         del self.__dict__[key]
-
 
   # Mutators. The cached properties must be cleared after these are called.
   def load_from_sqlalchemy(self, conn: sqlalchemy.engine.base.Connection):
@@ -318,12 +306,10 @@ class Config:
 
     self.check_schema_validity()
 
-
   def add_inference_service(self, service_name: str, service: InferenceService):
     self.clear_cached_properties()
     logger.info(f'Adding inference service {service_name}')
     self.inference_services[service_name] = service
-
 
   def bind_inference_service(self, bound_service: BoundInferenceService):
     '''

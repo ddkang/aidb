@@ -11,7 +11,7 @@ DB_URL = "postgresql+asyncpg://postgres@localhost"
 # DB_URL = "sqlite+aiosqlite://"
 
 async def main():
-  data_dir = '/tests/data/jackson'
+  data_dir = './tests/data/jackson'
   # Set up the aidb database
   aidb_db_fname = 'aidb_test'
   await create_db(DB_URL, aidb_db_fname)
