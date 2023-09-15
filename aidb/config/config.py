@@ -324,4 +324,5 @@ class Config:
       self.check_inference_service_validity(bound_service)
     except Exception:
       self.inference_bindings.remove(bound_service)
+      self.clear_cached_properties()
       raise
