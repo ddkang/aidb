@@ -19,7 +19,7 @@ async def main():
   await create_db(DB_URL, aidb_db_fname)
   tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
   await clear_all_tables(tmp_engine)
-  await insert_data_in_tables(tmp_engine, aidb_db_fname, True)
+  await insert_data_in_tables(tmp_engine, data_dir, True)
   await setup_config_tables(tmp_engine)
   del tmp_engine
 
