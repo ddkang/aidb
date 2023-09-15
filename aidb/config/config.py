@@ -123,9 +123,9 @@ class Config:
           continue
         if output_col_name in self.tables[output_table].foreign_keys:
           if self.tables[output_table].foreign_keys[output_col_name] not in primary_key_columns:
-            raise Exception(f"Column {output_col} refers to key not the primary key of input columns")
-          else:
-            continue
+            raise Exception(
+              f"Column {output_col} refers to key {self.tables[output_table].foreign_keys[output_col_name]} "
+              f"that is not the primary key of input columns")
         else:
           if output_col in column_service:
             raise Exception(f'Column {output_col} is bound to multiple services')
