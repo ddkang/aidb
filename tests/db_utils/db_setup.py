@@ -11,7 +11,28 @@ from sqlalchemy.ext.declarative import declarative_base
 from aidb.config.config_types import python_type_to_sqlalchemy_type
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
 from sqlalchemy.sql import text
-from tests.utils import extract_column_info
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class ColumnInfo:
+  name: str
+  is_primary_key: bool
+  refers_to: Optional[tuple]  # (table, column)
+  d_type = None
+
+
+def extract_column_info(table_name, column_str) -> ColumnInfo:
+  pk = False
+  if column_str.startswith("pk_"):
+    pk = True
+    column_str = column_str[3:]  # get rid of pk_ prefix
+  t, c = column_str.split('.')
+  fk = None
+  if t != table_name:
+    fk = (t, c)
+  return ColumnInfo(c, pk, fk)
 
 
 async def create_db(db_url: str, db_name: str):
