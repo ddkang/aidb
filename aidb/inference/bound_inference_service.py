@@ -4,9 +4,11 @@ from typing import Dict, List
 
 import pandas as pd
 import sqlalchemy.ext.asyncio
+from sqlalchemy.schema import ForeignKeyConstraint
 
 from aidb.config.config_types import Column, InferenceBinding, Table
 from aidb.inference.inference_service import InferenceService
+from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import cache_table_name_from_inputs
 from aidb.utils.logger import logger
 
@@ -26,7 +28,6 @@ class BoundInferenceService():
 
 @dataclass
 class CachedBoundInferenceService(BoundInferenceService):
-  _loop: asyncio.AbstractEventLoop
   _engine: sqlalchemy.ext.asyncio.AsyncEngine
   _columns: Dict[str, Column]
   _tables: Dict[str, Table]
@@ -38,7 +39,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
 
   def __post_init__(self):
-    self._cache_table_name = cache_table_name_from_inputs(self.binding.input_columns)
+    self._cache_table_name = cache_table_name_from_inputs(self.service.name, self.binding.input_columns)
     logger.debug('Cache table name', self._cache_table_name)
 
     # Get table takes a synchronous connection
@@ -47,16 +48,25 @@ class CachedBoundInferenceService(BoundInferenceService):
       metadata = sqlalchemy.MetaData()
 
       columns = []
+      fk_constraints = {}
       for column_name in self.binding.input_columns:
         column = self._columns[column_name]
         new_table_col_name = self.convert_column_name(column_name)
         logger.debug('New table col name', new_table_col_name)
         logger.debug('Ref column', str(column))
-        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type, sqlalchemy.ForeignKey(column)))
-        # TODO: should this be grouped by table?
+        fk_ref_table_name = str(column).split('.')[0]
+        if fk_ref_table_name not in fk_constraints:
+          fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
+        # both tables will have same column name
+        fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
+        fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
+        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
 
+      multi_table_fk_constraints = []
+      for _, fk_cons in fk_constraints.items():
+        multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
 
-      table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns)
+      table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns, *multi_table_fk_constraints)
       # Create the table if it doesn't exist
       if not self._cache_table_name in inspector.get_table_names():
         metadata.create_all(conn)
@@ -67,7 +77,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
 
-    self._cache_table, self._cache_columns = self._loop.run_until_complete(tmp())
+    self._cache_table, self._cache_columns = asyncio_run(tmp())
 
     # Query the table to see if it works
     async def query_table():
@@ -76,7 +86,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         tmp.fetchall()
 
     try:
-      self._loop.run_until_complete(query_table())
+      asyncio_run(query_table())
     except:
       raise ValueError(f'Could not query table {self._cache_table_name}')
 
@@ -160,31 +170,44 @@ class CachedBoundInferenceService(BoundInferenceService):
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
             tmp_df = row_results[columns]
-            tmp_values = tmp_df.to_dict(orient='list')
-            values = {}
-            for k, v in tmp_values.items():
-              k = k.split('.')[1]
-              values[k] = v
 
-            insert = self.get_insert()(self._tables[table]._table).values(**values)
+            if self._dialect == 'mysql' or self._dialect == 'postgresql':
+              tmp_values = tmp_df.to_dict(orient='list')
+              values = {}
+              for k, v in tmp_values.items():
+                k = k.split('.')[1]
+                values[k] = v
+              insert = self.get_insert()(self._tables[table]._table).values(**values)
+            else: # FIXME: debug why sqlite can't take a dict of lists
+              values = []
+              for idx, row in tmp_df.iterrows():
+                sqlalchemy_row = {}
+                for col in tmp_df.columns:
+                  col_name = col.split('.')[1]
+                  sqlalchemy_row[col_name] = row[col]
+                values.append(sqlalchemy_row)
+              print(values)
+              insert = self.get_insert()(self._tables[table]._table).values(values)
+
             # FIXME: does this need to be used anywhere else?
             # FIXME: needs to be tested for sqlite and postgresql
-            if self._dialect == 'mysql':
-              insert = insert.on_duplicate_key_update(
-                **values
-              )
-            elif self._dialect == 'sqlite':
-              insert = insert.on_conflict_do_update(
-                index_elements=[self._tables[table].primary_key],
-                set_=values,
-              )
-            elif self._dialect == 'postgresql':
-              insert = insert.on_conflict_do_update(
-                index_elements=[self._tables[table].primary_key],
-                set_=values,
-              )
-            else:
-              raise NotImplementedError(f'Unknown dialect {self._dialect}')
+            if len(self._tables[table].primary_key) > 0:
+              if self._dialect == 'mysql':
+                insert = insert.on_duplicate_key_update(
+                  values
+                )
+              elif self._dialect == 'sqlite':
+                insert = insert.on_conflict_do_update(
+                  index_elements=self._tables[table].primary_key,
+                  set_=values,
+                )
+              elif self._dialect == 'postgresql':
+                insert = insert.on_conflict_do_update(
+                  index_elements=self._tables[table].primary_key,
+                  set_=values,
+                )
+              else:
+                raise NotImplementedError(f'Unknown dialect {self._dialect}')
             await conn.execute(insert)
           results.append(row_results)
 

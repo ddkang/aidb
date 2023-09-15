@@ -269,21 +269,19 @@ class Config:
     self.clear_cached_properties()
 
     metadata = sqlalchemy.MetaData()
-    # TODO: should base go into config?
-    Base = sqlalchemy.ext.automap.automap_base()
-    Base.prepare(conn, reflect=True)
+    metadata.reflect(conn)
 
     aidb_tables: Dict[str, Table] = {}
     aidb_cols = {}
     aidb_relations = {}
 
-    for table_name in Base.classes.keys():
+    for sqlalchemy_table in metadata.sorted_tables:
+      table_name = sqlalchemy_table.name
       if table_name.startswith(CONFIG_PREFIX):
         continue
       if table_name.startswith(CACHE_PREFIX):
         continue
 
-      sqlalchemy_table = sqlalchemy.Table(table_name, metadata, autoload=True, autoload_with=conn)
       table_cols = {}
       for column in sqlalchemy_table.columns:
         aidb_cols[str(column)] = column
@@ -292,9 +290,7 @@ class Config:
           aidb_relations[str(fk.column)] = str(column)
           aidb_relations[str(column)] = str(fk.column)
 
-      aidb_tables[table_name] = Table(
-        sqlalchemy.Table(table_name, metadata, autoload=True, autoload_with=conn),
-      )
+      aidb_tables[table_name] = Table(sqlalchemy_table)
 
     blob_metadata_table = sqlalchemy.Table(BLOB_TABLE_NAMES_TABLE, metadata, autoload=True, autoload_with=conn)
     try:
