@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import sqlalchemy
 import sqlalchemy.ext.asyncio
-from sqlalchemy import MetaData, Table
+from sqlalchemy import MetaData
 from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -174,7 +174,7 @@ async def setup_config_tables(engine):
     table_names_and_columns = {}
     for table_name in table_names:
       table = metadata.tables[table_name]
-      table_names_and_columns[table_name] = [column.name for column in table.columns]
+      table_names_and_columns[table_name] = [column.name for column in table.columns if column.primary_key]
     return table_names, table_names_and_columns
 
   async with engine.begin() as conn:
