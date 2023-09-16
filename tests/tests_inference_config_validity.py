@@ -50,6 +50,26 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
     register_inference_services(aidb_engine, data_dir)
     del aidb_engine
 
+  async def test_negative_col_by_multiple(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/same_col_by_multiple_services')
+
+    # Set up the aidb database
+    aidb_db_fname = 'aidb_test.sqlite'
+    await create_db(DB_URL, aidb_db_fname)
+
+    tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
+    await setup_config_tables(tmp_engine)
+    del tmp_engine
+    # Connect to the aidb database
+    aidb_engine = Engine(
+      f'{DB_URL}/{aidb_db_fname}',
+      debug=False,
+    )
+    with self.assertRaises(Exception):
+      register_inference_services(aidb_engine, data_dir)
+    del aidb_engine
+
 
 if __name__ == '__main__':
   unittest.main()
