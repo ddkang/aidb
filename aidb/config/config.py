@@ -53,7 +53,9 @@ class Config:
       binding = bound_service.binding
       for inp in binding.input_columns:
         for out in binding.output_columns:
-          graph.add_edge(inp, out, bound_service=bound_service)
+          # TODO: Should we check it to be primary key too?
+          if inp != out:
+            graph.add_edge(inp, out, bound_service=bound_service)
     return graph
 
   @cached_property
@@ -181,21 +183,25 @@ class Config:
     # 1. If table A can join table B, then the join keys are those columns that have same name in both table A and B.
     # 2. If table C is a derived table of table A, then the foreign key columns of table C have same name as
     # corresponding columns in table A. e.x. objects.frame -> blob.frame
-    primary_key_columns = set()
+    input_primary_key_columns = set()
     for input_table in input_tables:
       for pk_col in self.tables[input_table].primary_key:
-        primary_key_columns.add(pk_col)
+        input_primary_key_columns.add(f"{input_table}.{pk_col}")
 
     for output_table in output_tables:
-      foreign_key_columns = set()
-      for fk_col in self.tables[output_table].foreign_keys:
+      out_foreign_key_columns = set()
+      out_primary_key_columns = set()
+      for fk_col, refers_to in self.tables[output_table].foreign_keys.items():
         if fk_col in self.tables[output_table].primary_key:
-          if fk_col not in primary_key_columns:
+          if refers_to not in input_primary_key_columns:
             raise Exception(f'{output_table} primary key column {fk_col} is not in input tables')
-          foreign_key_columns.add(fk_col)
+          out_foreign_key_columns.add(refers_to)
 
-      for pk_col in primary_key_columns:
-        if pk_col not in foreign_key_columns:
+      for pk_col in self.tables[output_table].primary_key:
+        out_primary_key_columns.add(f"{output_table}.{pk_col}")
+
+      for pk_col in input_primary_key_columns:
+        if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
           raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
 
   def check_inference_service_validity(self, bound_inference: BoundInferenceService):
