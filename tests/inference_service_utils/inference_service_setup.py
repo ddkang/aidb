@@ -10,8 +10,6 @@ from aidb.inference.http_inference_service import HTTPInferenceService
 def register_inference_services(engine: Engine, data_dir: str):
   csv_fnames = glob.glob(f'{data_dir}/inference/*.csv')
   csv_fnames.sort()  # TODO: sort by number
-  inference_service_meta_data = pd.read_csv(f'{data_dir}/metadata.csv')
-  inference_service_meta_data.set_index("inference_service", drop=True, inplace=True)
   for csv_fname in csv_fnames:
     base_fname = os.path.basename(csv_fname)
     service_name = base_fname.split('.')[0]
@@ -24,8 +22,16 @@ def register_inference_services(engine: Engine, data_dir: str):
 
     engine.register_inference_service(service)
     df = pd.read_csv(csv_fname)
-    input_columns = df.columns[:inference_service_meta_data.loc[service_name]["num_inputs"]]
-    output_columns = df.columns[inference_service_meta_data.loc[service_name]["num_inputs"]:]
+    columns = df.columns
+    input_columns = []
+    output_columns = []
+    for col in columns:
+      if col.startswith("in__"):
+        input_columns.append(col[4:])
+      elif col.startswith("out__"):
+        output_columns.append(col[5:])
+      else:
+        raise Exception("Invalid column name, column name should start with in__ or out__")
     engine.bind_inference_service(
       service_name,
       InferenceBinding(

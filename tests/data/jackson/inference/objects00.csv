@@ -1,1 +1,1 @@
-blobs_00.frame,objects00.frame,objects00.object_name,objects00.confidence,objects00.x_min,objects00.y_min,objects00.x_max,objects00.y_max,objects00.object_id
+in__blobs_00.frame,out__objects00.frame,out__objects00.object_name,out__objects00.confidence,out__objects00.x_min,out__objects00.y_min,out__objects00.x_max,out__objects00.y_max,out__objects00.object_id
