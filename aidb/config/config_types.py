@@ -44,11 +44,9 @@ def python_type_to_sqlalchemy_type(python_type):
 Column = sqlalchemy.schema.Column
 Graph = nx.DiGraph
 
-
 class InferenceBinding(NamedTuple):
   input_columns: Tuple[str]
   output_columns: Tuple[str]
-
 
 # TODO: think about this architecture
 @dataclass
