@@ -20,7 +20,7 @@ class ColumnInfo:
   name: str
   is_primary_key: bool
   refers_to: Optional[tuple]  # (table, column)
-  d_type = None
+  dtype = None
 
 
 def extract_column_info(table_name, column_str) -> ColumnInfo:
@@ -80,7 +80,7 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
       fk_constraints = {}
       for column in df.columns:
         column_info = extract_column_info(table_name, column)
-        column_info.d_type = python_type_to_sqlalchemy_type(df[column].dtype)
+        column_info.dtype = python_type_to_sqlalchemy_type(df[column].dtype)
         columns_info.append(column_info)
         df.rename(columns={column: column_info.name}, inplace=True)
 
@@ -98,7 +98,7 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
         multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
 
       _ = sqlalchemy.Table(table_name, metadata, *[
-        sqlalchemy.Column(c_info.name, c_info.d_type, primary_key=c_info.is_primary_key) for c_info in columns_info
+        sqlalchemy.Column(c_info.name, c_info.dtype, primary_key=c_info.is_primary_key) for c_info in columns_info
       ], *multi_table_fk_constraints)
 
     await conn.run_sync(lambda conn: metadata.create_all(conn))
