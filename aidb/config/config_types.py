@@ -76,16 +76,3 @@ class Table:
       for fk in col.foreign_keys:
         fkeys[col.name] = fk.target_fullname
     return fkeys
-
-
-def python_type_to_sqlalchemy_type(python_type):
-  if python_type == int:
-    return sqlalchemy.Integer
-  elif python_type == float:
-    return sqlalchemy.Float
-  elif python_type == str or python_type == object:
-    return sqlalchemy.String
-  elif python_type == bool:
-    return sqlalchemy.Boolean
-  else:
-    raise ValueError(f'Unknown python type {python_type}')
