@@ -1,3 +1,12 @@
+import glob
+import os
+import pandas as pd
+import uvicorn
+
+from fastapi import FastAPI, Request
+
+from multiprocessing import Process
+
 def run_server(data_dir: str):
   app = FastAPI()
 
@@ -34,3 +43,9 @@ def run_server(data_dir: str):
   # config = Config(app=app, host="127.0.0.1", port=8000)
   # server = Server(config=config)
   uvicorn.run(app, host="127.0.0.1", port=8000)
+
+if __name__=='__main__':
+  p = Process(target=run_server, args=["/home/akash/Documents/aidb-new/tests/data/jackson"])
+  p.start()
+  print("absbdsadhgfahjdsgfahjsdgfhjagsdhjfagdsjhfgahjkdfgajhksdgfakjhsdfgaksjdg")
+  p.terminate()

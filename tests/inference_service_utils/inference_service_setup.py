@@ -17,7 +17,7 @@ def register_inference_services(engine: Engine, data_dir: str):
     service = HTTPInferenceService(
       service_name,
       False,
-      url=f'http://mockurl.com/{service_name}',
+      url=f'http://127.0.0.1:8000/{service_name}',
       headers={'Content-Type': 'application/json'},
     )
 
