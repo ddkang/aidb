@@ -163,7 +163,7 @@ class Config:
     '''
     1. Each output table should include the minimal set of primary key columns from the input tables.
     2. To ensure that no primary key column in the output table is null, any column in the output table
-    with a foreign key relationship must exist in the primary key columns of the input tables.
+       with a foreign key relationship must exist in the primary key columns of the input tables.
     '''
     # Assumption:
     # 1. If table A can join table B, then the join keys are those columns that have same name in both table A and B.
@@ -177,6 +177,8 @@ class Config:
     for output_table in output_tables:
       out_foreign_key_columns = set()
       out_primary_key_columns = set()
+
+      # Each output table should include the minimal set of primary key columns from the input tables.
       for fk_col, refers_to in self.tables[output_table].foreign_keys.items():
         if fk_col in self.tables[output_table].primary_key:
           if refers_to not in input_primary_key_columns:
@@ -186,6 +188,8 @@ class Config:
       for pk_col in self.tables[output_table].primary_key:
         out_primary_key_columns.add(f"{output_table}.{pk_col}")
 
+      # Any column in the output table with a foreign key relationship
+      # must exist in the primary key columns of the input tables.
       for pk_col in input_primary_key_columns:
         if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
           raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
@@ -200,8 +204,11 @@ class Config:
     3. The output column must be bound to only one inference service.
     4. The input table must include the minimal set of primary key columns from the output table.
        And to ensure that no primary key column in the output table is null, any column in the output table.
+       with a foreign key relationship must exist in the primary key columns of the input tables.
     5. The graphs of table relations and column relations must form DAGs.
     '''
+
+    # The inference service must be defined in config.
     if bound_inference.service.name not in self.inference_services:
       raise Exception(f'Inference service {bound_inference.service.name} is not defined in config')
 
@@ -209,6 +216,7 @@ class Config:
     output_tables = set()
     binding = bound_inference.binding
 
+    # The input columns and output columns must exist in the database schema.
     if not binding.input_columns or not binding.output_columns:
       raise Exception(f'Inference service {bound_inference.service.name} has no input columns or output columns')
 
@@ -223,10 +231,15 @@ class Config:
       output_table = column.split('.')[0]
       output_tables.add(output_table)
 
-    self.column_by_service  # Check if the output column is bound to only one inference service
+    # Check if the output column is bound to only one inference service
+    self.column_by_service
 
+    # The input table must include the minimal set of primary key columns from the output table.
+    # And to ensure that no primary key column in the output table is null, any column in the output table.
+    # with a foreign key relationship must exist in the primary key columns of the input tables.
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
+    # The graphs of table relations and column relations must form DAGs.
     table_graph = self.table_graph
     for input_table in input_tables:
       for output_table in output_tables:
