@@ -8,7 +8,7 @@ import sqlalchemy
 
 from aidb.config.config_types import Column, Graph, InferenceBinding, Table
 from aidb.inference.bound_inference_service import (
-  BoundInferenceService, CachedBoundInferenceService)
+    BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
 from aidb.utils.constants import (BLOB_TABLE_NAMES_TABLE, CACHE_PREFIX,
                                   CONFIG_PREFIX)
