@@ -13,6 +13,7 @@ def register_inference_services(engine: Engine, data_dir: str):
   for csv_fname in csv_fnames:
     base_fname = os.path.basename(csv_fname)
     service_name = base_fname.split('.')[0]
+    # FIXME: the url should be updated with the correct url
     service = HTTPInferenceService(
       service_name,
       False,
