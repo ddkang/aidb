@@ -40,6 +40,8 @@ class Config:
   columns: Dict[str, Column] = field(default_factory=dict)
   relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
+
+
   @cached_property
   def inference_graph(self) -> Graph:
     '''
@@ -53,7 +55,7 @@ class Config:
       binding = bound_service.binding
       for inp in binding.input_columns:
         for out in binding.output_columns:
-            graph.add_edge(inp, out, bound_service=bound_service)
+          graph.add_edge(inp, out, bound_service=bound_service)
     return graph
 
 
