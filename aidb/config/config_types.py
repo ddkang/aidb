@@ -81,6 +81,7 @@ def python_type_to_sqlalchemy_type(python_type):
     return sqlalchemy.Integer
   elif python_type == float:
     return sqlalchemy.Float
+  # TODO: think if this is the best way.
   elif python_type == str or python_type == object:
     return sqlalchemy.String
   elif python_type == bool:
