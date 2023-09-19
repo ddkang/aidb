@@ -38,7 +38,7 @@ class Config:
   # Schema
   tables: Dict[str, Table] = field(default_factory=dict)
   columns: Dict[str, Column] = field(default_factory=dict)
-  relations: Dict[str, str] = field(default_factory=dict) # left -> right
+  relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
 
 
@@ -108,8 +108,18 @@ class Config:
 
 
   @cached_property
-  def column_by_service(self) -> Dict[str, Tuple[InferenceBinding, InferenceService]]:
-    raise NotImplementedError()
+  def column_by_service(self) -> Dict[str, BoundInferenceService]:
+    '''
+    Returns a dictionary mapping output column names to the inference service that produces them.
+    '''
+    column_service = dict()
+    for bound_service in self.inference_bindings:
+      for output_col in bound_service.binding.output_columns:
+        if output_col in column_service:
+          raise Exception(f'Column {output_col} is bound to multiple services')
+        else:
+          column_service[output_col] = bound_service
+    return column_service
 
 
   @cached_property
@@ -150,7 +160,95 @@ class Config:
     if not nx.is_directed_acyclic_graph(self.table_graph):
       raise Exception('Invalid Table Schema: Table relations can not have cycle')
 
-    # TODO: check inference service validity
+
+  def _check_foreign_key_refers_to_primary_key(self, input_tables, output_tables):
+    '''
+    1. Each output table should include the minimal set of primary key columns from the input tables.
+    2. To ensure that no primary key column in the output table is null, any column in the output table
+       with a foreign key relationship must exist in the primary key columns of the input tables.
+    '''
+    # Assumption:
+    # 1. If table A can join table B, then the join keys are those columns that have same name in both table A and B.
+    # 2. If table C is a derived table of table A, then the foreign key columns of table C have same name as
+    # corresponding columns in table A. e.x. objects.frame -> blob.frame
+    input_primary_key_columns = set()
+    for input_table in input_tables:
+      for pk_col in self.tables[input_table].primary_key:
+        input_primary_key_columns.add(f"{input_table}.{pk_col}")
+
+    for output_table in output_tables:
+      out_foreign_key_columns = set()
+      out_primary_key_columns = set()
+
+      # Each output table should include the minimal set of primary key columns from the input tables.
+      for fk_col, refers_to in self.tables[output_table].foreign_keys.items():
+        if fk_col in self.tables[output_table].primary_key:
+          if refers_to not in input_primary_key_columns:
+            raise Exception(f'{output_table} primary key column {fk_col} is not in input tables')
+          out_foreign_key_columns.add(refers_to)
+
+      for pk_col in self.tables[output_table].primary_key:
+        out_primary_key_columns.add(f"{output_table}.{pk_col}")
+
+      # Any column in the output table with a foreign key relationship
+      # must exist in the primary key columns of the input tables.
+      for pk_col in input_primary_key_columns:
+        if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
+          raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
+
+
+  def check_inference_service_validity(self, bound_inference: BoundInferenceService):
+    '''
+    Check if the inference service is valid whenever adding a bound inference.
+    It must satisfy the following conditions:
+    1. The inference service must be defined in config.
+    2. The input columns and output columns must exist in the database schema.
+    3. The output column must be bound to only one inference service.
+    4. The input table must include the minimal set of primary key columns from the output table.
+       And to ensure that no primary key column in the output table is null, any column in the output table.
+       with a foreign key relationship must exist in the primary key columns of the input tables.
+    5. The graphs of table relations and column relations must form DAGs.
+    '''
+
+    # The inference service must be defined in config.
+    if bound_inference.service.name not in self.inference_services:
+      raise Exception(f'Inference service {bound_inference.service.name} is not defined in config')
+
+    input_tables = set()
+    output_tables = set()
+    binding = bound_inference.binding
+
+    # The input columns and output columns must exist in the database schema.
+    if not binding.input_columns or not binding.output_columns:
+      raise Exception(f'Inference service {bound_inference.service.name} has no input columns or output columns')
+
+    for column in binding.input_columns:
+      if column not in self.columns:
+        raise Exception(f'Input column {column} doesn\'t exist in database')
+      input_tables.add(column.split('.')[0])
+
+    for column in binding.output_columns:
+      if column not in self.columns:
+        raise Exception(f'Output column {column} doesn\'t exist in database')
+      output_table = column.split('.')[0]
+      output_tables.add(output_table)
+
+    # Check if the output column is bound to only one inference service
+    self.column_by_service
+
+    # The input table must include the minimal set of primary key columns from the output table.
+    # And to ensure that no primary key column in the output table is null, any column in the output table.
+    # with a foreign key relationship must exist in the primary key columns of the input tables.
+    self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
+
+    # The graphs of table relations and column relations must form DAGs.
+    table_graph = self.table_graph
+    for input_table in input_tables:
+      for output_table in output_tables:
+        if input_table != output_table:
+          table_graph.add_edge(output_table, input_table)
+    if not nx.is_directed_acyclic_graph(table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
+      raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in relations')
 
 
   def clear_cached_properties(self):
@@ -233,3 +331,9 @@ class Config:
     '''
     self.clear_cached_properties()
     self.inference_bindings.append(bound_service)
+    try:
+      self.check_inference_service_validity(bound_service)
+    except Exception:
+      self.inference_bindings.remove(bound_service)
+      self.clear_cached_properties()
+      raise
