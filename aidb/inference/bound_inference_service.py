@@ -207,6 +207,9 @@ class CachedBoundInferenceService(BoundInferenceService):
                 pass
               else:
                 raise NotImplementedError(f'Unknown dialect {self._dialect}')
+
+            if self._dialect != "sqlite":
+              await conn.execute(insert)
           results.append(row_results)
 
     return results
