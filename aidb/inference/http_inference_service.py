@@ -40,11 +40,10 @@ class HTTPInferenceService(CachedInferenceService):
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     # Turns the input into a list
-    input_dic = input.to_dict()
-    input = {}
-    for k,v in input_dic.items():
-      input[k] = v
-    body = json.dumps(input)
+    input_with_keys_required_by_inference_service = {}
+    for k, v in input.to_dict().items():
+      input_with_keys_required_by_inference_service[self._columns_to_input_keys[k]] = v
+    body = json.dumps(input_with_keys_required_by_inference_service)
     response = requests.post(self._url, data=body, headers=self._headers)
     response.raise_for_status()
     response = response.json()
