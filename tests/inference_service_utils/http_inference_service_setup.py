@@ -51,7 +51,6 @@ def run_server(data_dir: str):
         for col in name_to_input_cols[service_name]:
           tmp = tmp[tmp[col] == inp[col]]
         res = tmp[name_to_output_cols[service_name]].to_dict(orient='list')
-        print(res)
         return res
       except Exception as e:
         print('Error', e)
@@ -64,5 +63,3 @@ def run_server(data_dir: str):
 if __name__=='__main__':
   p = Process(target=run_server, args=["/home/akash/Documents/aidb-new/tests/data/jackson"])
   p.start()
-  print("absbdsadhgfahjdsgfahjsdgfhjagsdhjfagdsjhfgahjkdfgajhksdgfakjhsdfgaksjdg")
-  p.terminate()

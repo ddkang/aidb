@@ -170,6 +170,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
             tmp_df = row_results[columns]
+            tmp_df = tmp_df.astype('object')
 
             if self._dialect == 'mysql' or self._dialect == 'postgresql':
               tmp_values = tmp_df.to_dict(orient='list')
@@ -186,7 +187,6 @@ class CachedBoundInferenceService(BoundInferenceService):
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
                 values.append(sqlalchemy_row)
-              print(values)
               insert = self.get_insert()(self._tables[table]._table).values(values)
 
             # FIXME: does this need to be used anywhere else?
@@ -197,10 +197,11 @@ class CachedBoundInferenceService(BoundInferenceService):
                   values
                 )
               elif self._dialect == 'sqlite':
-                insert = insert.on_conflict_do_update(
-                  index_elements=self._tables[table].primary_key,
-                  set_=values,
-                )
+                pass
+                # insert = insert.on_conflict_do_update(
+                #   index_elements=self._tables[table].primary_key,
+                #   set_=values,
+                # )
               elif self._dialect == 'postgresql':
                 insert = insert.on_conflict_do_update(
                   index_elements=self._tables[table].primary_key,

@@ -13,6 +13,7 @@ from multiprocessing import Process
 
 DB_URL = "sqlite+aiosqlite://"
 
+# DB_URL = "postgresql+asyncpg://postgres@localhost"
 
 class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
 
@@ -32,13 +33,13 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
     ]
 
     # Set up the ground truth database
-    gt_db_fname = 'aidb_gt.sqlite'
+    gt_db_fname = 'aidb_gt'
     await create_db(DB_URL, gt_db_fname)
     gt_engine = await setup_db(DB_URL, gt_db_fname, data_dir)
     await insert_data_in_tables(gt_engine, data_dir, False)
 
     # Set up the aidb database
-    aidb_db_fname = 'aidb_test.sqlite'
+    aidb_db_fname = 'aidb_test'
     await create_db(DB_URL, aidb_db_fname)
     tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
     await clear_all_tables(tmp_engine)
@@ -59,14 +60,15 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(exact_query))
         gt_res = gt_res.fetchall()
-        print(gt_res)
       # Run the query on the aidb database
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = engine.execute(aidb_query)
       # TODO: check that the results are the same
       print(gt_res[0])
       print(aidb_res[0])
+      assert len(gt_res) == len(aidb_res)
       del gt_engine
+      p.terminate()
 
 
 if __name__ == '__main__':
