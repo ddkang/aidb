@@ -179,15 +179,17 @@ class CachedBoundInferenceService(BoundInferenceService):
                 k = k.split('.')[1]
                 values[k] = v
               insert = self.get_insert()(self._tables[table]._table).values(**values)
-            else: # FIXME: debug why sqlite can't take a dict of lists
-              values = []
+            elif self._dialect == 'sqlite': # FIXME: debug why sqlite can't take a dict of lists
               for idx, row in tmp_df.iterrows():
                 sqlalchemy_row = {}
                 for col in tmp_df.columns:
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
-                values.append(sqlalchemy_row)
-              insert = self.get_insert()(self._tables[table]._table).values(values)
+                insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
+                    index_elements=self._tables[table].primary_key,
+                    set_=sqlalchemy_row,
+                  )
+                await conn.execute(insert)
 
             # FIXME: does this need to be used anywhere else?
             # FIXME: needs to be tested for sqlite and postgresql
@@ -196,20 +198,15 @@ class CachedBoundInferenceService(BoundInferenceService):
                 insert = insert.on_duplicate_key_update(
                   values
                 )
-              elif self._dialect == 'sqlite':
-                pass
-                # insert = insert.on_conflict_do_update(
-                #   index_elements=self._tables[table].primary_key,
-                #   set_=values,
-                # )
               elif self._dialect == 'postgresql':
                 insert = insert.on_conflict_do_update(
                   index_elements=self._tables[table].primary_key,
                   set_=values,
                 )
+              elif self._dialect == 'sqlite':
+                pass
               else:
                 raise NotImplementedError(f'Unknown dialect {self._dialect}')
-            await conn.execute(insert)
           results.append(row_results)
 
     return results

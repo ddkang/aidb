@@ -13,8 +13,6 @@ from multiprocessing import Process
 
 DB_URL = "sqlite+aiosqlite://"
 
-# DB_URL = "postgresql+asyncpg://postgres@localhost"
-
 class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
 
   async def test_negative_col_by_multiple(self):
@@ -63,9 +61,6 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = engine.execute(aidb_query)
-      # TODO: check that the results are the same
-      print(gt_res[0])
-      print(aidb_res[0])
       assert len(gt_res) == len(aidb_res)
       del gt_engine
       p.terminate()
