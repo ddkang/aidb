@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List, Tuple, Union
 
 import pandas as pd
@@ -14,6 +15,8 @@ class HTTPInferenceService(CachedInferenceService):
       headers: Union[Dict, None]=None,
       copy_input: bool=True,
       batch_supported: bool=False,
+      columns_to_input_keys: Union[Dict, None] = None,
+      response_keys_to_columns: Union[Dict, None]=None,
       **kwargs
   ):
     '''
@@ -27,6 +30,8 @@ class HTTPInferenceService(CachedInferenceService):
     self._headers = headers
     self._copy_input = copy_input
     self._batch_supported = batch_supported
+    self._columns_to_input_keys = columns_to_input_keys
+    self._response_keys_to_columns = response_keys_to_columns
 
 
   def signature(self) -> Tuple[List, List]:
@@ -35,11 +40,16 @@ class HTTPInferenceService(CachedInferenceService):
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     # Turns the input into a list
-    body = input.to_json(orient='records')
+    input_dic = input.to_dict()
+    input = {}
+    for k,v in input_dic.items():
+      input[k] = v
+    body = json.dumps(input)
     response = requests.post(self._url, data=body, headers=self._headers)
     response.raise_for_status()
     response = response.json()
     output = pd.DataFrame(response)
+    output = output.replace(self._response_keys_to_columns)
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
       output = output.assign(**input)
