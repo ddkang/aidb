@@ -15,13 +15,17 @@ def register_inference_services(engine: Engine, data_dir: str):
     service_name = base_fname.split('.')[0]
     df = pd.read_csv(csv_fname)
     columns = df.columns
+    input_cols = []
+    output_cols = []
     columns_to_input_keys = {}
     output_keys_to_columns = {}
     for col in columns:
       if col.startswith("in__"):
         columns_to_input_keys[col[4:]] = col[4:]
+        input_cols.append(col[4:])
       elif col.startswith("out__"):
         output_keys_to_columns[col[5:]] = col[5:]
+        output_cols.append(col[5:])
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")
 
@@ -38,7 +42,7 @@ def register_inference_services(engine: Engine, data_dir: str):
     engine.bind_inference_service(
       service_name,
       InferenceBinding(
-        tuple(columns_to_input_keys.keys()),
-        tuple(output_keys_to_columns.keys()),
+        tuple(input_cols),
+        tuple(output_cols),
       )
     )
