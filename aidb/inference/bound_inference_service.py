@@ -170,6 +170,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
             tmp_df = row_results[columns]
+            tmp_df = tmp_df.astype('object')
 
             if self._dialect == 'mysql' or self._dialect == 'postgresql':
               tmp_values = tmp_df.to_dict(orient='list')
@@ -178,16 +179,18 @@ class CachedBoundInferenceService(BoundInferenceService):
                 k = k.split('.')[1]
                 values[k] = v
               insert = self.get_insert()(self._tables[table]._table).values(**values)
-            else: # FIXME: debug why sqlite can't take a dict of lists
-              values = []
+            elif self._dialect == 'sqlite':
               for idx, row in tmp_df.iterrows():
                 sqlalchemy_row = {}
                 for col in tmp_df.columns:
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
-                values.append(sqlalchemy_row)
-              print(values)
-              insert = self.get_insert()(self._tables[table]._table).values(values)
+                # on_conflict_do_update takes only 1 row at a time
+                insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
+                  index_elements=self._tables[table].primary_key,
+                  set_=sqlalchemy_row,
+                )
+                await conn.execute(insert)
 
             # FIXME: does this need to be used anywhere else?
             # FIXME: needs to be tested for sqlite and postgresql
@@ -196,19 +199,18 @@ class CachedBoundInferenceService(BoundInferenceService):
                 insert = insert.on_duplicate_key_update(
                   values
                 )
-              elif self._dialect == 'sqlite':
-                insert = insert.on_conflict_do_update(
-                  index_elements=self._tables[table].primary_key,
-                  set_=values,
-                )
               elif self._dialect == 'postgresql':
                 insert = insert.on_conflict_do_update(
                   index_elements=self._tables[table].primary_key,
                   set_=values,
                 )
+              elif self._dialect == 'sqlite':
+                pass
               else:
                 raise NotImplementedError(f'Unknown dialect {self._dialect}')
-            await conn.execute(insert)
+
+            if self._dialect != "sqlite":
+              await conn.execute(insert)
           results.append(row_results)
 
     return results
