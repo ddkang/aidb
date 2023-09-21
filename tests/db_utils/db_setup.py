@@ -145,6 +145,7 @@ async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
       for column in df.columns:
         column_info = extract_column_info(table_name, column)
         df.rename(columns={column: column_info.name}, inplace=True)
+      # FIXME: in case of mysql, this function doesn't wait, hence throwing integrity error
       await conn.run_sync(lambda conn: df.to_sql(table_name, conn, if_exists='append', index=False))
 
 
