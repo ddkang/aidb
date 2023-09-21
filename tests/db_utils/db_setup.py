@@ -37,7 +37,7 @@ def extract_column_info(table_name, column_str) -> ColumnInfo:
 
 async def create_db(db_url: str, db_name: str):
   dialect = db_url.split("+")[0]
-  if dialect == "postgresql":
+  if dialect == "postgresql" or dialect=="mysql":
     engine = sqlalchemy.ext.asyncio.create_async_engine(db_url, isolation_level='AUTOCOMMIT')
     try:
       async with engine.begin() as conn:
@@ -80,7 +80,12 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
       fk_constraints = {}
       for column in df.columns:
         column_info = extract_column_info(table_name, column)
-        column_info.dtype = python_type_to_sqlalchemy_type(df[column].dtype)
+        dtype = python_type_to_sqlalchemy_type(df[column].dtype)
+        if dtype == sqlalchemy.String:
+          # TODO: VAR CHAR lenth should be based on the number of characters
+          column_info.dtype = sqlalchemy.String(20) # 30 characters long
+        else:
+          column_info.dtype = dtype
         columns_info.append(column_info)
         df.rename(columns={column: column_info.name}, inplace=True)
 
@@ -126,6 +131,7 @@ async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
 
   gt_dir = f'{data_dir}/ground_truth'
   gt_csv_fnames = glob.glob(f'{gt_dir}/*.csv')
+  # Define an asynchronous function to insert data
   async with engine.begin() as conn:
     gt_csv_fnames = await conn.run_sync(get_insertion_order, gt_csv_fnames, )
     # Create tables

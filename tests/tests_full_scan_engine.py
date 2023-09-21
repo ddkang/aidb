@@ -12,7 +12,7 @@ from aidb.engine import Engine
 from multiprocessing import Process
 
 DB_URL = "sqlite+aiosqlite://"
-
+# DB_URL = "mysql+aiomysql://aidb:aidb@localhost"
 class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
 
   async def test_negative_col_by_multiple(self):
@@ -31,13 +31,13 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
     ]
 
     # Set up the ground truth database
-    gt_db_fname = 'aidb_gt'
+    gt_db_fname = 'aidbgt'
     await create_db(DB_URL, gt_db_fname)
     gt_engine = await setup_db(DB_URL, gt_db_fname, data_dir)
     await insert_data_in_tables(gt_engine, data_dir, False)
 
     # Set up the aidb database
-    aidb_db_fname = 'aidb_test'
+    aidb_db_fname = 'aidbtest'
     await create_db(DB_URL, aidb_db_fname)
     tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
     await clear_all_tables(tmp_engine)
