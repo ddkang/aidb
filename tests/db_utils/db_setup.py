@@ -37,7 +37,7 @@ def extract_column_info(table_name, column_str) -> ColumnInfo:
 
 async def create_db(db_url: str, db_name: str):
   dialect = db_url.split("+")[0]
-  if dialect == "postgresql" or dialect=="mysql":
+  if dialect == "postgresql" or dialect == "mysql":
     engine = sqlalchemy.ext.asyncio.create_async_engine(db_url, isolation_level='AUTOCOMMIT')
     try:
       async with engine.begin() as conn:
@@ -83,7 +83,7 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
         dtype = python_type_to_sqlalchemy_type(df[column].dtype)
         if dtype == sqlalchemy.String:
           # TODO: VAR CHAR lenth should be based on the number of characters
-          column_info.dtype = sqlalchemy.String(20) # 20 characters long
+          column_info.dtype = sqlalchemy.String(20)  # 20 characters long
         else:
           column_info.dtype = dtype
         columns_info.append(column_info)
