@@ -179,16 +179,17 @@ class CachedBoundInferenceService(BoundInferenceService):
                 k = k.split('.')[1]
                 values[k] = v
               insert = self.get_insert()(self._tables[table]._table).values(**values)
-            elif self._dialect == 'sqlite': # FIXME: debug why sqlite can't take a dict of lists
+            elif self._dialect == 'sqlite':
               for idx, row in tmp_df.iterrows():
                 sqlalchemy_row = {}
                 for col in tmp_df.columns:
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
+                # on_conflict_do_update takes only 1 row at a time
                 insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
-                    index_elements=self._tables[table].primary_key,
-                    set_=sqlalchemy_row,
-                  )
+                  index_elements=self._tables[table].primary_key,
+                  set_=sqlalchemy_row,
+                )
                 await conn.execute(insert)
 
             # FIXME: does this need to be used anywhere else?

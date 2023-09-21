@@ -61,6 +61,7 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = engine.execute(aidb_query)
+      # TODO: equality check should be implemented
       assert len(gt_res) == len(aidb_res)
       del gt_engine
       p.terminate()
