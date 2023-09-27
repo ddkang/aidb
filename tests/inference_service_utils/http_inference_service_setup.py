@@ -61,5 +61,5 @@ def run_server(data_dir: str):
   uvicorn.run(app, host="127.0.0.1", port=8000)
 
 if __name__=='__main__':
-  p = Process(target=run_server, args=["/home/akash/Documents/aidb-new/tests/data/jackson"])
+  p = Process(target=run_server, args=["/home/sathyasravya/repos/aidb-new/tests/data/jackson"])
   p.start()
