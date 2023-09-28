@@ -150,7 +150,7 @@ class FaissVectorDataBase(VectorDatabase):
     create index for cluster representatives, get topk representatives and distances for each blob index
     '''
     #TODO: maybe also change to create an individual index
-    self.create_index(index_name, embeddings.shape[1])
+    self.create_index(index_name, embeddings.shape[1], recreate_index=True)
     data = pd.DataFrame({'values': embeddings.tolist()})
     self.insert_data(index_name, data)
     topk_reps, topk_dists = self.query_by_embedding(index_name, embeddings, top_k=top_k, filter_ids=reps)

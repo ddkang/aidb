@@ -181,7 +181,7 @@ class WeaviateVectorDataBase(VectorDatabase):
     '''
     create index for cluster representatives, get topk representatives and distances for each blob index
     '''
-    self.create_index(index_name)
+    self.create_index(index_name, recreate_index=True)
     data = pd.DataFrame({'id': reps.tolist(), 'values': embeddings[reps].tolist()})
     self.insert_data(index_name, data)
     topk_reps, topk_dists = self.query_by_embedding(index_name, embeddings, top_k=top_k)
