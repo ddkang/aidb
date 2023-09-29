@@ -5,10 +5,11 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.sql import text
 
 from aidb.engine.base_engine import BaseEngine
+from aidb.query.query import Query
 
 
 class FullScanEngine(BaseEngine):
-  async def execute_full_scan(self, query: str, **kwargs):
+  async def execute_full_scan(self, query: Query, **kwargs):
     '''
     Executes a query by doing a full scan and returns the results.
     '''
@@ -34,6 +35,7 @@ class FullScanEngine(BaseEngine):
 
     # The query is irrelevant since we do a full scan anyway
     service_ordering = self._config.inference_topological_order
+    filtering_predicates = query.filtering_predicates
     for bound_service in service_ordering:
       binding = bound_service.binding
       inp_cols = binding.input_columns
@@ -54,5 +56,5 @@ class FullScanEngine(BaseEngine):
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
-      res = await conn.execute(text(query))
+      res = await conn.execute(text(query.get_sql_query_text()))
       return res.fetchall()

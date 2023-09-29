@@ -1,6 +1,6 @@
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.utils.asyncio import asyncio_run
-
+from aidb.query.query import Query
 
 class Engine(FullScanEngine):
   def execute(self, query: str, **kwargs):
@@ -8,5 +8,6 @@ class Engine(FullScanEngine):
     Executes a query and returns the results.
     '''
     # TODO: branch based on query type
-    res = asyncio_run(self.execute_full_scan(query, **kwargs))
+    parsed_query = Query(query, self._config.tables)
+    res = asyncio_run(self.execute_full_scan(parsed_query, **kwargs))
     return res

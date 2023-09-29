@@ -25,8 +25,8 @@ class InferenceConfigIntegrityTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM objects00;''',
-        '''SELECT * FROM objects00;''',
+        '''SELECT * FROM objects00 WHERE object_name='car';''',
+        '''SELECT * FROM objects00;'''
       )
     ]
 
