@@ -73,6 +73,19 @@ class Config:
         table_graph.add_edge(table_name, parent_table)
     return table_graph
 
+  @cached_property
+  def column_graph(self) -> Graph:
+    '''
+    Directed graph of foreign key relationship between columns.
+    The column graph _nodes_ are columns. The _edges_ are foreign key relations.
+    If A -> B, then A is a foreign key column that refers to B.
+    '''
+    column_graph = nx.DiGraph()
+    for table_name in self.tables:
+      for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
+        column_graph.add_edge(f"{table_name}.{fk_col}", pk_other_table)
+    return column_graph
+
 
   @cached_property
   def inference_topological_order(self) -> List[BoundInferenceService]:

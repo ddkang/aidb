@@ -12,7 +12,6 @@ def change_literal_type_to_col_type(t, v):
   else:
     return v
 
-
 @dataclass
 class Expression:
   type: str  # column or literal
