@@ -70,7 +70,7 @@ class WeaviateVectorDataBase(VectorDatabase):
 
     schema = {
       "class": index_name,
-      "description": f"An {index_name} class to store embedding",
+      "description": f"Index {index_name} to store embedding",
       "vectorizer": "none",
       "properties": [{"name": "original_id", "dataType": ["int"]}],
       "vectorIndexConfig": {"distance": similarity}
@@ -112,7 +112,7 @@ class WeaviateVectorDataBase(VectorDatabase):
     index_name = self._check_index_validity(index_name)
 
     with self.weaviate_client.batch as batch:
-      for idx, item in data.iterrows():
+      for _, item in data.iterrows():
         metadata = dict()
         metadata['original_id'] = item['id']
         uuid = generate_uuid5(item['original_id'])

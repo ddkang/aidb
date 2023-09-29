@@ -142,7 +142,7 @@ class Tasti:
     '''
     when new embeddings are added, we update cluster representative ids and dists for all blob index
     '''
-    #TODO: do we need to check if there is override bewteen blob_index and new_blob_index?
+    #TODO: do we need to check if there is override between blob_index and new_blob_index?
     self.blob_index = pd.concat([self.blob_index, new_blob_index])
     new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
                                                                new_blob_index.values.reshape(1, -1)[0])

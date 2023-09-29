@@ -7,13 +7,17 @@ import numpy as np
 
 
 class FaissVectorDataBase(VectorDatabase):
-  def __init__(self, path: str):
+  def __init__(self, path: str, use_gpu: bool = False):
     '''
     Authentication
     '''
 
     self.index_list = dict()
     self.path = path
+    if use_gpu:
+      self.gpu_resources = faiss.StandardGpuResources()
+    else:
+      self.gpu_resources = None
 
 
   def create_index(
@@ -43,6 +47,9 @@ class FaissVectorDataBase(VectorDatabase):
     else:
       raise Exception('Similarity function must be one of l2, cosine and dot_product')
 
+    if index_name in self.index_list:
+      raise Exception(f'Index {index_name} already exists, please use another name')
+
     if index_factory == "HNSW":
       new_index = faiss.IndexHNSWFlat(embedding_dim, n_links, metric_type)
       new_index.hnsw.efSearch = ef_search
@@ -52,6 +59,9 @@ class FaissVectorDataBase(VectorDatabase):
 
     # use to add data with ids
     self.index_list[index_name] = new_index
+    if self.gpu_resources is not None:
+      self.index_list[index_name] = faiss.index_cpu_to_gpu(
+        self.gpu_resources, 0, self.index_list[index_name])
 
 
   def load_index(self, index_name: str):
@@ -59,6 +69,9 @@ class FaissVectorDataBase(VectorDatabase):
     Read index from disk
     '''
     self.index_list[index_name] = faiss.read_index(self.path)
+    if self.gpu_resources is not None:
+      self.index_list[index_name] = faiss.index_cpu_to_gpu(
+        self.gpu_resources, 0, self.index_list[index_name])
 
 
   def save_index(self, index_name:str):
@@ -128,16 +141,6 @@ class FaissVectorDataBase(VectorDatabase):
     all_topk_dists, all_topk_reps = connected_index.search(query_embeddings.astype('float32'), top_k, params=params)
 
     return np.array(all_topk_reps).astype('int64'), np.array(all_topk_dists).astype('float32')
-
-
-  def train_index(
-    self,
-    index_name: str,
-    embeddings: Optional[np.ndarray] = None
-  ):
-
-    connected_index = self._connect_by_index(index_name)
-    connected_index.train(embeddings)
 
 
   def execute(self,
