@@ -64,8 +64,9 @@ class FullScanEngine(BaseEngine):
     for bound_service in service_ordering:
       binding = bound_service.binding
       inp_cols = binding.input_columns
-      inp_cols_str = ', '.join(inp_cols)
-      inp_tables = get_tables(inp_cols)
+      refined_inp_cols = [get_original_column(col, column_graph) for col in inp_cols]
+      inp_cols_str = ', '.join(refined_inp_cols)
+      inp_tables = get_tables(refined_inp_cols)
       join_str = get_join_str(inp_tables)
       inp_query_str = f'''
         SELECT {inp_cols_str}
@@ -75,6 +76,8 @@ class FullScanEngine(BaseEngine):
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
+
+      inp_df.columns = inp_cols
 
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)
