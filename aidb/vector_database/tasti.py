@@ -4,7 +4,7 @@ from tqdm import tqdm
 from aidb.vector_database.faiss_vector_database import FaissVectorDataBase
 from aidb.vector_database.chroma_vector_database import ChromaVectorDataBase
 from aidb.vector_database.weaviate_vector_database import WeaviateVectorDataBase
-from typing import List, Optional
+from typing import Optional
 import numpy as np
 
 @njit(parallel=True)
@@ -80,6 +80,7 @@ class Tasti:
 
     self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
                                                                 self.blob_ids.values.reshape(1, -1)[0])
+    #TODO: load rep from stored database or parameter
     self.reps = None
 
   # TODO: Add memory efficient FPF Random Bucketter
@@ -109,7 +110,10 @@ class Tasti:
       reps[i] = np.argmax(min_dists)
       get_and_update_dists(self.embeddings[reps[i]], self.embeddings, min_dists)
 
-    self.reps = np.unique(np.concatenate((self.reps, reps)))
+    if self.reps is not None:
+      self.reps = np.unique(np.concatenate((self.reps, reps)))
+    else:
+      self.reps = np.unique(reps)
 
 
   def get_representative_blob_ids(self) -> pd.DataFrame:
@@ -144,12 +148,13 @@ class Tasti:
     in other words, we don't need to use FPF to reselect cluster representatives
     '''
     new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                               new_blob_ids.values.reshape(1, -1)[0])
+                                                               new_blob_ids.values.reshape(1, -1)[0],
+                                                               reload=True)
     if self.do_filter:
       topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name,
                                                                       new_embeddings,
                                                                       top_k,
-                                                                      filters=self.reps)
+                                                                      filter_ids=self.reps)
     else:
       topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings, top_k)
     topk_reps = self.blob_ids.iloc[np.concatenate(topk_reps)].values.reshape(-1, top_k)
@@ -169,7 +174,7 @@ class Tasti:
     #TODO: do we need to check if there is override bewteen blob_ids and new_blob_ids?
     self.blob_ids = pd.concat([self.blob_ids, new_blob_ids])
     new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                               new_blob_ids.values.reshape(1, -1)[0])
+                                                               new_blob_ids.values.reshape(1, -1)[0], reload=True)
     self.embeddings = np.concatenate((self.embeddings, new_embeddings), axis=0)
 
     self._FPF(nb_buckets)

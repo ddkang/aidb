@@ -7,7 +7,6 @@ from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
 from aidb.vector_database.vector_database import VectorDatabase
 
-
 class WeaviateVectorDataBase(VectorDatabase):
   def __init__(
       self,
@@ -122,17 +121,16 @@ class WeaviateVectorDataBase(VectorDatabase):
       for _, item in data.iterrows():
         metadata = dict()
         metadata['original_id'] = item['id']
-        uuid = generate_uuid5(item['original_id'])
+        uuid = generate_uuid5(item['id'])
         vector = item['values']
         batch.add_data_object(metadata, index_name, uuid, vector)
 
 
-  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray) -> np.ndarray:
+  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
     '''
     Get data by id and return results
     '''
     index_name = self._check_index_validity(index_name)
-
     result = []
     for id in ids:
       uuid = generate_uuid5(id)

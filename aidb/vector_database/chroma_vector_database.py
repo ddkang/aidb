@@ -12,7 +12,7 @@ class ChromaVectorDataBase(VectorDatabase):
     Authentication
     :param path: path to store vector database
     '''
-
+    self.path = path
     self.client = chromadb.PersistentClient(path=path)
     self.index_list = [collection.name for collection in self.client.list_collections()]
 
@@ -70,19 +70,20 @@ class ChromaVectorDataBase(VectorDatabase):
     connected_index = self._connect_by_index(index_name)
 
     ids = np.array(data['id']).astype('str').tolist()
-    embeddings = list(data['values'])
+    embeddings = data['values'].tolist()
     metadata = data.drop(['id', 'values'], axis=1)
     if metadata.empty:
       metadata = None
     connected_index.upsert(ids=ids, embeddings=embeddings, metadatas=metadata)
 
 
-  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray) -> np.ndarray:
+  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
     '''
     Get data by id and return results
     '''
+    if reload:
+      self.client = chromadb.PersistentClient(path=self.path)
     connected_index = self._connect_by_index(index_name)
-
     id_list = ids.astype('str').tolist()
     fetch_response = connected_index.get(ids=id_list, include=['embeddings'])
     result = np.array(fetch_response['embeddings'])

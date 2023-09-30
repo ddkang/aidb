@@ -84,14 +84,16 @@ class FaissVectorDataBase(VectorDatabase):
     '''
     Read index from disk
     '''
-    self.index_list[index_name] = faiss.read_index(self.path)
+    load_path = self.path + index_name + '.index'
+    self.index_list[index_name] = faiss.read_index(load_path)
     if self.gpu_resources is not None:
       self.index_list[index_name] = faiss.index_cpu_to_gpu(
         self.gpu_resources, 0, self.index_list[index_name])
 
 
   def save_index(self, index_name:str):
-    faiss.write_index(self.index_list[index_name], self.path)
+    save_path = self.path + index_name + '.index'
+    faiss.write_index(self.index_list[index_name], save_path)
 
 
   def delete_index(self, index_name: str):
@@ -125,12 +127,13 @@ class FaissVectorDataBase(VectorDatabase):
     self.index_list[index_name].add(embedding_list)
 
 
-  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray) -> np.ndarray:
+  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
     '''
     Get data by id and return results
     '''
     connected_index = self._connect_by_index(index_name)
-
+    if reload:
+      self.load_index(index_name)
     result = []
     for id in ids.tolist():
       record = connected_index.reconstruct(id)
