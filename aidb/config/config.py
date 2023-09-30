@@ -207,7 +207,18 @@ class Config:
       # must exist in the primary key columns of the input tables.
       for pk_col in input_primary_key_columns:
         if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
-          raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
+          current_table = pk_col.split('.')[0]
+          current_pk_col = pk_col.split('.')[1]
+          raise_exception = True
+          while current_pk_col in self.tables[current_table].foreign_keys:
+            if current_pk_col in self.tables[current_table].foreign_keys:
+              current_pk_col = self.tables[current_table].foreign_keys[current_pk_col]
+              current_table = current_pk_col.split('.')[0]
+            if current_pk_col in out_foreign_key_columns or current_pk_col in out_primary_key_columns:
+              raise_exception = False
+              break
+          if raise_exception:
+            raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
 
 
   def check_inference_service_validity(self, bound_inference: BoundInferenceService):
@@ -255,12 +266,7 @@ class Config:
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
     # The graphs of table relations and column relations must form DAGs.
-    table_graph = self.table_graph
-    for input_table in input_tables:
-      for output_table in output_tables:
-        if input_table != output_table:
-          table_graph.add_edge(output_table, input_table)
-    if not nx.is_directed_acyclic_graph(table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
+    if not nx.is_directed_acyclic_graph(self.table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
       raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in relations')
 
 
