@@ -10,14 +10,18 @@ from aidb.vector_database.vector_database import VectorDatabase
 
 class WeaviateVectorDataBase(VectorDatabase):
   def __init__(
-    self,
-    url: str,
-    username: Optional[str] = None,
-    pwd: Optional[str] = None,
-    api_key: Optional[str] = None
+      self,
+      url: str,
+      username: Optional[str] = None,
+      pwd: Optional[str] = None,
+      api_key: Optional[str] = None
   ):
     '''
     Authentication
+    :param url: weaviate url
+    :param username: weaviate username
+    :param pwd: weaviate password
+    :param api_key: weaviate api key, user should choose input either username/pwd or api_key
     '''
     auth_client_secret = self._get_auth_secret(username, pwd, api_key)
     self.weaviate_client = weaviate.Client(
@@ -38,7 +42,9 @@ class WeaviateVectorDataBase(VectorDatabase):
 
   @staticmethod
   def _get_auth_secret(username: Optional[str] = None, password: Optional[str] = None, api_key: Optional[str] = None):
-
+    '''
+    verify the user information
+    '''
     if api_key:
       return AuthApiKey(api_key=api_key)
     elif username and password:
@@ -54,7 +60,8 @@ class WeaviateVectorDataBase(VectorDatabase):
     recreate_index: bool = False
   ):
     '''
-    Create a new index, which is similar to a table
+    Create a new index of vectordatabase
+    :similarity: similarity function, it should be one of l2-squared, cosine and dot
     '''
     if recreate_index:
       self.delete_index(index_name)
@@ -91,10 +98,10 @@ class WeaviateVectorDataBase(VectorDatabase):
 
 
   def _sanitize_index_name(self, index_name: str) -> str:
-      '''
-      index should start with a capital
-      '''
-      return index_name[0].upper() + index_name[1:]
+    '''
+    index should start with a capital
+    '''
+    return index_name[0].upper() + index_name[1:]
 
 
   def _check_index_validity(self, index_name: str):
@@ -135,14 +142,15 @@ class WeaviateVectorDataBase(VectorDatabase):
 
 
   def query_by_embedding(
-    self,
-    index_name: str,
-    query_emb_list: np.ndarray,
-    top_k: int = 5,
-    filters: Optional[Dict[str, str]] = None
+      self,
+      index_name: str,
+      query_emb_list: np.ndarray,
+      top_k: int = 5,
+      filters: Optional[Dict[str, str]] = None
   ) -> (np.ndarray, np.ndarray):
     '''
     Query nearest k embeddings, return embeddings and ids
+    :param filters: do filter by metadata
     '''
     index_name = self._check_index_validity(index_name)
     properties = ['original_id', '_additional {distance}']
@@ -172,14 +180,15 @@ class WeaviateVectorDataBase(VectorDatabase):
     return np.array(all_topk_reps), np.array(all_topk_dists)
 
 
-  def execute(self,
-              index_name: str,
-              embeddings: np.ndarray,
-              reps: np.ndarray,
-              top_k: int = 5
-              ) -> (np.ndarray, np.ndarray):
+  def execute(
+      self,
+      index_name: str,
+      embeddings: np.ndarray,
+      reps: np.ndarray,
+      top_k: int = 5
+  ) -> (np.ndarray, np.ndarray):
     '''
-    create index for cluster representatives, get topk representatives and distances for each blob index
+    create a new index storing cluster representatives, get topk representatives and distances for each blob index
     '''
     self.create_index(index_name, recreate_index=True)
     data = pd.DataFrame({'id': reps.tolist(), 'values': embeddings[reps].tolist()})

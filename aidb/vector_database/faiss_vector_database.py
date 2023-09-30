@@ -10,6 +10,8 @@ class FaissVectorDataBase(VectorDatabase):
   def __init__(self, path: str, use_gpu: bool = False):
     '''
     Authentication
+    :param path: path to store vector database
+    :param use_gpu: whether use gpu
     '''
 
     self.index_list = dict()
@@ -21,18 +23,32 @@ class FaissVectorDataBase(VectorDatabase):
 
 
   def create_index(
-    self,
-    index_name: str,
-    embedding_dim: int,
-    similarity: str = 'l2',
-    index_factory: str = 'Flat',
-    n_links: int = 64,
-    ef_search: int = 20,
-    ef_construction: int = 80,
-    recreate_index: bool = False
+      self,
+      index_name: str,
+      embedding_dim: int,
+      similarity: str = 'l2',
+      index_factory: str = 'Flat',
+      n_links: int = 64,
+      ef_search: int = 20,
+      ef_construction: int = 80,
+      recreate_index: bool = False
   ):
     '''
-    Create a new index, which is similar to a table
+    Create a new index of vector database
+    :similarity: similarity function, it should be one of l2, cosine and dot_product
+    :index_factory: index type
+                    Recommended options:
+                    - 'Flat': exact search, best accuracy
+                    - 'HNSW': Graph-based heuristic search
+                    - 'IVFxxx,Flat': Inverted file search, xxx is the number of centroids aka nlist.
+                    For more details see:
+                    - [Overview of indices](https://github.com/facebookresearch/faiss/wiki/Faiss-indexes)
+                    - [Guideline for choosing an index]
+                      (https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index)
+                    - [FAISS Index factory](https://github.com/facebookresearch/faiss/wiki/The-index-factory)
+    :n_links: number of neighbors, only used for HNSW
+    :ef_search: expansion factor at search time, only used for HNSW
+    :ef_construction: expansion factor at construction time, only used for HNSW
     '''
     if recreate_index:
       self.delete_index(index_name)
@@ -123,14 +139,15 @@ class FaissVectorDataBase(VectorDatabase):
 
 
   def query_by_embedding(
-    self,
-    index_name: str,
-    query_embeddings: np.ndarray,
-    top_k: int = 5,
-    filter_ids: Optional[np.ndarray] = None
+      self,
+      index_name: str,
+      query_embeddings: np.ndarray,
+      top_k: int = 5,
+      filter_ids: Optional[np.ndarray] = None
   ) -> (np.ndarray, np.ndarray):
     '''
     Query nearest k embeddings, return embeddings and ids
+    :param filter_ids: will only select ids in this array
     '''
     connected_index = self._connect_by_index(index_name)
 
@@ -143,16 +160,17 @@ class FaissVectorDataBase(VectorDatabase):
     return np.array(all_topk_reps).astype('int64'), np.array(all_topk_dists).astype('float32')
 
 
-  def execute(self,
-              index_name: str,
-              embeddings: np.ndarray,
-              reps: np.ndarray,
-              top_k: int = 5
-              ) -> (np.ndarray, np.ndarray):
+  def execute(
+      self,
+      index_name: str,
+      embeddings: np.ndarray,
+      reps: np.ndarray,
+      top_k: int = 5
+  ) -> (np.ndarray, np.ndarray):
     '''
-    create index for cluster representatives, get topk representatives and distances for each blob index
+    create a new index storing all data, query topk representatives and distances for each blob id by doing filter
     '''
-    #TODO: maybe also change to create an individual index
+    #TODO: maybe also change to create an index storing only cluster representatives
     self.create_index(index_name, embeddings.shape[1], recreate_index=True)
     data = pd.DataFrame({'values': embeddings.tolist()})
     self.insert_data(index_name, data)

@@ -10,6 +10,7 @@ class ChromaVectorDataBase(VectorDatabase):
   def __init__(self, path: str):
     '''
     Authentication
+    :param path: path to store vector database
     '''
 
     self.client = chromadb.PersistentClient(path=path)
@@ -17,13 +18,14 @@ class ChromaVectorDataBase(VectorDatabase):
 
 
   def create_index(
-    self,
-    index_name: str,
-    similarity: str = 'l2',
-    recreate_index: bool = False
+      self,
+      index_name: str,
+      similarity: str = 'l2',
+      recreate_index: bool = False
   ):
     '''
-    Create a new index, which is similar to a table
+    Create a new index of vector database
+    :similarity: similarity function, it should be one of l2, cosine and ip
     '''
     if recreate_index:
       self.delete_index(index_name)
@@ -88,11 +90,11 @@ class ChromaVectorDataBase(VectorDatabase):
 
 
   def query_by_embedding(
-    self,
-    index_name: str,
-    query_embeddings: np.ndarray,
-    top_k: int = 5,
-    filters: Optional[Dict[str, str]] = None
+      self,
+      index_name: str,
+      query_embeddings: np.ndarray,
+      top_k: int = 5,
+      filters: Optional[Dict[str, str]] = None
   ) -> (np.ndarray, np.ndarray):
     '''
     Query nearest k embeddings, return embeddings and ids
@@ -104,15 +106,15 @@ class ChromaVectorDataBase(VectorDatabase):
     return np.array(all_topk_reps).astype('int64'), np.array(all_topk_dists)
 
 
-  def execute(self,
-              index_name: str,
-              embeddings: np.ndarray,
-              reps: np.ndarray,
-              top_k: int = 5
-              ) -> (np.ndarray, np.ndarray):
-
+  def execute(
+      self,
+      index_name: str,
+      embeddings: np.ndarray,
+      reps: np.ndarray,
+      top_k: int = 5
+  ) -> (np.ndarray, np.ndarray):
     '''
-    create index for cluster representatives, get topk representatives and distances for each blob index
+    create a new index storing cluster representatives, get topk representatives and distances for each blob index
     '''
     self.create_index(index_name, recreate_index=True)
     data = pd.DataFrame({'id': reps.tolist(), 'values': embeddings[reps].tolist()})
