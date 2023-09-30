@@ -31,7 +31,6 @@ class FullScanEngine(BaseEngine):
       for table in table_order:
          table_pairs += [(e[1], e[0]) for e in table_graph.in_edges(table)]
       first_table = table_order[0]
-      # table_pairs = [(tables[i], tables[i+1]) for i in range(len(table_order) - 1)]
       join_strs = []
       for table1_name, table2_name in table_pairs:
         table2 = self._config.tables[table2_name]
