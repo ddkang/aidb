@@ -1,5 +1,6 @@
 from typing import List
 
+import networkx as nx
 import pandas as pd
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.sql import text
@@ -22,17 +23,27 @@ class FullScanEngine(BaseEngine):
         tables.add(table_name)
       return list(tables)
 
+
     def get_join_str(tables: List[str]) -> str:
-      table_pairs = [(tables[i], tables[i+1]) for i in range(len(tables) - 1)]
+      table_graph = self._config.table_graph.subgraph(tables)
+      # all input tables should be connectable
+      # NetworkX is connected not implemented for directed graph
+      assert nx.is_connected(table_graph.to_undirected())
+      table_order = list(nx.topological_sort(table_graph))[::-1]
+      table_pairs = []
+      for table in table_order:
+         table_pairs += [(e[1], e[0]) for e in table_graph.in_edges(table)]
+      first_table = table_order[0]
       join_strs = []
       for table1_name, table2_name in table_pairs:
-        table1 = self._config.tables[table1_name]
+        table2 = self._config.tables[table2_name]
         join_cols = []
-        for fkey in table1.foreign_keys:
-          if fkey.startswith(table2_name + '.'):
-            join_cols.append((fkey, fkey.replace(table2_name, table1_name, 1)))
-        join_strs.append(f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
-      return '\n'.join(join_strs)
+        for _, fkey in table2.foreign_keys.items():
+          if fkey.startswith(table1_name + '.'):
+            join_cols.append((fkey, fkey.replace(table1_name, table2_name, 1)))
+        if len(join_cols) > 0:
+          join_strs.append(f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
+      return f"FROM {first_table}\n" + '\n'.join(join_strs)
 
     def get_original_column(column, column_graph: nx.DiGraph):
       if column not in column_graph.nodes:
@@ -70,7 +81,6 @@ class FullScanEngine(BaseEngine):
       join_str = get_join_str(inp_tables)
       inp_query_str = f'''
         SELECT {inp_cols_str}
-        FROM {', '.join(inp_tables)}
         {join_str};
       '''
 
