@@ -191,21 +191,21 @@ class Config:
         out_primary_key_columns.add(f"{output_table}.{pk_col}")
 
       # Any column in the output table with a foreign key relationship
-      # must exist in the primary key columns of the input tables.
+      # must exist in the primary key columns of the input tables
+      # or the columns that the primary key columns of the input tables refer to.
       for pk_col in input_primary_key_columns:
-        if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
-          current_table = pk_col.split('.')[0]
-          current_pk_col = pk_col.split('.')[1]
-          raise_exception = True
-          while current_pk_col in self.tables[current_table].foreign_keys:
-            if current_pk_col in self.tables[current_table].foreign_keys:
-              current_pk_col = self.tables[current_table].foreign_keys[current_pk_col]
-              current_table = current_pk_col.split('.')[0]
-            if current_pk_col in out_foreign_key_columns or current_pk_col in out_primary_key_columns:
-              raise_exception = False
-              break
-          if raise_exception:
-            raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
+        current_table = pk_col.split('.')[0]
+        current_pk_col = pk_col.split('.')[1]
+        raise_exception = True
+        while current_pk_col in self.tables[current_table].foreign_keys:
+          if current_pk_col in self.tables[current_table].foreign_keys:
+            current_pk_col = self.tables[current_table].foreign_keys[current_pk_col]
+            current_table = current_pk_col.split('.')[0]
+          if current_pk_col in out_foreign_key_columns or current_pk_col in out_primary_key_columns:
+            raise_exception = False
+            break
+        if raise_exception:
+          raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
 
 
   def check_inference_service_validity(self, bound_inference: BoundInferenceService):
