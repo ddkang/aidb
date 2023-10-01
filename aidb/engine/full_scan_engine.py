@@ -3,10 +3,11 @@ from typing import List
 import networkx as nx
 import pandas as pd
 from sqlalchemy.dialects.mysql import insert
+import sqlglot.expressions as exp
 from sqlalchemy.sql import text
 
 from aidb.engine.base_engine import BaseEngine
-from aidb.query.query import Query
+from aidb.query.query import Query, FilteringClause
 
 import networkx as nx
 
@@ -16,13 +17,13 @@ class FullScanEngine(BaseEngine):
     '''
     Executes a query by doing a full scan and returns the results.
     '''
+
     def get_tables(columns: List[str]) -> List[str]:
       tables = set()
       for col in columns:
         table_name = col.split('.')[0]
         tables.add(table_name)
       return list(tables)
-
 
     def get_join_str(tables: List[str]) -> str:
       table_graph = self._config.table_graph.subgraph(tables)
@@ -32,7 +33,7 @@ class FullScanEngine(BaseEngine):
       table_order = list(nx.topological_sort(table_graph))[::-1]
       table_pairs = []
       for table in table_order:
-         table_pairs += [(e[1], e[0]) for e in table_graph.in_edges(table)]
+        table_pairs += [(e[1], e[0]) for e in table_graph.in_edges(table)]
       first_table = table_order[0]
       join_strs = []
       for table1_name, table2_name in table_pairs:
@@ -42,7 +43,8 @@ class FullScanEngine(BaseEngine):
           if fkey.startswith(table1_name + '.'):
             join_cols.append((fkey, fkey.replace(table1_name, table2_name, 1)))
         if len(join_cols) > 0:
-          join_strs.append(f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
+          join_strs.append(
+            f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
       return f"FROM {first_table}\n" + '\n'.join(join_strs)
 
     def get_original_column(column, column_graph: nx.DiGraph):
@@ -55,6 +57,38 @@ class FullScanEngine(BaseEngine):
       else:
         return get_original_column(column_derived_from[0], column_graph)
 
+    def get_expr_string(node):
+      if node == exp.GT:
+        return ">"
+      elif node == exp.LT:
+        return "<"
+      elif node == exp.GTE:
+        return ">="
+      elif node == exp.LTE:
+        return "<="
+      elif node == exp.EQ:
+        return "="
+      elif node == exp.Like:
+        return "LIKE"
+      elif node == exp.NEQ:
+        return "!="
+      else:
+        raise NotImplementedError
+
+    def predicate_to_str(p: FilteringClause):
+      if p.right_exp is None:
+        sql_expr = str(p.left_exp.value)
+      else:
+        sql_expr = f"{p.left_exp.value} {get_expr_string(p.op)} {p.right_exp.value}"
+      if p.is_negation:
+        sql_expr = "NOT " + sql_expr
+      return sql_expr
+
+    def get_where_str(filtering_predicates: List[List[FilteringClause]]):
+      and_connected = []
+      for fp in filtering_predicates:
+        and_connected.append(" OR ".join([predicate_to_str(p) for p in fp]))
+      return " AND ".join(and_connected)
 
     # The query is irrelevant since we do a full scan anyway
     service_ordering = self._config.inference_topological_order
@@ -71,7 +105,6 @@ class FullScanEngine(BaseEngine):
             inference_engines_required.add(columns_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
 
-
     for bound_service in service_ordering:
       binding = bound_service.binding
       inp_cols = binding.input_columns
@@ -81,7 +114,8 @@ class FullScanEngine(BaseEngine):
       join_str = get_join_str(inp_tables)
       inp_query_str = f'''
         SELECT {inp_cols_str}
-        {join_str};
+        {join_str}
+        WHERE {get_where_str(filtering_predicates)};
       '''
 
       async with self._sql_engine.begin() as conn:
