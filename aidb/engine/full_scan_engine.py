@@ -80,11 +80,17 @@ class FullScanEngine(BaseEngine):
       for k, v in column_to_root_column.items():
         where_str = where_str.replace(k, v)
 
-      inp_query_str = f'''
-        SELECT {inp_cols_str}
-        {join_str}
-        WHERE {where_str};
-      '''
+      if len(filtering_predicates_satisfied) > 0:
+        inp_query_str = f'''
+          SELECT {inp_cols_str}
+          {join_str}
+          WHERE {where_str};
+        '''
+      else:
+        inp_query_str = f'''
+          SELECT {inp_cols_str}
+          {join_str};
+        '''
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
