@@ -76,3 +76,19 @@ def predicate_to_str(p: FilteringClause):
   if p.is_negation:
     sql_expr = "NOT " + sql_expr
   return sql_expr
+
+
+def extract_column_or_value(node):
+  """
+  return a tuple containing if this is column or literal
+  :param node:
+  :return:
+  """
+  if isinstance(node, exp.Paren):
+    return extract_column_or_value(node.args["this"])
+  elif isinstance(node, exp.Column):
+    return ("column", node)
+  elif isinstance(node, exp.Literal) or isinstance(node, exp.Boolean):
+    return ("literal", node.args["this"])
+  else:
+    raise Exception("Not Supported Yet")

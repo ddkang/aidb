@@ -104,5 +104,5 @@ class FullScanEngine(BaseEngine):
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
-      res = await conn.execute(text(query.get_sql_query_text()))
+      res = await conn.execute(text(query.sql_query_text))
       return res.fetchall()
