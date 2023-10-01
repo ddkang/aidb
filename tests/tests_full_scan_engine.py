@@ -41,8 +41,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM lights01 WHERE light_2='green';''',
-        '''SELECT * FROM lights01 WHERE light_2='green';'''
+        '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2='green';''',
+        '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2='green';'''
       ),
       (
         'full_scan',
