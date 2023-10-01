@@ -1,14 +1,13 @@
 from typing import List
 
-import pandas as pd
-from sqlalchemy.sql import text
-
-from aidb.engine.base_engine import BaseEngine
-from aidb.engine.utils import get_inference_engines_required, get_tables_required
-from aidb.query.query import Query, FilteringClause
-from aidb.query.utils import predicate_to_str
-
 import networkx as nx
+import pandas as pd
+from aidb.engine.base_engine import BaseEngine
+from aidb.engine.utils import (get_inference_engines_required,
+                               get_tables_required)
+from aidb.query.query import FilteringClause, Query
+from aidb.query.utils import predicate_to_str
+from sqlalchemy.sql import text
 
 
 class FullScanEngine(BaseEngine):
