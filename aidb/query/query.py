@@ -1,15 +1,15 @@
-import sqlglot.expressions as exp
-
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
-from sqlglot import Tokenizer, Parser
+
+import sqlglot.expressions as exp
+from aidb.config.config_types import Table
+from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
+                              change_literal_type_to_col_type,
+                              extract_column_or_value)
+from sqlglot import Parser, Tokenizer
 from sympy import sympify
 from sympy.logic.boolalg import to_cnf
-
-from aidb.config.config_types import Table
-from aidb.query.utils import change_literal_type_to_col_type, FilteringClause, Expression
-from aidb.query.utils import FilteringPredicate, extract_column_or_value
 
 
 @dataclass

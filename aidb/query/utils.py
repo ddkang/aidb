@@ -1,6 +1,7 @@
-import sqlalchemy
 from dataclasses import dataclass
 from typing import Any, Union
+
+import sqlalchemy
 import sqlglot.expressions as exp
 
 
