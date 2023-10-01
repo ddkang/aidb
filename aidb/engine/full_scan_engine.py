@@ -1,8 +1,6 @@
 from typing import List
 
-import networkx as nx
 import pandas as pd
-from sqlalchemy.dialects.mysql import insert
 import sqlglot.expressions as exp
 from sqlalchemy.sql import text
 
@@ -90,41 +88,62 @@ class FullScanEngine(BaseEngine):
         and_connected.append(" OR ".join([predicate_to_str(p) for p in fp]))
       return " AND ".join(and_connected)
 
+    def get_inference_engines_required(filtering_predicates, columns_by_service):
+      inference_engines_required_predicates = []
+      for filtering_predicate in filtering_predicates:
+        inference_engines_required = set()
+        for or_connected_predicate in filtering_predicate:
+          if or_connected_predicate.left_exp.type == "column":
+            originated_from = get_original_column(or_connected_predicate.left_exp.value, column_graph)
+            if originated_from in columns_by_service:
+              inference_engines_required.add(columns_by_service[originated_from].service.name)
+        inference_engines_required_predicates.append(inference_engines_required)
+      return inference_engines_required_predicates
+
     # The query is irrelevant since we do a full scan anyway
     service_ordering = self._config.inference_topological_order
     filtering_predicates = query.filtering_predicates
     columns_by_service = self._config.column_by_service
     column_graph = self._config.column_graph
-    inference_engines_required_predicates = []
-    for filtering_predicate in filtering_predicates:
-      inference_engines_required = set()
-      for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
-          originated_from = get_original_column(or_connected_predicate.left_exp.value, column_graph)
-          if originated_from in columns_by_service:
-            inference_engines_required.add(columns_by_service[originated_from].service.name)
-      inference_engines_required_predicates.append(inference_engines_required)
+    inference_engines_required_predicates = get_inference_engines_required(filtering_predicates, columns_by_service)
 
+    inference_services_executed = set()
     for bound_service in service_ordering:
       binding = bound_service.binding
       inp_cols = binding.input_columns
-      refined_inp_cols = [get_original_column(col, column_graph) for col in inp_cols]
+      original_column_mapping = {}
+      refined_inp_cols = []
+      for col in inp_cols:
+        original_column = get_original_column(col, column_graph)
+        refined_inp_cols.append(original_column)
+        original_column_mapping[col] = original_column
+
       inp_cols_str = ', '.join(refined_inp_cols)
       inp_tables = get_tables(refined_inp_cols)
       join_str = get_join_str(inp_tables)
+
+      filtering_predicates_satisfied = []
+      for p, e in zip(filtering_predicates, inference_engines_required_predicates):
+        if len(inference_services_executed.intersection(e)) == len(e):
+          filtering_predicates_satisfied.append(p)
+
+      where_str = get_where_str(filtering_predicates_satisfied)
+      for k, v in original_column_mapping.items():
+        where_str = where_str.replace(k, v)
+
       inp_query_str = f'''
         SELECT {inp_cols_str}
         {join_str}
-        WHERE {get_where_str(filtering_predicates)};
+        WHERE {where_str};
       '''
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
 
-      inp_df.columns = inp_cols
-
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)
+
+      inference_services_executed.add(bound_service.service.name)
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
