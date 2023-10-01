@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy.sql import text
 
 from aidb.engine.base_engine import BaseEngine
-from aidb.engine.utils import get_inference_engines_required
+from aidb.engine.utils import get_inference_engines_required, get_tables_required
 from aidb.query.query import Query, FilteringClause
 from aidb.query.utils import predicate_to_str
 
@@ -59,6 +59,7 @@ class FullScanEngine(BaseEngine):
     column_to_root_column = self._config.columns_to_root_column
     inference_engines_required_predicates = get_inference_engines_required(filtering_predicates, columns_by_service,
                                                                            column_to_root_column)
+    tables_required_predicates = get_tables_required(filtering_predicates, column_to_root_column)
 
     inference_services_executed = set()
     for bound_service in service_ordering:
@@ -72,8 +73,9 @@ class FullScanEngine(BaseEngine):
 
       # filtering predicates that can be satisfied by the currently executed inference engines
       filtering_predicates_satisfied = []
-      for p, e in zip(filtering_predicates, inference_engines_required_predicates):
-        if len(inference_services_executed.intersection(e)) == len(e):
+      for p, e, t in zip(filtering_predicates, inference_engines_required_predicates, tables_required_predicates):
+        if len(inference_services_executed.intersection(e)) == len(e) and len(set(inp_tables).intersection(t)) == len(
+                t):
           filtering_predicates_satisfied.append(p)
 
       where_str = get_where_str(filtering_predicates_satisfied)

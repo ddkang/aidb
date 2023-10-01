@@ -31,9 +31,24 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
+        '''SELECT * FROM lights01 WHERE light_2='green';''',
+        '''SELECT * FROM lights01 WHERE light_2='green';'''
+      ),
+      (
+        'full_scan',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
-      )
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM counts03 WHERE frame >= 10000;''',
+        '''SELECT * FROM counts03 WHERE frame >= 10000;''',
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;''',
+        '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;'''
+      ),
     ]
 
     for query_type, aidb_query, exact_query in queries:
@@ -47,8 +62,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: equality check should be implemented
       assert len(gt_res) == len(aidb_res)
-      del gt_engine
-      p.terminate()
+    del gt_engine
+    p.terminate()
 
   async def test_multi_table_input(self):
     dirname = os.path.dirname(__file__)
@@ -80,8 +95,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: equality check should be implemented
       assert len(gt_res) == len(aidb_res)
-      del gt_engine
-      p.terminate()
+    del gt_engine
+    p.terminate()
 
 
 if __name__ == '__main__':
