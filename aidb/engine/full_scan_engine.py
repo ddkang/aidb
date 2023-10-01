@@ -5,7 +5,7 @@ import sqlglot.expressions as exp
 from sqlalchemy.sql import text
 
 from aidb.engine.base_engine import BaseEngine
-from aidb.query.query import Query, FilteringClause
+from aidb.query.query import Query, FilteringClause, Expression
 
 import networkx as nx
 
@@ -45,16 +45,6 @@ class FullScanEngine(BaseEngine):
             f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
       return f"FROM {first_table}\n" + '\n'.join(join_strs)
 
-    def get_original_column(column, column_graph: nx.DiGraph):
-      if column not in column_graph.nodes:
-        return column
-      column_derived_from = list(column_graph[column].keys())
-      assert len(column_derived_from) <= 1
-      if len(column_derived_from) == 0:
-        return column
-      else:
-        return get_original_column(column_derived_from[0], column_graph)
-
     def get_expr_string(node):
       if node == exp.GT:
         return ">"
@@ -74,10 +64,25 @@ class FullScanEngine(BaseEngine):
         raise NotImplementedError
 
     def predicate_to_str(p: FilteringClause):
+      def exp_to_str(e: Expression):
+        if e.type == "column":
+          return e.value
+        elif e.type == "literal":
+          try:
+            val = float(e.value)
+            if '.' in e.value:
+              return val
+            else:
+              return int(val)
+          except ValueError:
+            return f"'{e.value}'"
+        else:
+          raise NotImplementedError
+
       if p.right_exp is None:
         sql_expr = str(p.left_exp.value)
       else:
-        sql_expr = f"{p.left_exp.value} {get_expr_string(p.op)} {p.right_exp.value}"
+        sql_expr = f"{exp_to_str(p.left_exp)} {get_expr_string(p.op)} {exp_to_str(p.right_exp)}"
       if p.is_negation:
         sql_expr = "NOT " + sql_expr
       return sql_expr
@@ -88,13 +93,17 @@ class FullScanEngine(BaseEngine):
         and_connected.append(" OR ".join([predicate_to_str(p) for p in fp]))
       return " AND ".join(and_connected)
 
-    def get_inference_engines_required(filtering_predicates, columns_by_service):
+    def get_inference_engines_required(filtering_predicates, columns_by_service, column_to_root_col):
       inference_engines_required_predicates = []
       for filtering_predicate in filtering_predicates:
         inference_engines_required = set()
         for or_connected_predicate in filtering_predicate:
           if or_connected_predicate.left_exp.type == "column":
-            originated_from = get_original_column(or_connected_predicate.left_exp.value, column_graph)
+            originated_from = column_to_root_col.get(or_connected_predicate.left_exp.value, or_connected_predicate.left_exp.value)
+            if originated_from in columns_by_service:
+              inference_engines_required.add(columns_by_service[originated_from].service.name)
+          if or_connected_predicate.right_exp.type == "column":
+            originated_from = column_to_root_col.get(or_connected_predicate.right_exp.value, or_connected_predicate.right_exp.value)
             if originated_from in columns_by_service:
               inference_engines_required.add(columns_by_service[originated_from].service.name)
         inference_engines_required_predicates.append(inference_engines_required)
@@ -104,19 +113,14 @@ class FullScanEngine(BaseEngine):
     service_ordering = self._config.inference_topological_order
     filtering_predicates = query.filtering_predicates
     columns_by_service = self._config.column_by_service
-    column_graph = self._config.column_graph
-    inference_engines_required_predicates = get_inference_engines_required(filtering_predicates, columns_by_service)
+    column_to_root_column = self._config.columns_to_root_column
+    inference_engines_required_predicates = get_inference_engines_required(filtering_predicates, columns_by_service, column_to_root_column)
 
     inference_services_executed = set()
     for bound_service in service_ordering:
       binding = bound_service.binding
       inp_cols = binding.input_columns
-      original_column_mapping = {}
-      refined_inp_cols = []
-      for col in inp_cols:
-        original_column = get_original_column(col, column_graph)
-        refined_inp_cols.append(original_column)
-        original_column_mapping[col] = original_column
+      refined_inp_cols = [column_to_root_column.get(col, col) for col in inp_cols]
 
       inp_cols_str = ', '.join(refined_inp_cols)
       inp_tables = get_tables(refined_inp_cols)
@@ -128,7 +132,7 @@ class FullScanEngine(BaseEngine):
           filtering_predicates_satisfied.append(p)
 
       where_str = get_where_str(filtering_predicates_satisfied)
-      for k, v in original_column_mapping.items():
+      for k, v in column_to_root_column.items():
         where_str = where_str.replace(k, v)
 
       inp_query_str = f'''

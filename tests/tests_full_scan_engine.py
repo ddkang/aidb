@@ -25,8 +25,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame > 20;''',
-        '''SELECT * FROM objects00;'''
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
       )
     ]
 
