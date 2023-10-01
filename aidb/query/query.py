@@ -108,6 +108,21 @@ class Query(object):
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
+    """
+    this class contains the functionality to convert filtering predicate in SQL query to
+    conjunctive normal form.
+    for e.g. in the following query
+
+    SELECT c.color , COUNT(c.blob_id)
+    FROM Colors c JOIN Blobs b
+    ON c.blob_id = b.blob_id
+    WHERE (b.timestamp > 10 and b.timestamp < 12) or c.color=red
+    GROUP BY c.blob_id
+
+    the filtering predicate will be converted to
+
+    (b.timestamp > 10 or c.color = red) and (b.timestamp < 12 or c.color = red)
+    """
     if self._expression.find(exp.Where) is not None:
       self.predicate_count = 0
       # predicate name (used for sympy package) to expression
@@ -115,7 +130,52 @@ class Query(object):
       self.sympy_representation = self._get_sympify_form(self._expression.find(exp.Where))
       self.sympy_expression = sympify(self.sympy_representation)
       self.cnf_expression = to_cnf(self.sympy_expression)
-      return self.get_filtering_predicate_cnf_representation()
+      filtering_predicates = self._get_filtering_predicate_cnf_representation()
+      if self._tables is None:
+        raise Exception("Need table and column information to support alias")
+      filtering_clauses = []
+      table_name_to_alias = self._get_table_aliases()
+      table_alias_to_name = {v: k for k, v in table_name_to_alias.items()}
+      tables_present_in_query = self._get_tables_in_query()
+      for or_connected_filtering_predicate in filtering_predicates:
+        or_connected_clauses = []
+        for fp in or_connected_filtering_predicate:
+          if isinstance(fp.predicate, exp.Column):
+            # in case of boolean type columns
+            column_name = self._get_normalized_col_name_from_col_exp(
+              fp.predicate, table_alias_to_name, self._tables, tables_present_in_query)
+            or_connected_clauses.append(
+              FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
+          else:
+            t1, v1 = self._extract_column_or_value(fp.predicate.args["this"])
+            t2, v2 = self._extract_column_or_value(fp.predicate.args["expression"])
+            if t1 == "column":
+              left_value = self._get_normalized_col_name_from_col_exp(
+                v1, table_alias_to_name, self._tables, tables_present_in_query)
+            else:
+              left_value = v1
+            if t2 == "column":
+              right_value = self._get_normalized_col_name_from_col_exp(
+                v2, table_alias_to_name, self._tables, tables_present_in_query)
+            else:
+              right_value = v2
+
+            if t1 == "literal" and t2 == "column":
+              t_name, c_name = right_value.split('.')
+              left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
+              # change compare_value_2 to float or int
+            elif t2 == "literal" and t1 == "column":
+              t_name, c_name = left_value.split('.')
+              right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
+            elif t1 == "literal" and t2 == "literal":
+              # both left and right cannot be literals
+              raise Exception("Comparisons among literals not supported in filtering predicate")
+
+            or_connected_clauses.append(
+              FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
+                              Expression(t2, right_value)))
+        filtering_clauses.append(or_connected_clauses)
+      return filtering_clauses
     else:
       return []
 
@@ -194,66 +254,3 @@ class Query(object):
       return ("literal", node.args["this"])
     else:
       raise Exception("Not Supported Yet")
-
-  def get_filtering_predicate_cnf_representation(self):
-    """
-      this class contains the functionality to convert filtering predicate in SQL query to
-      conjunctive normal form.
-      for e.g. in the following query
-
-      SELECT c.color , COUNT(c.blob_id)
-      FROM Colors c JOIN Blobs b
-      ON c.blob_id = b.blob_id
-      WHERE (b.timestamp > 10 and b.timestamp < 12) or c.color=red
-      GROUP BY c.blob_id
-
-      the filtering predicate will be converted to
-
-      (b.timestamp > 10 or c.color = red) and (b.timestamp < 12 or c.color = red)
-    """
-    filtering_predicates = self._get_filtering_predicate_cnf_representation()
-    if self._tables is None:
-      raise Exception("Need table and column information to support alias")
-    filtering_clauses = []
-    table_name_to_alias = self._get_table_aliases()
-    table_alias_to_name = {v: k for k, v in table_name_to_alias.items()}
-    tables_present_in_query = self._get_tables_in_query()
-    for or_connected_filtering_predicate in filtering_predicates:
-      or_connected_clauses = []
-      for fp in or_connected_filtering_predicate:
-        if isinstance(fp.predicate, exp.Column):
-          # in case of boolean type columns
-          column_name = self._get_normalized_col_name_from_col_exp(
-            fp.predicate, table_alias_to_name, self._tables, tables_present_in_query)
-          or_connected_clauses.append(
-            FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
-        else:
-          t1, v1 = self._extract_column_or_value(fp.predicate.args["this"])
-          t2, v2 = self._extract_column_or_value(fp.predicate.args["expression"])
-          if t1 == "column":
-            left_value = self._get_normalized_col_name_from_col_exp(
-              v1, table_alias_to_name, self._tables, tables_present_in_query)
-          else:
-            left_value = v1
-          if t2 == "column":
-            right_value = self._get_normalized_col_name_from_col_exp(
-              v2, table_alias_to_name, self._tables, tables_present_in_query)
-          else:
-            right_value = v2
-
-          if t1 == "literal" and t2 == "column":
-            t_name, c_name = right_value.split('.')
-            left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
-            # change compare_value_2 to float or int
-          elif t2 == "literal" and t1 == "column":
-            t_name, c_name = left_value.split('.')
-            right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
-          elif t1 == "literal" and t2 == "literal":
-            # both left and right cannot be literals
-            raise Exception("Comparisons among literals not supported in filtering predicate")
-
-          or_connected_clauses.append(
-            FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
-                            Expression(t2, right_value)))
-      filtering_clauses.append(or_connected_clauses)
-    return filtering_clauses
