@@ -7,11 +7,11 @@ from fastapi import FastAPI, Request
 
 from multiprocessing import Process
 
-def run_server(data_dir: str):
+def run_server(data_dir: str, service_concerned='*'):
   app = FastAPI()
 
   inference_dir = f'{data_dir}/inference'
-  inference_csv_fnames = glob.glob(f'{inference_dir}/*.csv')
+  inference_csv_fnames = glob.glob(f'{inference_dir}/{service_concerned}.csv')
   inference_csv_fnames.sort()
 
   # Create the inference services

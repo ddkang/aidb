@@ -1,4 +1,5 @@
 from aidb.query.column_extractor import ColumnExtractor
+from aidb.utils.logger import logger
 
 import sqlglot.expressions as exp
 from sqlglot import Tokenizer, Parser
@@ -16,9 +17,9 @@ def is_aqp_exp(node):
     or isinstance(node, exp.Budget)
 
 def _remove_aqp(node):
-	if is_aqp_exp(node):
-		return None
-	return node
+  if is_aqp_exp(node):
+    return None
+  return node
 
 
 class Query(object):
@@ -27,12 +28,6 @@ class Query(object):
     self._tokens = Tokenizer().tokenize(sql)
     self._expression: exp.Expression = Parser().parse(self._tokens)[0]
     self.transform_sql_to_base()
-    self.printItems()
-
-  def printItems(self):
-  	print('SQL: ', self.sql)
-  	print('Tokens: ', self._tokens)
-  	print('Expression: ', vars(self._expression))
 
   def transform_sql_to_base(self):
     if not hasattr(self, '_exp_no_aqp'):
@@ -56,7 +51,8 @@ class Query(object):
     elif isinstance(select_exp, exp.Sum):
       return exp.Sum
     else:
-      logger.warning('Unsupported aggregation', select_exp)
+      logger.debug('Unsupported aggregation', select_exp)
+      return None
 
   # Extract tables from query
   def get_tables_in_query(self):
@@ -64,8 +60,6 @@ class Query(object):
     for node, _, _ in self._expression.walk():
       if isinstance(node, exp.Table):
         table_list.add(node.args["this"].args["this"])
-
-    print(table_list, 'table_list')
     return table_list
 
   def get_aggregated_column(self, agg_type):
@@ -75,7 +69,6 @@ class Query(object):
     will return sentiment
     """
     agg_exp_tree = self._expression.find(agg_type)
-
     for node, _, key in agg_exp_tree.walk():
       if isinstance(node, exp.Column):
         if isinstance(node.args['this'], exp.Identifier):
@@ -83,17 +76,14 @@ class Query(object):
     return None
 
   def extract_columns(self):
-    self.transform_sql_to_base()
     extractor = ColumnExtractor()
     return extractor.extract(self._exp_no_aqp)
 
   def is_approx_agg_query(self):
-  	# will be changed in future based on confidence
-  	# for node, _, _ in self._expression.walk():
-  	return True
+    return True if self.get_agg_type() else False
 
   def process_aggregate_query(self):
-  	self.tables_concerned = self.get_tables_in_query()
-  	self.colums_concerned = self.extract_columns()
-  	self.agg_type = self.get_agg_type()
-  	self.aggregated_column = self.get_aggregated_column(self.agg_type)
+    self.tables_concerned = self.get_tables_in_query()
+    self.columns_concerned = self.extract_columns()
+    self.agg_type = self.get_agg_type()
+    self.aggregated_column = self.get_aggregated_column(self.agg_type)

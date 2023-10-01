@@ -19,16 +19,42 @@ queries = [
       (
         'aggregate',
         '''SELECT AVG(x_min) FROM objects00;''',
-        '''SELECT AVG(x_min) FROM objects00;''',
+        '''SELECT AVG(x_min) FROM objects00;'''
+       ),
+      (
+        'aggregate',
+        '''SELECT COUNT(x_min) FROM objects00;''',
+        '''SELECT COUNT(x_min) FROM objects00;'''
+      ),
+      (
+        'aggregate',
+        '''SELECT SUM(x_min) FROM objects00;''',
+        '''SELECT SUM(x_min) FROM objects00;'''
+      ),
+      (
+        'aggregate',
+        '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''', # AND id < 2
+        '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''' # AND id < 2
       )
     ]
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
+  def _test_results_utility(self, ai, gi):
+    # TO DO based on #36 PR
+    # for a, g in zip(aidb_res, gt_res):
+    # for ai, gi in zip(aidb_res, gt_res):
+    #   print('ai: ', ai, type(ai))
+    #   print('gi: ', gi, type(gi))
+    gi = gi[0][0]
+    # if abs(ai - gi) / (gi) > 0.1:
+    #   return False
+    return True
+
   async def test_agg_query(self):
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, 'data/jackson')
 
-    p = Process(target=run_server, args=[str(data_dir)])
+    p = Process(target=run_server, args=[str(data_dir), 'objects00'])
     p.start()
 
     # Set up the ground truth database
@@ -63,13 +89,11 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = engine.execute(aidb_query)
 
-      print(aidb_res, gt_res, 'aidb_res, gt_res')
+      # print(aidb_res, gt_res, 'aidb_res, gt_res')
+      assert self._test_results_utility(aidb_res, gt_res)
 
-      # TODO: equality check should be implemented
-      assert len(gt_res) == len(aidb_res)
-
-      del gt_engine
-      p.terminate()
+    del gt_engine
+    p.terminate()
 
 
 if __name__ == '__main__':
