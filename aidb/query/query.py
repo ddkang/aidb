@@ -1,6 +1,6 @@
 import sqlglot.expressions as exp
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
 from sqlglot import Tokenizer, Parser
@@ -14,8 +14,42 @@ from aidb.query.utils import FilteringPredicate, extract_column_or_value
 
 @dataclass
 class Query(object):
+  """
+  class to hold sql query related data
+  this is immutable class
+  """
   sql_str: str
   tables: Dict[str, Table]
+
+  _sql_str: str = field(init=False, repr=False)
+  _tables: Dict[str, Table] = field(init=False, repr=False)
+
+  @property
+  def sql_str(self) -> str:
+    return self._sql_str
+
+  @sql_str.setter
+  def sql_str(self, value: str):
+    # when new sql str is set, clear the cached properties
+    self.clear_cached_properties()
+    self._sql_str = value
+
+  @property
+  def tables(self) -> Dict[str, Table]:
+    return self._tables
+
+  @tables.setter
+  def tables(self, value: Dict[str, Table]):
+    # when new tables are set, clear the cached properties
+    self.clear_cached_properties()
+    self._tables = value
+
+  def clear_cached_properties(self):
+    # Need the keys because the cached properties are only created when they are accessed.
+    keys = [key for key, value in vars(Query).items() if isinstance(value, cached_property)]
+    for key in keys:
+      if key in self.__dict__:
+        del self.__dict__[key]
 
   @cached_property
   def _tokens(self):
@@ -69,7 +103,7 @@ class Query(object):
     return {v: k for k, v in table_name_to_alias.items()}
 
   @cached_property
-  def _tables_in_query(self):
+  def tables_in_query(self):
     table_list = set()
     for node, _, _ in self._expression.walk():
       if isinstance(node, exp.Table):
@@ -77,8 +111,8 @@ class Query(object):
     return table_list
 
   def _get_predicate_name(self):
-    self.predicate_count += 1
-    predicate_name = f"P{self.predicate_count}"
+    self._predicate_count += 1
+    predicate_name = f"P{self._predicate_count}"
     return predicate_name
 
   def _get_sympify_form(self, node):
@@ -89,7 +123,7 @@ class Query(object):
       return self._get_sympify_form(node.args["this"])
     elif isinstance(node, exp.Column):
       predicate_name = self._get_predicate_name()
-      self.predicate_mappings[predicate_name] = node
+      self._predicate_mappings[predicate_name] = node
       return predicate_name
     elif isinstance(node, exp.Not):
       return f"~({self._get_sympify_form(node.args['this'])})"
@@ -111,21 +145,18 @@ class Query(object):
       # TODO: chained comparison operators not supported
       assert "this" in node.args and "expression" in node.args
       predicate_name = self._get_predicate_name()
-      self.predicate_mappings[predicate_name] = node
+      self._predicate_mappings[predicate_name] = node
       return predicate_name
     else:
       raise NotImplementedError
 
-  def get_cnf_form_predicate(self):
-    return self.cnf_expression
-
-  def _get_original_predicate(self, predicate_name):
+  def _get_original_predicate(self, predicate_name) -> FilteringPredicate:
     if predicate_name[0] == "~":
-      return FilteringPredicate(True, self.predicate_mappings[predicate_name[1:]])
+      return FilteringPredicate(True, self._predicate_mappings[predicate_name[1:]])
     else:
-      return FilteringPredicate(False, self.predicate_mappings[predicate_name])
+      return FilteringPredicate(False, self._predicate_mappings[predicate_name])
 
-  def _get_or_clause_representation(self, or_expression):
+  def _get_or_clause_representation(self, or_expression) -> List[FilteringPredicate]:
     connected_by_ors = list(or_expression.args)
     predicates_in_ors = []
     if len(connected_by_ors) <= 1:
@@ -135,11 +166,11 @@ class Query(object):
         predicates_in_ors.append(self._get_original_predicate(str(s)))
     return predicates_in_ors
 
-  def _get_filtering_predicate_cnf_representation(self):
-    if '&' not in str(self.cnf_expression):
-      return [self._get_or_clause_representation(self.cnf_expression)]
+  def _get_filtering_predicate_cnf_representation(self, cnf_expression) -> List[List[FilteringPredicate]]:
+    if '&' not in str(cnf_expression):
+      return [self._get_or_clause_representation(cnf_expression)]
 
-    or_expressions_connected_by_ands = list(self.cnf_expression.args)
+    or_expressions_connected_by_ands = list(cnf_expression.args)
     or_expressions_connected_by_ands_repr = []
     for or_expression in or_expressions_connected_by_ands:
       connected_by_ors = self._get_or_clause_representation(or_expression)
@@ -166,13 +197,13 @@ class Query(object):
     if self._expression.find(exp.Where) is not None:
       if self._tables_info is None:
         raise Exception("Need table and column information to support alias")
-      self.predicate_count = 0
+      self._predicate_count = 0
       # predicate name (used for sympy package) to expression
-      self.predicate_mappings = {}
-      self.sympy_representation = self._get_sympify_form(self._expression.find(exp.Where))
-      self.sympy_expression = sympify(self.sympy_representation)
-      self.cnf_expression = to_cnf(self.sympy_expression)
-      filtering_predicates = self._get_filtering_predicate_cnf_representation()
+      self._predicate_mappings = {}
+      sympy_representation = self._get_sympify_form(self._expression.find(exp.Where))
+      sympy_expression = sympify(sympy_representation)
+      cnf_expression = to_cnf(sympy_expression)
+      filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression)
       filtering_clauses = []
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
@@ -215,7 +246,7 @@ class Query(object):
 
   def _get_table_of_column(self, col_name):
     tables_of_column = []
-    for table in self._tables_in_query:
+    for table in self.tables_in_query:
       if col_name in self._tables_info[table]:
         tables_of_column.append(table)
     if len(tables_of_column) == 0:
