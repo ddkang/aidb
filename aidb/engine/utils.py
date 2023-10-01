@@ -2,7 +2,7 @@ def get_inference_engines_required(filtering_predicates, columns_by_service, col
   """
   Inference services required to run to satisfy the columns present in each filtering predicate
   for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-  it returns [[object, color], [], [object]]
+  it returns [[color], [], [object]]
   """
   inference_engines_required_predicates = []
   for filtering_predicate in filtering_predicates:
@@ -26,7 +26,7 @@ def get_tables_required(filtering_predicates, column_to_root_col):
   """
   Tables needed to satisfy the columns present in each filtering predicate
   for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-  it returns [[color], [], [object]]
+  it returns [[color], [blob], [object]]
   """
   tables_required_predicates = []
   for filtering_predicate in filtering_predicates:

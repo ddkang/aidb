@@ -31,11 +31,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM lights01 WHERE light_2='green';''',
-        '''SELECT * FROM lights01 WHERE light_2='green';'''
-      ),
-      (
-        'full_scan',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
       ),
@@ -43,6 +38,11 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         'full_scan',
         '''SELECT * FROM counts03 WHERE frame >= 10000;''',
         '''SELECT * FROM counts03 WHERE frame >= 10000;''',
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM lights01 WHERE light_2='green';''',
+        '''SELECT * FROM lights01 WHERE light_2='green';'''
       ),
       (
         'full_scan',
