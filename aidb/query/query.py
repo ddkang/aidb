@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Dict, List
 
 import sqlglot.expressions as exp
-from aidb.config.config_types import Table
+from aidb.config.config import Config
 from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
                               change_literal_type_to_col_type,
                               extract_column_or_value)
@@ -19,37 +19,7 @@ class Query(object):
   this is immutable class
   """
   sql_str: str
-  tables: Dict[str, Table]
-
-  _sql_str: str = field(init=False, repr=False)
-  _tables: Dict[str, Table] = field(init=False, repr=False)
-
-  @property
-  def sql_str(self) -> str:
-    return self._sql_str
-
-  @sql_str.setter
-  def sql_str(self, value: str):
-    # when new sql str is set, clear the cached properties
-    self.clear_cached_properties()
-    self._sql_str = value
-
-  @property
-  def tables(self) -> Dict[str, Table]:
-    return self._tables
-
-  @tables.setter
-  def tables(self, value: Dict[str, Table]):
-    # when new tables are set, clear the cached properties
-    self.clear_cached_properties()
-    self._tables = value
-
-  def clear_cached_properties(self):
-    # Need the keys because the cached properties are only created when they are accessed.
-    keys = [key for key, value in vars(Query).items() if isinstance(value, cached_property)]
-    for key in keys:
-      if key in self.__dict__:
-        del self.__dict__[key]
+  config: Config
 
   @cached_property
   def _tokens(self):
@@ -64,9 +34,12 @@ class Query(object):
     return self._expression.sql()
 
   @cached_property
-  def _tables_info(self):
+  def _tables(self) -> Dict[str, Dict[str, str]]:
+    """
+    dictionary of tables to columns and their types
+    """
     _tables = dict()
-    for table_name, table in self.tables.items():
+    for table_name, table in self.config.tables.items():
       _tables[table_name] = dict()
       for column in table.columns:
         _tables[table_name][column.name] = column.type
@@ -195,7 +168,7 @@ class Query(object):
     (b.timestamp > 10 or c.color = red) and (b.timestamp < 12 or c.color = red)
     """
     if self._expression.find(exp.Where) is not None:
-      if self._tables_info is None:
+      if self._tables is None:
         raise Exception("Need table and column information to support alias")
       self._predicate_count = 0
       # predicate name (used for sympy package) to expression
@@ -227,11 +200,11 @@ class Query(object):
 
             if t1 == "literal" and t2 == "column":
               t_name, c_name = right_value.split('.')
-              left_value = change_literal_type_to_col_type(self._tables_info[t_name][c_name], left_value)
+              left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
               # change compare_value_2 to float or int
             elif t2 == "literal" and t1 == "column":
               t_name, c_name = left_value.split('.')
-              right_value = change_literal_type_to_col_type(self._tables_info[t_name][c_name], right_value)
+              right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
             elif t1 == "literal" and t2 == "literal":
               # both left and right cannot be literals
               raise Exception("Comparisons among literals not supported in filtering predicate")
@@ -247,7 +220,7 @@ class Query(object):
   def _get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
-      if col_name in self._tables_info[table]:
+      if col_name in self._tables[table]:
         tables_of_column.append(table)
     if len(tables_of_column) == 0:
       raise Exception(f"Column - {col_name} is not present in any table")
@@ -270,3 +243,49 @@ class Query(object):
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
+
+  @cached_property
+  def inference_engines_required_for_filtering_predicates(self):
+    """
+    Inference services required to run to satisfy the columns present in each filtering predicate
+    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
+    it returns [[color], [], [object]]
+    """
+    inference_engines_required_predicates = []
+    for filtering_predicate in self.filtering_predicates:
+      inference_engines_required = set()
+      for or_connected_predicate in filtering_predicate:
+        if or_connected_predicate.left_exp.type == "column":
+          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
+                                                                   or_connected_predicate.left_exp.value)
+          if originated_from in self.config.column_by_service:
+            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+        if or_connected_predicate.right_exp.type == "column":
+          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
+                                                                   or_connected_predicate.right_exp.value)
+          if originated_from in self.config.column_by_service:
+            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+      inference_engines_required_predicates.append(inference_engines_required)
+    return inference_engines_required_predicates
+
+  @cached_property
+  def tables_in_filtering_predicates(self):
+    """
+    Tables needed to satisfy the columns present in each filtering predicate
+    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
+    it returns [[color], [blob], [object]]
+    """
+    tables_required_predicates = []
+    for filtering_predicate in self.filtering_predicates:
+      tables_required = set()
+      for or_connected_predicate in filtering_predicate:
+        if or_connected_predicate.left_exp.type == "column":
+          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
+                                                                   or_connected_predicate.left_exp.value)
+          tables_required.add(originated_from.split('.')[0])
+        if or_connected_predicate.right_exp.type == "column":
+          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
+                                                                   or_connected_predicate.right_exp.value)
+          tables_required.add(originated_from.split('.')[0])
+      tables_required_predicates.append(tables_required)
+    return tables_required_predicates

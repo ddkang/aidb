@@ -8,6 +8,6 @@ class Engine(FullScanEngine):
     Executes a query and returns the results.
     '''
     # TODO: branch based on query type
-    parsed_query = Query(query, self._config.tables)
+    parsed_query = Query(query, self._config)
     res = asyncio_run(self.execute_full_scan(parsed_query, **kwargs))
     return res
