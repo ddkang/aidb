@@ -26,11 +26,11 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
 class Tasti(TastiConfig):
   def __post_init__(self):
     self.rep_index_name = f"{self.index_name}__representatives"
+    self.rand = np.random.RandomState(self.seed)
     self.do_filter = False
     self.initialize_vector_database()
     self.validate_index_name()
     self.initialize_embeddings()
-    self.rand = np.random.RandomState(self.seed)
 
 
   def initialize_vector_database(self):

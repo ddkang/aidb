@@ -5,7 +5,7 @@ from typing import List
 CACHE_PREFIX = '__cache'
 CONFIG_PREFIX = '__config'
 REP_PREFIX = '__rep'
-TOPK_PREFIX = '__TOPK'
+TOPK_PREFIX = '__topk'
 '''
 The schema of the blob metadata table is as follows:
   table_name: str

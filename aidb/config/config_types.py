@@ -128,8 +128,8 @@ class TastiConfig:
   blob_ids: pd.DataFrame
   nb_buckets: int
   vector_database_name: VectorDatabaseType = field(default=VectorDatabaseType.FAISS)
-  weaviate_auth: Optional[WeaviateAuth] = field(default=None)
-  index_path: Optional[str] = field(default=None)
   percent_fpf: float = 0.75
   seed: int = 1234
+  weaviate_auth: Optional[WeaviateAuth] = field(default=None)
+  index_path: Optional[str] = field(default=None)
   reps: Optional[np.ndarray] = field(default=None)

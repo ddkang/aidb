@@ -21,13 +21,11 @@ class WeaviateVectorDatabase(VectorDatabase):
 
     status = self.weaviate_client.is_ready()
     if not status:
-      raise Exception(
-        f"Initial connection to Weaviate failed"
-      )
+      raise Exception('Initial connection to Weaviate failed')
 
     self.weaviate_client.batch.configure(batch_size=200, dynamic=True)
 
-    self.index_list = [c['class'] for c in self.weaviate_client.schema.get()["classes"]]
+    self.index_list = [c['class'] for c in self.weaviate_client.schema.get()['classes']]
 
 
   @staticmethod
@@ -57,7 +55,7 @@ class WeaviateVectorDatabase(VectorDatabase):
       self.delete_index(index_name)
 
     if not index_name:
-      raise Exception(f'Index name must not be none')
+      raise Exception('Index name must not be none')
 
     if similarity not in ['cosine', 'dot', 'l2-squared']:
       raise Exception('Similarity function must be one of euclidean, cosine and dotproduct')
@@ -66,11 +64,11 @@ class WeaviateVectorDatabase(VectorDatabase):
       raise Exception(f'Index {index_name} already exists, please use another name')
 
     schema = {
-      "class": index_name,
-      "description": f"Index {index_name} to store embedding",
-      "vectorizer": "none",
-      "properties": [{"name": "original_id", "dataType": ["int"]}],
-      "vectorIndexConfig": {"distance": similarity}
+      'class': index_name,
+      'description': f'Index {index_name} to store embedding',
+      'vectorizer': 'none',
+      'properties': [{'name': 'original_id', 'dataType': ['int']}],
+      'vectorIndexConfig': {'distance': similarity}
     }
 
     self.weaviate_client.schema.create_class(schema)
@@ -147,7 +145,7 @@ class WeaviateVectorDatabase(VectorDatabase):
     alias_list = ['alias' + str(i) for i in range(len(query_emb_list))]
     for alias, query_emb in zip(alias_list, query_emb_list):
       new_query = self.weaviate_client.query.get(class_name=index_name, properties=properties)
-      new_query.with_near_vector({"vector": query_emb})
+      new_query.with_near_vector({'vector': query_emb})
       new_query.with_limit(top_k)
       new_query.with_alias(alias)
       if filters:

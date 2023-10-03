@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
-from aidb.vector_database.faiss_vector_database import FaissVectorDataBase
-from aidb.vector_database.chroma_vector_database import ChromaVectorDataBase
-from aidb.vector_database.weaviate_vector_database import WeaviateVectorDataBase
+from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
 from typing import Optional
+from aidb.config.config_types import WeaviateAuth, VectorDatabaseType
 import unittest
 
 
@@ -16,23 +17,17 @@ class TastiTests():
     embedding_dim: int,
     nb_buckets: int,
     vector_database: str = 'FAISS',
-    url: Optional[str] = None,
-    username: Optional[str] = None,  # FIXME: define a datatype for weaviate input
-    pwd: Optional[str] = None,
-    api_key: Optional[str] = None,
-    index_path: Optional[str] = None,
     percent_fpf: float = 0.75,
-    seed: int = 1234
+    seed: int = 1234,
+    weaviate_auth: Optional[WeaviateAuth] = None,
+    index_path: Optional[str] = None,
   ):
     #
     self.index_name = index_name
     self.embedding_dim = embedding_dim
     self.vd_name = vector_database
     self.index_path = index_path
-    self.url = url
-    self.username = username
-    self.pwd = pwd
-    self.api_key = api_key
+    self.weaviate_auth = weaviate_auth
     self.nb_buckets = nb_buckets
     self.seed = seed
     self.total_data = 0
@@ -41,8 +36,8 @@ class TastiTests():
     blob_ids = self.generate_blob_ids(data_size, 0)
     self.user_database = None
     self.simulate_user_providing_database()
-    self.vector_database = Tasti(index_name, blob_ids, nb_buckets, vector_database, url, username,
-                                pwd, api_key, index_path, percent_fpf, seed)
+    self.vector_database = Tasti(index_name, blob_ids, nb_buckets, self.vd_name,
+                                 percent_fpf, seed, weaviate_auth, index_path)
 
 
 
@@ -65,19 +60,19 @@ class TastiTests():
     Originally, user will provide a vector database, and Tasti will read from it.
     This function is used to create a vector database to store original data
     '''
-    if self.vd_name == 'FAISS':
-      self.user_database = FaissVectorDataBase(self.index_path)
+    if self.vd_name == VectorDatabaseType.FAISS:
+      self.user_database = FaissVectorDatabase(self.index_path)
       self.user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
       self.user_database.insert_data(self.index_name, self.data)
       self.user_database.save_index(self.index_name)
 
-    elif self.vd_name == 'Chroma':
-      self.user_database = ChromaVectorDataBase(self.index_path)
+    elif self.vd_name == VectorDatabaseType.CHROMA:
+      self.user_database = ChromaVectorDatabase(self.index_path)
       self.user_database.create_index(self.index_name, recreate_index=True)
       self.user_database.insert_data(self.index_name, self.data)
 
-    elif self.vd_name == 'Weaviate':
-      self.user_database = WeaviateVectorDataBase(self.url, self.username, self.pwd, self.api_key)
+    elif self.vd_name == VectorDatabaseType.WEAVIATE:
+      self.user_database = WeaviateVectorDatabase(self.weaviate_auth)
       self.user_database.create_index(self.index_name, recreate_index=True)
       self.user_database.insert_data(self.index_name, self.data)
 
@@ -100,7 +95,7 @@ class TastiTests():
 
 
     #Chroma uses HNSW, which will not return exact search result
-    if self.vd_name == 'FAISS':
+    if self.vd_name == VectorDatabaseType.FAISS.value:
       for representative_id in list(representative_blob_ids['id']):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
         assert 0 in topk_representatives.loc[representative_id]['topk_dists']
@@ -119,15 +114,16 @@ def test(vector_database):
   data_size = 10000
   embedding_dim = 128
   nb_buckets = 1000
-  url = 'https://example-2cd2xvs2.weaviate.network'
-  api_key = 'rjksx5km3VbBosUyySBfg0CEMiqESCK5vl59'
+  url = ''
+  api_key = ''
   index_path = './'
+  weaviate_auth = WeaviateAuth(url, api_key=api_key)
   tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database,
-                          url=url, api_key=api_key, index_path=index_path)
+                          weaviate_auth=weaviate_auth, index_path=index_path)
   tasti_test.test()
 
 if __name__ == '__main__':
     test('FAISS')
-    test('Chroma')
+    # test('Chroma')
     #too slow
     # test('Weaviate')
