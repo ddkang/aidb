@@ -1,10 +1,6 @@
-from typing import List
-
-import networkx as nx
 import pandas as pd
 from aidb.engine.base_engine import BaseEngine
-from aidb.query.query import FilteringClause, Query
-from aidb.query.utils import predicate_to_str
+from aidb.query.query import Query
 from sqlalchemy.sql import text
 
 
@@ -14,81 +10,12 @@ class FullScanEngine(BaseEngine):
     Executes a query by doing a full scan and returns the results.
     '''
 
-    def get_tables(columns: List[str]) -> List[str]:
-      tables = set()
-      for col in columns:
-        table_name = col.split('.')[0]
-        tables.add(table_name)
-      return list(tables)
-
-    def get_join_str(tables: List[str]) -> str:
-      table_graph = self._config.table_graph.subgraph(tables)
-      # all input tables should be connectable
-      # NetworkX is connected not implemented for directed graph
-      assert nx.is_connected(table_graph.to_undirected())
-      table_order = list(nx.topological_sort(table_graph))[::-1]
-      table_pairs = []
-      for table in table_order:
-        table_pairs += [(e[1], e[0]) for e in table_graph.in_edges(table)]
-      first_table = table_order[0]
-      join_strs = []
-      for table1_name, table2_name in table_pairs:
-        table2 = self._config.tables[table2_name]
-        join_cols = []
-        for _, fkey in table2.foreign_keys.items():
-          if fkey.startswith(table1_name + '.'):
-            join_cols.append((fkey, fkey.replace(table1_name, table2_name, 1)))
-        if len(join_cols) > 0:
-          join_strs.append(
-            f'INNER JOIN {table2_name} ON {" AND ".join([f"{col1} = {col2}" for col1, col2 in join_cols])}')
-      return f"FROM {first_table}\n" + '\n'.join(join_strs)
-
-    def get_where_str(filtering_predicates: List[List[FilteringClause]]):
-      and_connected = []
-      for fp in filtering_predicates:
-        and_connected.append(" OR ".join([predicate_to_str(p) for p in fp]))
-      return " AND ".join(and_connected)
-
     # The query is irrelevant since we do a full scan anyway
     service_ordering = self._config.inference_topological_order
-    filtering_predicates = query.filtering_predicates
-    column_to_root_column = self._config.columns_to_root_column
-    inference_engines_required_for_filtering_predicates = query.inference_engines_required_for_filtering_predicates
-    tables_in_filtering_predicates = query.tables_in_filtering_predicates
 
     inference_services_executed = set()
     for bound_service in service_ordering:
-      binding = bound_service.binding
-      inp_cols = binding.input_columns
-      root_inp_cols = [column_to_root_column.get(col, col) for col in inp_cols]
-
-      inp_cols_str = ', '.join(root_inp_cols)
-      inp_tables = get_tables(root_inp_cols)
-      join_str = get_join_str(inp_tables)
-
-      # filtering predicates that can be satisfied by the currently executed inference engines
-      filtering_predicates_satisfied = []
-      for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
-                         tables_in_filtering_predicates):
-        if len(inference_services_executed.intersection(e)) == len(e) and len(set(inp_tables).intersection(t)) == len(
-                t):
-          filtering_predicates_satisfied.append(p)
-
-      where_str = get_where_str(filtering_predicates_satisfied)
-      for k, v in column_to_root_column.items():
-        where_str = where_str.replace(k, v)
-
-      if len(filtering_predicates_satisfied) > 0:
-        inp_query_str = f'''
-          SELECT {inp_cols_str}
-          {join_str}
-          WHERE {where_str};
-        '''
-      else:
-        inp_query_str = f'''
-          SELECT {inp_cols_str}
-          {join_str};
-        '''
+      inp_query_str = self.get_input_query_for_inference_service(bound_service, query, inference_services_executed)
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
