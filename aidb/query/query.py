@@ -12,7 +12,7 @@ from sympy import sympify
 from sympy.logic.boolalg import to_cnf
 
 
-@dataclass
+@dataclass(frozen=True)
 class Query(object):
   """
   class to hold sql query related data
