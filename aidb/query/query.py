@@ -22,17 +22,21 @@ class Query(object):
   sql_str: str
   config: Config
 
+
   @cached_property
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
+
 
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
+
   @cached_property
   def sql_query_text(self):
     return self._expression.sql()
+
 
   @cached_property
   def _tables(self) -> Dict[str, Dict[str, str]]:
@@ -45,6 +49,7 @@ class Query(object):
       for column in table.columns:
         _tables[table_name][column.name] = column.type
     return _tables
+
 
   @cached_property
   def table_name_to_aliases(self):
@@ -71,10 +76,12 @@ class Query(object):
             table_alias[str.lower(tbl_name)] = str.lower(tbl_alias)
     return table_alias
 
+
   @cached_property
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
+
 
   @cached_property
   def tables_in_query(self):
@@ -84,9 +91,11 @@ class Query(object):
         table_list.add(node.args["this"].args["this"])
     return table_list
 
+
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
     return predicate_name
+
 
   def _get_sympify_form(self, node, predicate_count, predicate_mappings):
     if node is None:
@@ -126,11 +135,13 @@ class Query(object):
     else:
       raise NotImplementedError
 
+
   def _get_original_predicate(self, predicate_name, predicate_mappings) -> FilteringPredicate:
     if predicate_name[0] == "~":
       return FilteringPredicate(True, predicate_mappings[predicate_name[1:]])
     else:
       return FilteringPredicate(False, predicate_mappings[predicate_name])
+
 
   def _get_or_clause_representation(self, or_expression, predicate_mappings) -> List[FilteringPredicate]:
     connected_by_ors = list(or_expression.args)
@@ -141,6 +152,7 @@ class Query(object):
       for s in connected_by_ors:
         predicates_in_ors.append(self._get_original_predicate(str(s), predicate_mappings))
     return predicates_in_ors
+
 
   def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
     List[FilteringPredicate]]:
@@ -153,6 +165,7 @@ class Query(object):
       connected_by_ors = self._get_or_clause_representation(or_expression, predicate_mappings)
       or_expressions_connected_by_ands_repr.append(connected_by_ors)
     return or_expressions_connected_by_ands_repr
+
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
@@ -221,6 +234,7 @@ class Query(object):
     else:
       return []
 
+
   def _get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
@@ -232,6 +246,7 @@ class Query(object):
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
       return tables_of_column[0]
+
 
   def _get_normalized_col_name_from_col_exp(self, node):
     """
@@ -247,6 +262,7 @@ class Query(object):
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
+
 
   @cached_property
   def inference_engines_required_for_filtering_predicates(self):
@@ -271,6 +287,7 @@ class Query(object):
             inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
+
 
   @cached_property
   def tables_in_filtering_predicates(self):
