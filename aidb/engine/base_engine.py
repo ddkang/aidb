@@ -241,6 +241,11 @@ class BaseEngine():
 
   def get_input_query_for_inference_service(self, bound_service: BoundInferenceService, user_query: Query,
                                             already_executed_inference_services: set):
+    """
+    this function returns the input query to fetch the input records for an inference service
+    input query will also contain the predicates that can be currently satisfied using the inference services
+    that are already executed
+    """
     filtering_predicates = user_query.filtering_predicates
     column_to_root_column = self._config.columns_to_root_column
     inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
