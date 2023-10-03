@@ -1,11 +1,13 @@
 import pandas as pd
 from numba import njit, prange
 from tqdm import tqdm
-from aidb.vector_database.faiss_vector_database import FaissVectorDataBase
-from aidb.vector_database.chroma_vector_database import ChromaVectorDataBase
-from aidb.vector_database.weaviate_vector_database import WeaviateVectorDataBase
+from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 from typing import Optional
 import numpy as np
+from dataclasses import dataclass
+from aidb.config.config_types import TastiConfig, VectorDatabaseType
 
 @njit(parallel=True)
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
@@ -20,70 +22,58 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
       min_dists[i] = dists
 
 
-class Tasti:
-  def __init__(
-      self,
-      index_name: str,
-      blob_ids: pd.DataFrame,
-      nb_buckets: int,
-      vector_database: str = 'FAISS',
-      url: Optional[str] = None,
-      username: Optional[str] = None, #FIXME: define a datatype for weaviate input
-      pwd: Optional[str] = None,
-      api_key: Optional[str] = None,
-      index_path: Optional[str] = None,
-      percent_fpf: float = 0.75,
-      seed: int = 1234
-  ):
-    '''
-    :param index_name: vector database index name
-    :param blob_ids: blob index in blob table, it should be unique for each data record
-    :param nb_buckets: number of buckets for FPF, it should be same as the number of buckets for oracle
-    :param vector_database: vector database type, it should be FAISS, Chroma or Weaviate
-    :param url: weaviate url
-    :param username: weaviate username
-    :param pwd: weaviate password
-    :param api_key: weaviate api key, user should choose input either username/pwd or api_key
-    :param index_path: vector database(FAISS, Chroma) index path, path to store database
-    :param percent_fpf: percent of randomly selected buckets in FPF
-    :param seed: random seed
-    '''
-
-    self.index_name = index_name
-    self.rep_index_name = self.index_name + '__representatives'
-    self.blob_ids = blob_ids
-    self.nb_buckets = nb_buckets
-    self.percent_fpf = percent_fpf
-    self.seed = seed
-    # FAISS query embedding distances by doing filter, other vector database create individual index
+@dataclass
+class Tasti(TastiConfig):
+  def __post_init__(self):
+    self.rep_index_name = f"{self.index_name}__representatives"
     self.do_filter = False
+    self.initialize_vector_database()
+    self.validate_index_name()
+    self.initialize_embeddings()
+    self.rand = np.random.RandomState(self.seed)
 
-    if vector_database == 'FAISS':
-      if index_path is None:
-        raise Exception('FAISS requires index path')
-      self.vector_database = FaissVectorDataBase(index_path)
-      self.vector_database.load_index(index_name)
-      self.do_filter = True
-    elif vector_database == 'Chroma':
-      if index_path is None:
-        raise Exception('Chroma requires index path')
-      self.vector_database = ChromaVectorDataBase(index_path)
-    elif vector_database == 'Weaviate':
-      if url is None:
-        raise Exception('Weaviate requires url to connect')
-      self.vector_database = WeaviateVectorDataBase(url, username, pwd, api_key)
+
+  def initialize_vector_database(self):
+    if self.vector_database_name == VectorDatabaseType.FAISS.value:
+      self.initialize_faiss()
+    elif self.vector_database_name == VectorDatabaseType.CHROMA.value:
+      self.initialize_chroma()
+    elif self.vector_database_name == VectorDatabaseType.WEAVIATE.value:
+      self.initialize_weaviate()
     else:
-      raise Exception(f'{vector_database} is not supported, please use FAISS, Chroma or Weaviate')
+      raise ValueError(f"{self.vector_database_name} is not supported, please use FAISS, Chroma, or Weaviate")
 
+
+  def initialize_faiss(self):
+    if self.index_path is None:
+      raise ValueError('FAISS requires index path')
+    self.vector_database = FaissVectorDatabase(self.index_path)
+    self.vector_database.load_index(self.index_name)
+    self.do_filter = True
+
+
+  def initialize_chroma(self):
+    if self.index_path is None:
+      raise ValueError('Chroma requires index path')
+    self.vector_database = ChromaVectorDatabase(self.index_path)
+
+
+  def initialize_weaviate(self):
+    if self.weaviate_auth.url is None:
+      raise ValueError('Weaviate requires URL to connect')
+    self.vector_database = WeaviateVectorDatabase(self.weaviate_auth)
+
+
+  def validate_index_name(self):
     if self.index_name not in self.vector_database.index_list:
-      raise Exception(f'Index {index_name} doesn\'t exist in vector database')
+      raise ValueError(f"Index {self.index_name} doesn't exist in vector database")
 
-    self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                                self.blob_ids.values.reshape(1, -1)[0])
-    #TODO: load rep from stored database or parameter
-    self.reps = None
 
-  # TODO: Add memory efficient FPF Random Bucketter
+  def initialize_embeddings(self):
+    self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name, self.blob_ids.values.reshape(1, -1)[0])
+
+
+  # # TODO: Add memory efficient FPF Random Bucketter
   def _FPF(self, nb_buckets: Optional[int] = None):
     '''
     FPF mining algorithm and return cluster representative ids, old cluster representatives will always be kept
@@ -93,11 +83,10 @@ class Tasti:
     else:
       buckets = self.nb_buckets
 
-    np.random.RandomState(self.seed)
     reps = np.full(buckets, -1)
     min_dists = np.full(len(self.embeddings), np.Inf, dtype=np.float32)
     num_random = int((1 - self.percent_fpf) * len(reps))
-    random_reps = np.random.choice(len(self.embeddings), num_random, replace=False)
+    random_reps = self.rand.choice(len(self.embeddings), num_random, replace=False)
 
     reps[0] = random_reps[0]
     get_and_update_dists(self.embeddings[reps[0]], self.embeddings, min_dists)
@@ -147,14 +136,11 @@ class Tasti:
     get topk representatives and distances for new embeddings using stale cluster representatives,
     in other words, we don't need to use FPF to reselect cluster representatives
     '''
-    new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                               new_blob_ids.values.reshape(1, -1)[0],
+    new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name, new_blob_ids.values.reshape(1, -1)[0],
                                                                reload=True)
     if self.do_filter:
-      topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name,
-                                                                      new_embeddings,
-                                                                      top_k,
-                                                                      filter_ids=self.reps)
+      topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings,
+                                                                      top_k, filter_ids=self.reps)
     else:
       topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings, top_k)
     topk_reps = self.blob_ids.iloc[np.concatenate(topk_reps)].values.reshape(-1, top_k)

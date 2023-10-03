@@ -6,25 +6,16 @@ import numpy as np
 from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
 from aidb.vector_database.vector_database import VectorDatabase
+from aidb.config.config_types import WeaviateAuth
 
-class WeaviateVectorDataBase(VectorDatabase):
-  def __init__(
-      self,
-      url: str,
-      username: Optional[str] = None,
-      pwd: Optional[str] = None,
-      api_key: Optional[str] = None
-  ):
+class WeaviateVectorDatabase(VectorDatabase):
+  def __init__(self, weaviate_auth: WeaviateAuth):
     '''
     Authentication
-    :param url: weaviate url
-    :param username: weaviate username
-    :param pwd: weaviate password
-    :param api_key: weaviate api key, user should choose input either username/pwd or api_key
     '''
-    auth_client_secret = self._get_auth_secret(username, pwd, api_key)
+    auth_client_secret = self._get_auth_secret(weaviate_auth.username, weaviate_auth.pwd, weaviate_auth.api_key)
     self.weaviate_client = weaviate.Client(
-      url=url,
+      url=weaviate_auth.url,
       auth_client_secret=auth_client_secret
     )
 

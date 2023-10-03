@@ -39,7 +39,7 @@ class VectorDatabase(abc.ABC):
 
 
   @abc.abstractmethod
-  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray) -> np.ndarray:
+  def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
     '''
     Get embeddings by id and return results
     :param ids: ids of data

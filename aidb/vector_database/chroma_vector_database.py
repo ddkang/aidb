@@ -6,7 +6,7 @@ from aidb.utils.logger import logger
 import numpy as np
 
 
-class ChromaVectorDataBase(VectorDatabase):
+class ChromaVectorDatabase(VectorDatabase):
   def __init__(self, path: str):
     '''
     Authentication

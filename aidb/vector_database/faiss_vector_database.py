@@ -6,7 +6,7 @@ from aidb.utils.logger import logger
 import numpy as np
 
 
-class FaissVectorDataBase(VectorDatabase):
+class FaissVectorDatabase(VectorDatabase):
   def __init__(self, path: str, use_gpu: bool = False):
     '''
     Authentication
@@ -131,9 +131,9 @@ class FaissVectorDataBase(VectorDatabase):
     '''
     Get data by id and return results
     '''
-    connected_index = self._connect_by_index(index_name)
     if reload:
       self.load_index(index_name)
+    connected_index = self._connect_by_index(index_name)
     result = []
     for id in ids.tolist():
       record = connected_index.reconstruct(id)
