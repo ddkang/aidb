@@ -33,8 +33,10 @@ class BaseEngine():
     if infer_config:
       self._config: Config = asyncio_run(self._infer_config())
 
+
   def __del__(self):
     asyncio_run(self._sql_engine.dispose())
+
 
   # ---------------------
   # Setup
@@ -60,6 +62,7 @@ class BaseEngine():
 
     return dialect
 
+
   def _create_sql_engine(self):
     logger.info(f'Creating SQL engine for {self._dialect}')
     if self._dialect == 'mysql':
@@ -76,6 +79,7 @@ class BaseEngine():
     )
 
     return engine
+
 
   async def _infer_config(self) -> Config:
     '''
@@ -114,8 +118,10 @@ class BaseEngine():
 
     return config
 
+
   def register_inference_service(self, service: InferenceService):
     self._config.add_inference_service(service.name, service)
+
 
   def bind_inference_service(self, service_name: str, binding: InferenceBinding):
     bound_service = CachedBoundInferenceService(
@@ -128,12 +134,14 @@ class BaseEngine():
     )
     self._config.bind_inference_service(bound_service)
 
+
   # ---------------------
   # Properties
   # ---------------------
   @property
   def dialect(self):
     return self._dialect
+
 
   # ---------------------
   # Inference
@@ -153,6 +161,7 @@ class BaseEngine():
 
     return final_df
 
+
   def process_inference_outputs(self, binding: InferenceBinding, joined_outputs: pd.DataFrame) -> pd.DataFrame:
     '''
     Process the outputs of inference by renaming the columns and selecting the
@@ -164,11 +173,14 @@ class BaseEngine():
     res = joined_outputs[list(binding.output_columns)]
     return res
 
+
   def inference(self, inputs: pd.DataFrame, bound_service: BoundInferenceService) -> List[pd.DataFrame]:
     return bound_service.batch(inputs)
 
+
   def execute(self, query: str):
     raise NotImplementedError()
+
 
   def _find_join_path(
       self,
@@ -204,12 +216,14 @@ class BaseEngine():
         stack.append(neighbor_table)
     return f"FROM {table_names[0]}\n" + '\n'.join(join_strs)
 
+
   def _get_tables(self, columns: List[str]) -> List[str]:
     tables = set()
     for col in columns:
       table_name = col.split('.')[0]
       tables.add(table_name)
     return list(tables)
+
 
   def _get_inner_join_query(self, table_names: List[str]):
     """
@@ -238,12 +252,14 @@ class BaseEngine():
       common_columns, table_relations, table_names)
     return join_path_str
 
+
   def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
     and_connected = []
     for fp in filtering_predicates:
       and_connected.append(" OR ".join(
         [predicate_to_str(p) for p in fp]))
     return " AND ".join(and_connected)
+
 
   def get_input_query_for_inference_service(self, bound_service: BoundInferenceService, user_query: Query,
                                             already_executed_inference_services: set):
