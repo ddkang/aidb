@@ -1,7 +1,8 @@
 import pandas as pd
+from sqlalchemy.sql import text
+
 from aidb.engine.base_engine import BaseEngine
 from aidb.query.query import Query
-from sqlalchemy.sql import text
 
 
 class FullScanEngine(BaseEngine):

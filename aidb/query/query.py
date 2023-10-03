@@ -3,13 +3,14 @@ from functools import cached_property
 from typing import Dict, List
 
 import sqlglot.expressions as exp
+from sqlglot import Parser, Tokenizer
+from sympy import sympify
+from sympy.logic.boolalg import to_cnf
+
 from aidb.config.config import Config
 from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
                               change_literal_type_to_col_type,
                               extract_column_or_value)
-from sqlglot import Parser, Tokenizer
-from sympy import sympify
-from sympy.logic.boolalg import to_cnf
 
 
 @dataclass(frozen=True)
