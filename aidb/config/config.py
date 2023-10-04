@@ -41,7 +41,6 @@ class Config:
   relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
 
-
   @cached_property
   def inference_graph(self) -> Graph:
     '''
@@ -72,6 +71,40 @@ class Config:
         parent_table = pk_other_table.split('.')[0]
         table_graph.add_edge(table_name, parent_table)
     return table_graph
+
+  @cached_property
+  def column_graph(self) -> Graph:
+    '''
+    Directed graph of foreign key relationship between columns.
+    The column graph _nodes_ are columns. The _edges_ are foreign key relations.
+    If A -> B, then A is a foreign key column that refers to B.
+    '''
+    column_graph = nx.DiGraph()
+    for table_name in self.tables:
+      for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
+        column_graph.add_edge(f"{table_name}.{fk_col}", pk_other_table)
+    return column_graph
+
+
+  @cached_property
+  def columns_to_root_column(self) -> Dict[str, str]:
+    # for e.g. blob -> object -> color, {'color.frame': 'blob.frame', 'object.frame': 'blob.frame'}
+    def get_original_column(column, column_graph: nx.DiGraph):
+      if column not in column_graph.nodes:
+        return column
+      column_derived_from = list(column_graph[column].keys())
+      assert len(column_derived_from) <= 1
+      if len(column_derived_from) == 0:
+        return column
+      else:
+        return get_original_column(column_derived_from[0], column_graph)
+
+    column_mappings = {}
+    for col in self.columns:
+      root_col = get_original_column(col, self.column_graph)
+      if root_col != col:
+        column_mappings[col] = root_col
+    return column_mappings
 
 
   @cached_property
@@ -191,10 +224,21 @@ class Config:
         out_primary_key_columns.add(f"{output_table}.{pk_col}")
 
       # Any column in the output table with a foreign key relationship
-      # must exist in the primary key columns of the input tables.
+      # must exist in the primary key columns of the input tables
+      # or the columns that the primary key columns of the input tables refer to.
       for pk_col in input_primary_key_columns:
         if pk_col not in out_foreign_key_columns and pk_col not in out_primary_key_columns:
-          raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
+          current_table = pk_col.split('.')[0]
+          current_pk_col = pk_col.split('.')[1]
+          raise_exception = True
+          while current_pk_col in self.tables[current_table].foreign_keys:
+            current_pk_col = self.tables[current_table].foreign_keys[current_pk_col]
+            current_table = current_pk_col.split('.')[0]
+            if current_pk_col in out_foreign_key_columns or current_pk_col in out_primary_key_columns:
+              raise_exception = False
+              break
+          if raise_exception:
+            raise Exception(f'Primary key column {pk_col} in input table is not refered by output table {output_table}')
 
 
   def check_inference_service_validity(self, bound_inference: BoundInferenceService):
@@ -242,12 +286,7 @@ class Config:
     self._check_foreign_key_refers_to_primary_key(input_tables, output_tables)
 
     # The graphs of table relations and column relations must form DAGs.
-    table_graph = self.table_graph
-    for input_table in input_tables:
-      for output_table in output_tables:
-        if input_table != output_table:
-          table_graph.add_edge(output_table, input_table)
-    if not nx.is_directed_acyclic_graph(table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
+    if not nx.is_directed_acyclic_graph(self.table_graph) or not nx.is_directed_acyclic_graph(self.inference_graph):
       raise Exception(f'Inference service {bound_inference.service.name} will result in cycle in relations')
 
 
