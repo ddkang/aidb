@@ -41,7 +41,6 @@ class Config:
   relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
 
-
   @cached_property
   def inference_graph(self) -> Graph:
     '''
@@ -72,6 +71,40 @@ class Config:
         parent_table = pk_other_table.split('.')[0]
         table_graph.add_edge(table_name, parent_table)
     return table_graph
+
+  @cached_property
+  def column_graph(self) -> Graph:
+    '''
+    Directed graph of foreign key relationship between columns.
+    The column graph _nodes_ are columns. The _edges_ are foreign key relations.
+    If A -> B, then A is a foreign key column that refers to B.
+    '''
+    column_graph = nx.DiGraph()
+    for table_name in self.tables:
+      for fk_col, pk_other_table in self.tables[table_name].foreign_keys.items():
+        column_graph.add_edge(f"{table_name}.{fk_col}", pk_other_table)
+    return column_graph
+
+
+  @cached_property
+  def columns_to_root_column(self) -> Dict[str, str]:
+    # for e.g. blob -> object -> color, {'color.frame': 'blob.frame', 'object.frame': 'blob.frame'}
+    def get_original_column(column, column_graph: nx.DiGraph):
+      if column not in column_graph.nodes:
+        return column
+      column_derived_from = list(column_graph[column].keys())
+      assert len(column_derived_from) <= 1
+      if len(column_derived_from) == 0:
+        return column
+      else:
+        return get_original_column(column_derived_from[0], column_graph)
+
+    column_mappings = {}
+    for col in self.columns:
+      root_col = get_original_column(col, self.column_graph)
+      if root_col != col:
+        column_mappings[col] = root_col
+    return column_mappings
 
 
   @cached_property
