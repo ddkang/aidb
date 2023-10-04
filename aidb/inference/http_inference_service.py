@@ -44,6 +44,8 @@ class HTTPInferenceService(CachedInferenceService):
     for k, v in input.to_dict().items():
       if k in self._columns_to_input_keys:
         input_with_keys_required_by_inference_service[self._columns_to_input_keys[k]] = v
+      else:
+        input_with_keys_required_by_inference_service[k] = v
     response = requests.post(self._url, json=input_with_keys_required_by_inference_service, headers=self._headers)
     response.raise_for_status()
     response = response.json()
