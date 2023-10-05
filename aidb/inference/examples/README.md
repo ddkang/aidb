@@ -38,12 +38,11 @@ dtype: object
 ```
 
 Response:
-```
-	index	finish_reason	created	id	model	role	content
-0	0	stop	1696485393	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ	gpt-3.5-turbo-0613	assistant	Yes, Google Cloud Vision API is an artificial ...
-1	1	stop	1696485393	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ	gpt-3.5-turbo-0613	assistant	Yes, I am familiar with the Google Cloud Visio...
-2	2	stop	1696485393	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ	gpt-3.5-turbo-0613	assistant	Yes, I am familiar with Google Cloud Vision AP...
-```
+|	|index|	finish_reason|	created|	id|	model|	role|	content|
+|---|---|---|---|---|---|---|---|
+|0|	0|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a service provided by Google Cloud Platform that allows developers to easily integrate image analysis and recognition capabilities into their applications. The API enables tasks such as labeling images, detecting objects and faces, reading printed and handwritten text, and identifying similar images. It uses machine learning models developed by Google to deliver accurate results.|
+|1|	1|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a machine learning-based technology that allows developers to integrate image analysis features into their applications. It can perform tasks such as detecting objects, faces, and landmarks in images, as well as extracting text, sentiment analysis, and generating image descriptions.|
+|2|	2|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a cloud-based machine learning API offered by Google that allows developers to integrate computer vision capabilities into their applications. The API provides various pre-trained models that can perform tasks such as labeling images, detecting faces, objects, and landmarks, OCR (optical character recognition), explicit content detection, and more.|
 
 ### [Images](https://platform.openai.com/docs/api-reference/images)
 
@@ -112,4 +111,34 @@ Response (this response is fake):
 | --- | --- |
 | 0	| Stanford PhD student Lvmin Zhang has created an elegant, non-nucleic acid that provides a direct replacement for the polyisopentocine and tritunocine monomers found in the A1, A2 and B1 |
 
+### [CV](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision)
 
+All HuggingFace CV tasks only accept filename as input. The output could be multiple columns and multiple rows, depending on tasks. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters.
+
+Example usage:
+```python
+import pandas as pd
+from aidb.inference.examples.huggingface_inference_service import HFVisionAudio
+hf_cv_request_dict = {
+    "filename": "/home/conrevo/图片/avatar.png"
+}
+hf_cv_request_pd = pd.Series(hf_cv_request_dict)
+hf_cv = HFVisionAudio(HF_KEY, "facebook/detr-resnet-50")
+hf_cv_response_pd = hf_cv.infer_one(hf_cv_request_pd)
+```
+
+Input Series:
+```
+filename    /path/to/image.png
+dtype: object
+```
+
+Response:
+|  | score | label | box |
+| --- | --- | --- | --- |
+|0|	0.998632|	tie	|{'xmin': 214, 'ymin': 254, 'xmax': 254, 'ymax': 426}|
+|1|	0.997547|	person	|{'xmin': 50, 'ymin': 26, 'xmax': 511, 'ymax': 509}|
+> TODO: box is a JSON object. There are probably better ways of representing it, but this varies between tasks.
+
+### [Audio](https://huggingface.co/docs/api-inference/detailed_parameters#audio)
+> TODO: Test audio.

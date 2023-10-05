@@ -54,5 +54,5 @@ class HFVisionAudio(HTTPInferenceService):
       response = requests.post(self._url, data=f, headers=self._headers)
     response.raise_for_status()
     response = response.json()
-    output = pd.DataFrame([response])
+    output = pd.DataFrame(response)
     return output
