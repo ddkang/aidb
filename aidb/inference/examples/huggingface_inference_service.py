@@ -21,7 +21,7 @@ class HFNLP(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       copy_input=False,
-      batch_supported=True,
+      batch_supported=False,
       is_single=False,
     )
 

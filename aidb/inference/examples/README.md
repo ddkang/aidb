@@ -62,10 +62,8 @@ openai_image_request_dict ={
     "size": "512x512"
   }
 openai_image_request_pd = pd.Series(openai_image_request_dict)
-print(openai_image_request_pd)
 openai_image = OpenAIImage(OPENAI_KEY)
 openai_image_response_pd = openai_image.infer_one(openai_image_request_pd)
-openai_image_response_pd
 ```
 
 Input Series:
@@ -77,11 +75,41 @@ dtype: object
 ```
 
 Response:
-```
-    created data
-0	1696490931	https://oaidalleapiprodscus.blob.core.windows....
-1	1696490931	https://oaidalleapiprodscus.blob.core.windows....
-```
+|  | created | data |
+| --- | --- | --- |
+|0|	1696526028|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-FSG2IoVXnPDW9BZzmPFbpmbD.png?st=2023-10-05T16%3A13%3A48Z&se=2023-10-05T18%3A13%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-05T16%3A36%3A11Z&ske=2023-10-06T16%3A36%3A11Z&sks=b&skv=2021-08-06&sig=qxcS2z0NfNjkTZbekbDr5GW4Atxo8/alqS6%2BABqahIM%3D |
+|1|	1696526028|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-aUkigAi9MXCdC2qBu8A8sDy0.png?st=2023-10-05T16%3A13%3A48Z&se=2023-10-05T18%3A13%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-05T16%3A36%3A11Z&ske=2023-10-06T16%3A36%3A11Z&sks=b&skv=2021-08-06&sig=CU6te7nynHR7nplAs4D%2B3Yoa4rTRdE%2BUnvx8jsba%2BTk%3D |
 
 ### [Audio](https://platform.openai.com/docs/api-reference/audio)
 > TODO: Test audio.
+
+## HuggingFace
+
+### [NLP](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing)
+
+All HuggingFace NLP tasks have the same input format. Your input should have 1 row and 1-3 columns `inputs`(required, a string), `parameters` (optional, a JSON object) and/or `options` (optional, a JSON object). Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters. You should only provide one row, otherwise HuggingFace will throw an error.
+
+Example usage:
+```python
+import pandas as pd
+from aidb.inference.examples.huggingface_inference_service import HFNLP
+hf_nlp_request_dict = {
+        "inputs": "Stanford PhD student Lvmin Zhang has created"
+    }
+hf_nlp_request_pd = pd.Series(hf_nlp_request_dict)
+hf_nlp = HFNLP(HF_KEY, "gpt2")
+hf_nlp_response_pd = hf_nlp.infer_one(hf_nlp_request_pd)
+```
+
+Input Series:
+```
+inputs    Stanford PhD student Lvmin Zhang has created
+dtype: object
+```
+
+Response (this response is fake):
+|  | generated_text |
+| --- | --- |
+| 0	| Stanford PhD student Lvmin Zhang has created an elegant, non-nucleic acid that provides a direct replacement for the polyisopentocine and tritunocine monomers found in the A1, A2 and B1 |
+
+
