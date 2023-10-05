@@ -104,6 +104,7 @@ class BaseEngine():
         None,
       )
       config.load_from_sqlalchemy(conn)
+      logger.debug(f'config: {repr(config)}')
       return config
 
     async with self._sql_engine.begin() as conn:

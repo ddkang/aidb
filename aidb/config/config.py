@@ -334,12 +334,15 @@ class Config:
       blob_keys_flat = conn.execute(blob_metadata_table.select()).fetchall()
       blob_tables = list(set([row['table_name'] for row in blob_keys_flat]))
       blob_tables.sort()
+      logger.debug(f'blob_metadata_table: {blob_metadata_table}')
+      logger.debug(f'blob_keys_flat: {blob_keys_flat}')
       blob_keys = defaultdict(list)
       for row in blob_keys_flat:
         full_name = f'{row["table_name"]}.{row["blob_key"]}'
         blob_keys[row['table_name']].append(full_name)
       for table in blob_keys:
         blob_keys[table].sort()
+      logger.debug(f'blob_keys: ', blob_keys)
     except:
       raise ValueError(f'Could not find blob metadata table {BLOB_TABLE_NAMES_TABLE} or table is malformed')
 
@@ -352,6 +355,7 @@ class Config:
     self.relations = aidb_relations
     self.blob_tables = blob_tables
     self.blob_keys = blob_keys
+    logger.debug(f'blob_tables: ', self.blob_tables)
 
     self.check_schema_validity()
 

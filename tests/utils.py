@@ -20,7 +20,7 @@ async def setup_gt_and_aidb_engine(db_url, data_dir):
   # Connect to the aidb database
   engine = Engine(
     f'{db_url}/{aidb_db_fname}',
-    debug=False,
+    debug=True,
   )
 
   return gt_engine, engine

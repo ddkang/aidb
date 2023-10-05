@@ -6,9 +6,12 @@ from aidb.config.config_types import InferenceBinding
 from aidb.engine import Engine
 from aidb.inference.http_inference_service import HTTPInferenceService
 
+import prettyprinter as pp
+pp.install_extras(exclude=['django', 'ipython', 'ipython_repr_pretty'])
 
-def register_inference_services(engine: Engine, data_dir: str):
-  csv_fnames = glob.glob(f'{data_dir}/inference/*.csv')
+
+def register_inference_services(engine: Engine, data_dir: str, service_concerned='*'):
+  csv_fnames = glob.glob(f'{data_dir}/inference/{service_concerned}.csv')
   csv_fnames.sort()  # TODO: sort by number
   for csv_fname in csv_fnames:
     base_fname = os.path.basename(csv_fname)
@@ -28,7 +31,10 @@ def register_inference_services(engine: Engine, data_dir: str):
         output_cols.append(col[5:])
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")
-
+    print('output_keys_to_columns')
+    pp.pprint(output_keys_to_columns)
+    print('columns_to_input_keys')
+    pp.pprint(columns_to_input_keys)
     service = HTTPInferenceService(
       service_name,
       False,
@@ -37,7 +43,10 @@ def register_inference_services(engine: Engine, data_dir: str):
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns
     )
-
+    print('input_cols')
+    pp.pprint(input_cols)
+    print('output_cols')
+    pp.pprint(output_cols)
     engine.register_inference_service(service)
     engine.bind_inference_service(
       service_name,

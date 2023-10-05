@@ -1,6 +1,10 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
+
+from aidb.query.column_extractor import ColumnExtractor
+from aidb.utils.logger import logger
 
 import sqlglot.expressions as exp
 from sqlglot import Parser, Tokenizer
@@ -11,6 +15,19 @@ from aidb.config.config import Config
 from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
                               change_literal_type_to_col_type,
                               extract_column_or_value)
+
+
+def is_aqp_exp(node):
+  return isinstance(node, exp.ErrorTarget) \
+    or isinstance(node, exp.RecallTarget) \
+    or isinstance(node, exp.PrecisionTarget) \
+    or isinstance(node, exp.Confidence) \
+    or isinstance(node, exp.Budget)
+
+def _remove_aqp(node):
+  if is_aqp_exp(node):
+    return None
+  return node
 
 
 @dataclass(frozen=True)
@@ -27,15 +44,20 @@ class Query(object):
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
 
-
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
-
   @cached_property
   def sql_query_text(self):
-    return self._expression.sql()
+    return self.base_sql_no_aqp.sql()
+
+  @cached_property
+  def base_sql_no_aqp(self):
+    _exp_no_aqp = self._expression.transform(_remove_aqp)
+    if _exp_no_aqp is None:
+      raise Exception('SQL contains no non-AQP statements')
+    return _exp_no_aqp
 
 
   @cached_property
@@ -81,7 +103,6 @@ class Query(object):
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
-
 
   @cached_property
   def tables_in_query(self):
@@ -192,6 +213,8 @@ class Query(object):
       # predicate mapping will be filled by this function
       sympy_representation, _ = self._get_sympify_form(self._expression.find(exp.Where), 0, predicate_mappings)
       sympy_expression = sympify(sympy_representation)
+      logger.debug(f'sympy_representation: ', repr(sympy_representation))
+      logger.debug(f'sympy_expression: ', repr(sympy_expression))
       cnf_expression = to_cnf(sympy_expression)
       filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
       filtering_clauses = []
@@ -230,6 +253,7 @@ class Query(object):
               FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
                               Expression(t2, right_value)))
         filtering_clauses.append(or_connected_clauses)
+        print(f'filtering_clauses: {repr(filtering_clauses)}')
       return filtering_clauses
     else:
       return []
@@ -245,6 +269,7 @@ class Query(object):
     elif len(tables_of_column) > 1:
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
+      print(f'tables of column: {tables_of_column}')
       return tables_of_column[0]
 
 
@@ -261,6 +286,7 @@ class Query(object):
         table_name = self.table_aliases_to_name[table_name]
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
+    print(f"{table_name}.{node.args['this'].args['this']}")
     return f"{table_name}.{node.args['this'].args['this']}"
 
 
@@ -310,3 +336,58 @@ class Query(object):
           tables_required.add(originated_from.split('.')[0])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
+
+  # Get aggregation type
+  def get_agg_type(self):
+    logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
+    # if len(self.base_sql_no_aqp.args['expressions']) != 1:
+    #   raise Exception('Multiple expressions found')
+    select_exp = self.base_sql_no_aqp.args['expressions'][0]
+    if isinstance(select_exp, exp.Avg):
+      return exp.Avg
+    elif isinstance(select_exp, exp.Count):
+      return exp.Count
+    elif isinstance(select_exp, exp.Sum):
+      return exp.Sum
+    else:
+      logger.debug('Unsupported aggregation', select_exp)
+      return None
+
+  def get_aggregated_column(self, agg_type):
+    """
+    returns the column name that is aggregated in the query.
+    for e.g. SELECT Avg(sentiment) from sentiments;
+    will return sentiment
+    """
+    agg_exp_tree = self._expression.find(agg_type)
+    for node, _, key in agg_exp_tree.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          return node.args['this'].args['this']
+    return None
+
+  @cached_property
+  def _columns(self):
+    extractor = ColumnExtractor()
+    return extractor.extract(self.base_sql_no_aqp)
+
+  def is_approx_agg_query(self):
+    return True if self.get_agg_type() else False
+
+  def get_confidence(self):
+    return 95
+
+  def get_error_target(self):
+    return 0.01
+
+  def get_table_of_column(self, col_name, tables_info, tables_in_query):
+    tables_of_column = []
+    for table in tables_in_query:
+      if col_name in tables_info[table]:
+        tables_of_column.append(table)
+    if len(tables_of_column) == 0:
+      raise Exception(f"Column - {col_name} is not present in any table")
+    elif len(tables_of_column) > 1:
+      raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
+    else:
+      return tables_of_column[0]
