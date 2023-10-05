@@ -86,7 +86,7 @@ Response:
 
 ### [NLP](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing)
 
-All HuggingFace NLP tasks have the same input format. Your input should have 1 row and 1-3 columns `inputs`(required, a string), `parameters` (optional, a JSON object) and/or `options` (optional, a JSON object). Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters. You should only provide one row, otherwise HuggingFace will throw an error.
+All HuggingFace NLP tasks are supported and they have the same input format. Your input should have 1 row and 1-3 columns `inputs`(required, a string), `parameters` (optional, a JSON object) and/or `options` (optional, a JSON object). Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters. You should only provide one row, otherwise HuggingFace will throw an error.
 
 Example usage:
 ```python
@@ -113,14 +113,14 @@ Response (this response is fake):
 
 ### [CV](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision)
 
-All HuggingFace CV tasks only accept filename as input. The output could be multiple columns and multiple rows, depending on tasks. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters.
+All HuggingFace CV tasks are supported and they only accept filename as input. The output could be multiple columns and multiple rows, depending on tasks. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters.
 
 Example usage:
 ```python
 import pandas as pd
 from aidb.inference.examples.huggingface_inference_service import HFVisionAudio
 hf_cv_request_dict = {
-  "filename": "/home/conrevo/图片/avatar.png"
+  "filename": "/path/to/image.png"
 }
 hf_cv_request_pd = pd.Series(hf_cv_request_dict)
 hf_cv = HFVisionAudio(HF_KEY, "facebook/detr-resnet-50")
@@ -144,3 +144,36 @@ Response:
 > TODO: Test audio.
 
 ## Google
+We support [files.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/files/annotate) and [images.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate). Please create corresponding [AnnotateFileRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateFileRequest) or [AnnotateImageRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateImageRequest) for input.
+
+Output is a JSON object, in the same format as [BatchAnnotateFilesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateFilesResponse) and [BatchAnnotateImagesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateImagesResponse).
+> TODO: I currently reserve output as JSON because they are TOO MUCH and I'm not sure what we/users want.
+
+Example usage:
+```python
+import base64
+import pandas as pd
+from aidb.inference.examples.google_inference_service import GoogleVisionAnnotate
+with open("/path/to/image.jpg", "rb") as f:
+    image_bytes = f.read()
+image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+google_cv_request_dict = {
+  "image": image_base64,
+  "features": [{
+      "type": "IMAGE_PROPERTIES",
+    }, {
+      "type": "FACE_DETECTION"
+    }
+  ]
+}
+google_cv_request_pd = pd.Series(google_cv_request_dict)
+google_cv = GoogleVisionAnnotate(GOOGLE_KEY, project_id="your_project_id")
+google_cv_response_pd = google_cv.infer_one(google_cv_request_pd)
+```
+
+The way to obtain a Google API key is tricky. Please do
+```bash
+gloud init
+gloud auth application-default print-access-token
+```
+in your terminal. You may need additional steps as prompted.
