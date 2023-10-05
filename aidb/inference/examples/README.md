@@ -1,6 +1,6 @@
 # Example Inference Services 
 
-## OpenAI 
+## [OpenAI API]()
 
 ### [Chat](https://platform.openai.com/docs/api-reference/chat)
 
@@ -56,10 +56,10 @@ Example usage:
 import pandas as pd
 from aidb.inference.examples.openai_inference_service import OpenAIImage
 openai_image_request_dict ={
-    "prompt": "Full body Miku smiling",
-    "n": 2,
-    "size": "512x512"
-  }
+  "prompt": "Full body Miku smiling",
+  "n": 2,
+  "size": "512x512"
+}
 openai_image_request_pd = pd.Series(openai_image_request_dict)
 openai_image = OpenAIImage(OPENAI_KEY)
 openai_image_response_pd = openai_image.infer_one(openai_image_request_pd)
@@ -93,8 +93,8 @@ Example usage:
 import pandas as pd
 from aidb.inference.examples.huggingface_inference_service import HFNLP
 hf_nlp_request_dict = {
-        "inputs": "Stanford PhD student Lvmin Zhang has created"
-    }
+  "inputs": "Stanford PhD student Lvmin Zhang has created"
+}
 hf_nlp_request_pd = pd.Series(hf_nlp_request_dict)
 hf_nlp = HFNLP(HF_KEY, "gpt2")
 hf_nlp_response_pd = hf_nlp.infer_one(hf_nlp_request_pd)
@@ -120,7 +120,7 @@ Example usage:
 import pandas as pd
 from aidb.inference.examples.huggingface_inference_service import HFVisionAudio
 hf_cv_request_dict = {
-    "filename": "/home/conrevo/图片/avatar.png"
+  "filename": "/home/conrevo/图片/avatar.png"
 }
 hf_cv_request_pd = pd.Series(hf_cv_request_dict)
 hf_cv = HFVisionAudio(HF_KEY, "facebook/detr-resnet-50")
@@ -142,3 +142,5 @@ Response:
 
 ### [Audio](https://huggingface.co/docs/api-inference/detailed_parameters#audio)
 > TODO: Test audio.
+
+## Google
