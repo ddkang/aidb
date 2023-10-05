@@ -66,13 +66,27 @@ class OpenAIImage(HTTPInferenceService):
     )
 
 
+  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    request = input.to_dict()
+    response = requests.post(self._url, json=request, headers=self._headers)
+    response.raise_for_status()
+    response = response.json()
+    if 'b64_json' in response['data'][0]:
+      response['data'] = [r['b64_json'] for r in response['data']]
+    elif 'url' in response['data'][0]:
+      response['data'] = [r['url'] for r in response['data']]
+    output = pd.DataFrame(response)
+    if self._copy_input:
+      output = output.assign(**input)
+    return output
+
+
 class OpenAIText(HTTPInferenceService):
   def __init__(self, token: str):
     '''
     :param str token: The token to use for authentication.
 
-    For `infer_one`, input can have multiple rows.
-      Except `messages` column, all other columns should be the same.
+    For `infer_one`, input should have 1 row.
       Format should follow https://platform.openai.com/docs/api-reference/chat/create
 
     outputs may have multiple rows. Columns containing all `choices` from generated text,
@@ -92,13 +106,18 @@ class OpenAIText(HTTPInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    request = input.to_dict(orient='records')[0]
-    request['messages'] = []
-    for message in input['messages']:
-      request['messages'].append(message)
+    request = input.to_dict()
     response = requests.post(self._url, json=request, headers=self._headers)
     response.raise_for_status()
     response = response.json()
+    choices = response['choices']
+    for choice in choices:
+      choice['created'] = response['created']
+      choice['id'] = response['id']
+      choice['model'] = response['model']
+      choice['role'] = choice['message']['role']
+      choice['content'] = choice['message']['content']
+      del choice['message']
     output = pd.DataFrame(response['choices'])
     if self._copy_input:
       output = output.assign(**input)

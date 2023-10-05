@@ -42,7 +42,7 @@ class HTTPInferenceService(CachedInferenceService):
     # Turns the input into a list
     input_with_keys_required_by_inference_service = {}
     for k, v in input.to_dict().items():
-      if k in self._columns_to_input_keys:
+      if self._columns_to_input_keys and k in self._columns_to_input_keys:
         input_with_keys_required_by_inference_service[self._columns_to_input_keys[k]] = v
       else:
         input_with_keys_required_by_inference_service[k] = v
