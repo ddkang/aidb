@@ -28,7 +28,7 @@ def register_inference_services(engine: Engine, data_dir: str):
         output_cols.append(col[5:])
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")
-    
+
     service = HTTPInferenceService(
       service_name,
       False,
@@ -37,7 +37,7 @@ def register_inference_services(engine: Engine, data_dir: str):
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns
     )
-    
+
     engine.register_inference_service(service)
     engine.bind_inference_service(
       service_name,
