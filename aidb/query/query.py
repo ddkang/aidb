@@ -212,8 +212,6 @@ class Query(object):
       # predicate mapping will be filled by this function
       sympy_representation, _ = self._get_sympify_form(self._expression.find(exp.Where), 0, predicate_mappings)
       sympy_expression = sympify(sympy_representation)
-      logger.debug(f'sympy_representation: ', repr(sympy_representation))
-      logger.debug(f'sympy_expression: ', repr(sympy_expression))
       cnf_expression = to_cnf(sympy_expression)
       filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
       filtering_clauses = []
@@ -369,7 +367,6 @@ class Query(object):
     value = None
     for node, _, key in self._expression.walk():
       if isinstance(node, exp_type):
-        # FIXME: this is only for AQP
         if value is not None:
           raise Exception('Multiple AQP keywords found')
         else:
