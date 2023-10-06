@@ -378,7 +378,7 @@ class Query(object):
     return 95
 
   def get_error_target(self):
-    return 0.01
+    return 0.1
 
   def get_table_of_column(self, col_name, tables_info, tables_in_query):
     tables_of_column = []

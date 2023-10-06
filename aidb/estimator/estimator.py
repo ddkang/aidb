@@ -29,8 +29,9 @@ def _get_estimate_bennett(
   conf: float
 ) -> Estimate:
   delta_inp = 1. - conf
-  b = scipy.stats.chi2.ppf(delta_inp / 2, num_samples - 1)
+  b = scipy.stats.chi2.ppf(delta_inp / 2, num_samples - 1) # lower critical value
   std_ub = std * np.sqrt(num_samples - 1) / np.sqrt(b)
+  std_ub = estimate + std * (1.96)
   var_ub = std_ub ** 2 * num_samples
   logger.info(f'estimate: {estimate}, std: {std}, max_statistic: {max_statistic}, num_samples: {num_samples}, conf: {conf}')
 
@@ -80,23 +81,12 @@ class WeightedMeanSingleEstimator(Estimator):
 class WeightedMeanSetEstimator(Estimator):
   def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
-    print(f'weights: {weights}')
     statistics = np.array([sample.statistic for sample in samples])
-    print(f'statistics: {statistics}')
     agg_table = kwargs.get("agg_table")
-    print(f'agg_table: {agg_table}')
     counts = np.array([sample.num_items[agg_table] if agg_table in sample.num_items else 0 for sample in samples])
-    print(f'counts: {counts}')
     cstats = np.repeat(statistics, counts)
-    print(f'cstats: {cstats}')
     weights = np.repeat(weights, counts)
-    print(f'weights modified: {weights}')
     wstats = DescrStatsW(cstats, weights=weights, ddof=0)
-    print(f'wstats: {wstats}')
-    print(f'max cstats: {np.abs(cstats).max()}')
-    print(f'len cstats: {len(cstats)}')
-    print(f'wstats.mean: {wstats.mean}')
-    print(f'wstats.std: {wstats.std}')
     return _get_estimate_bennett(
       wstats.mean,
       wstats.std,

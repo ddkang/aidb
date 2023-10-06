@@ -15,13 +15,6 @@ from aidb.estimator.estimator import (Estimator, WeightedCountSetEstimator,
 from aidb.samplers.sampler import SampledBlobId, SampledBlob
 
 
-def get_flat_keys(cols):
-  return [col.split('.')[1] for col in cols]
-
-def combine_str(cols):
-  return ','.join(cols)
-
-
 class ApproximateAggregateEngine(BaseEngine):
   def _get_estimator(self, agg_type: exp.Expression, columns: List[str]) -> Estimator:
     if agg_type == exp.Sum:
@@ -33,7 +26,7 @@ class ApproximateAggregateEngine(BaseEngine):
     else:
       raise NotImplementedError()
   
-  def get_pilot_sampling_query(self,bound_service, query,
+  def get_random_sampling_query(self,bound_service, query,
                         inference_services_executed):
     inp_query_str = self.get_input_query_for_inference_service(
                           bound_service,
@@ -43,7 +36,7 @@ class ApproximateAggregateEngine(BaseEngine):
 
     return f'''{inp_query_str.replace(';', '')}
                 ORDER BY RANDOM()
-                LIMIT {self.num_pilot_samples};'''
+                LIMIT {self.num_samples_required};'''
 
 
   def get_num_blob_ids_query(self, table, column, num_samples=100):
@@ -56,44 +49,37 @@ class ApproximateAggregateEngine(BaseEngine):
   def get_population_percent(self):
     return 10
 
-  def statistic_fn(self, sample, agg_on_column, agg_table):
+  def search_sample_columns(self, sample, agg_on_column, agg_table):
     column_of_interest = f'{agg_table}.{agg_on_column}'
-    print(f'sample: {sample}, typesample: {type(sample)}')
-    print(f'column_of_interest: {column_of_interest}')
     if column_of_interest not in sample.columns:
-      print('cond1')
       return False
     if sample[column_of_interest].empty:
-      print('cond2')
       return False
     return True
 
-  async def get_sampled_blobs_with_stats(self, infer_output, agg_on_column, agg_table, query, another_conn):
+  async def get_sampled_blobs_with_stats(self, infer_output, agg_on_column, agg_table, query, est_conn):
     sampled_blobs = []
     num_samples = len(infer_output)
     mass = 1.
     wt = 1. / (num_samples)
     for idx in range(num_samples):
-      print(f'idx: {idx}')
-      print(f'{repr(infer_output[idx])}, type: {type(infer_output[idx])}')
       sampled_blob_id = SampledBlobId(
                           infer_output[idx],
                           1. / num_samples,
                           1.
                         )
-      blob_table = {agg_table: infer_output[idx]} # self._config.blob_tables[0]
-      statistic_ans = self.statistic_fn(infer_output[idx], agg_on_column, agg_table) # if statistic_fn is not None else None
-      if not statistic_ans:
+      blob_table = {agg_table: infer_output[idx]}
+      if not self.search_sample_columns(infer_output[idx], agg_on_column, agg_table):
         continue
 
       map_cols = {}
       for col in infer_output[idx].columns:
-        map_cols[col] = col.split('.')[1]
+        hier_col = col.split('.')
+        map_cols[col] = hier_col[1] if len(hier_col) > 1 else hier_col[0]
       infer_output[idx].rename(columns=map_cols, inplace=True)
-      print(f'modified df: {repr(infer_output[idx])}, type: {type(infer_output[idx])}')
       proxy_table = f'{agg_table}_proxy'
 
-      await another_conn.run_sync(
+      await est_conn.run_sync(
             lambda sync_conn: infer_output[idx].to_sql(
                 proxy_table,
                 con=sync_conn,
@@ -102,20 +88,16 @@ class ApproximateAggregateEngine(BaseEngine):
             )
         )
       new_query = query.sql_query_text.replace(agg_table, proxy_table)
-      print(f'orig q:{query.sql_query_text}, query executed: {new_query}')
-      res = await another_conn.execute(text(new_query))
-      print(f'res: {res},')
+      res = await est_conn.execute(text(new_query))
       res = res.fetchone()
-      print(f' res.fetchone/ statistic_ans: {res}')      
       statistic_ans = res[0]
-
       sampled_blobs.append(SampledBlob(
                               infer_output[idx],
                               1. / num_samples,
                               1.,
                               blob_table,
                               statistic_ans,
-                              {agg_table: len(infer_output[idx])} # self._config.blob_tables[0]
+                              {agg_table: len(infer_output[idx])}
                           )
       )
     return sampled_blobs
@@ -145,12 +127,7 @@ class ApproximateAggregateEngine(BaseEngine):
                                 inp_table,
                                 inp_col
                         )
-      print(f'''inp_col: {inp_col}
-                inp_table: {inp_table}
-                    ''')
-      print('num_ids_query', num_ids_query)
       return num_ids_query
-
     num_ids_query = get_num_ids_query()
     async with self._sql_engine.begin() as conn:
       self.num_blob_ids = await conn.run_sync(
@@ -160,72 +137,55 @@ class ApproximateAggregateEngine(BaseEngine):
                               )
                           )
     self.num_blob_ids = int(self.num_blob_ids.iloc[0, 0])
-    print('self.num_blob_ids: ', self.num_blob_ids, type(self.num_blob_ids))
-    self.num_pilot_samples = int(self.num_blob_ids * population_percent / 100.)
+
+    #for pilot run
+    self.num_samples_required = int(self.num_blob_ids * population_percent / 100.)
 
     service_ordering = self._config.inference_topological_order
-    print(f'service_ordering: {service_ordering}')
     inference_services_executed = set()
-    print(f'self._config.column_by_service: {self._config.column_by_service}')
-    async with self._sql_engine.begin() as conn:
-      for bound_service in service_ordering:
-        out_query = self.get_pilot_sampling_query(
-                            bound_service,
-                            query,
-                            inference_services_executed
-                          )
-        print(f'out_query: {out_query}')
+    for bound_service in service_ordering:
+      if not f'{agg_on_column_table}.{agg_on_column}' in bound_service.binding.output_columns:
+        continue
+      out_query = self.get_random_sampling_query(
+                          bound_service,
+                          query,
+                          inference_services_executed
+                        )
+      async with self._sql_engine.begin() as conn:
         out_df = await conn.run_sync(
                           lambda conn: pd.read_sql(
                             text(out_query),
                             conn
                           )
                         )
-        print('out_df: ', out_df.head(), len(out_df))
+      input_samples = await bound_service.infer(out_df)
 
-        if not f'{agg_on_column_table}.{agg_on_column}' in bound_service.binding.output_columns:
-          continue
-        print(f'agg_on_column_table: {agg_on_column_table}, agg_on_column: {agg_on_column}')
-        input_samples = await bound_service.infer(out_df)
-        print(f'input_samples: {repr(input_samples)}, type: {type(input_samples)}')
-
+      async with self._sql_engine.begin() as conn:
         sampled_blobs = await self.get_sampled_blobs_with_stats(input_samples, agg_on_column, agg_on_column_table, query, conn)
-        print(f'sampled_blobs: {repr(sampled_blobs)}')
 
-        estimator = self._get_estimator(agg_type, columns)
-        pilot_estimate = estimator.estimate(sampled_blobs, self.num_pilot_samples, conf / 2, agg_table=agg_on_column_table)
-        print(f'pilot_estimate: {repr(pilot_estimate)}')
-        p_lb = statsmodels.stats.proportion.proportion_confint(len(sampled_blobs), self.num_pilot_samples, alpha / 2.)[0]
-        num_samples = int(
-          (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 * \
-            (1. / p_lb)
-        )
-        print(f'pilot_estimate.std_ub, num_samples, p_lb: {pilot_estimate}, {pilot_estimate.std_ub}, {num_samples}, {p_lb}')
-
-        self.num_pilot_samples = num_samples # change variable name, as now we're using final no. of samples
-        final_query = self.get_pilot_sampling_query(
-                            bound_service,
-                            query,
-                            inference_services_executed
-                          )
-        print(f'final_query: {final_query}')
+      estimator = self._get_estimator(agg_type, columns)
+      pilot_estimate = estimator.estimate(sampled_blobs, self.num_samples_required, conf, agg_table=agg_on_column_table)
+      p_lb = statsmodels.stats.proportion.proportion_confint(len(sampled_blobs), self.num_samples_required, conf)[0]
+      num_samples = int(
+        (scipy.stats.norm.ppf(1. - alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 *\
+          (1. / p_lb)
+          )
+      self.num_samples_required = num_samples
+      final_query = self.get_random_sampling_query(
+                          bound_service,
+                          query,
+                          inference_services_executed
+                        )
+      async with self._sql_engine.begin() as conn:
         final_df = await conn.run_sync(
                           lambda conn: pd.read_sql(
                             text(final_query),
                             conn
                           )
                         )
+      all_samples = await bound_service.infer(final_df)
+      input_samples.extend(all_samples)
 
-        print('final_df: ', final_df.head(), len(final_df))
-
-        #ERROR occuring at below line of code
-        '''sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
-          [SQL: INSERT INTO objects00 (frame, object_name, confidence, x_min, y_min, x_max, y_max, object_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (frame, object_id) DO UPDATE SET frame = ?, object_name = ?, confidence = ?, x_min = ?, y_min = ?, x_max = ?, y_max = ?, object_id = ?]
-          [parameters: (2040, 'car', 1.0, 1144.31, 821.11, 1590.52, 1077.12, 0, 2040, 'car', 1.0, 1144.31, 821.11, 1590.52, 1077.12, 0)]
-          (Background on this error at: https://sqlalche.me/e/14/e3q8)
-        '''
-        all_samples = await bound_service.infer(final_df)
-        input_samples.extend(all_samples)
+      async with self._sql_engine.begin() as conn:
         all_blobs = await self.get_sampled_blobs_with_stats(input_samples, agg_on_column, agg_on_column_table, query, conn)
-        print(f'all_blobs needed: {repr(all_blobs)}, len(all_blobs): {len(all_blobs)}')
-        return [(estimator.estimate(all_blobs, num_samples, conf, agg_table=agg_on_column_table).estimate,)]
+      return [(estimator.estimate(all_blobs, num_samples, conf, agg_table=agg_on_column_table).estimate,)]

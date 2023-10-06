@@ -23,13 +23,13 @@ queries = [
        ),
       (
         'aggregate',
-        '''SELECT COUNT(x_min) FROM objects00;''',
-        '''SELECT COUNT(x_min) FROM objects00;'''
+        '''SELECT SUM(x_min) FROM objects00;''',
+        '''SELECT SUM(x_min) FROM objects00;'''
       ),
       (
         'aggregate',
-        '''SELECT SUM(x_min) FROM objects00;''',
-        '''SELECT SUM(x_min) FROM objects00;'''
+        '''SELECT COUNT(x_min) FROM objects00;''',
+        '''SELECT COUNT(x_min) FROM objects00;'''
       )
       # ,
      # (
@@ -50,10 +50,10 @@ queries = [
     ]
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
-  def _equality_check(self, ai, gi):
+  def _equality_check(self, aidb_res, gt_res):
     # TO DO
-    gi = gi[0][0]
-    if abs(ai - gi) / (gi) < 1:
+    aidb_res, gt_res = aidb_res[0][0], gt_res[0][0]
+    if abs(aidb_res - gt_res) / (gt_res) < 0.05:
       return True
     return False
 
