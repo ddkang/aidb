@@ -126,8 +126,6 @@ class CachedBoundInferenceService(BoundInferenceService):
 
   async def infer(self, inputs: pd.DataFrame):
     # FIXME: figure out where to put the column renaming
-    print(f'infer inputs: {inputs.head()}, cols: {inputs.columns}, len: {len(inputs)}')
-    print(f'infer function self.binding.input_columns: {self.binding.input_columns}')
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
 
@@ -167,15 +165,11 @@ class CachedBoundInferenceService(BoundInferenceService):
           # FIXME: figure out where to put the column renaming
           for idx, col in enumerate(self.binding.output_columns):
             row_results.rename(columns={row_results.columns[idx]: col}, inplace=True)
-          print(f'row_results: {row_results}')
           tables = self.get_tables(self.binding.output_columns)
-          print(f'tables: {tables}')
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
             tmp_df = row_results[columns]
             tmp_df = tmp_df.astype('object')
-            print(f'columns: {columns}')
-            print(f'tmp_df: {repr(tmp_df)}')
 
             if self._dialect == 'mysql' or self._dialect == 'postgresql':
               tmp_values = tmp_df.to_dict(orient='list')
@@ -191,18 +185,10 @@ class CachedBoundInferenceService(BoundInferenceService):
                   col_name = col.split('.')[1]
                   sqlalchemy_row[col_name] = row[col]
                 # on_conflict_do_update takes only 1 row at a time
-                print(f'''
-                        sqlalchemy_row: {sqlalchemy_row}
-                        self._tables[table]._table: {self._tables[table]._table}
-                        self._tables[table].primary_key: {self._tables[table].primary_key}
-                  ''')
                 insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
                   index_elements=self._tables[table].primary_key,
                   set_=sqlalchemy_row,
                 )
-                print(f'''
-                  insert stmt: {insert}
-                  ''')
                 await conn.execute(insert)
 
             # FIXME: does this need to be used anywhere else?
