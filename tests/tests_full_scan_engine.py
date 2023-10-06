@@ -7,7 +7,6 @@ from sqlalchemy.sql import text
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
 from tests.utils import setup_gt_and_aidb_engine
-from aidb.utils.logger import logger
 
 from multiprocessing import Process
 
@@ -95,7 +94,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: equality check should be implemented
-      logger.debug(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
       assert len(gt_res) == len(aidb_res)
     del gt_engine
     p.terminate()
