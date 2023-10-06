@@ -16,7 +16,7 @@ class GoogleVisionAnnotate(HTTPInferenceService):
     '''
     assert infer_type in [
         "images", "files"
-      ], "infer_type must be images"
+      ], "infer_type must be images or files"
     super().__init__(
         name='google_vision_image_annotate',
         url=f'https://vision.googleapis.com/v1/{infer_type}:annotate',
