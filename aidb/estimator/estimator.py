@@ -31,7 +31,7 @@ def _get_estimate_bennett(
   delta_inp = 1. - conf
   b = scipy.stats.chi2.ppf(delta_inp / 2, num_samples - 1) # lower critical value
   std_ub = std * np.sqrt(num_samples - 1) / np.sqrt(b)
-  std_ub = estimate + std * (1.96)
+  # std_ub = estimate + std * (1.96)
   var_ub = std_ub ** 2 * num_samples
   logger.info(f'estimate: {estimate}, std: {std}, max_statistic: {max_statistic}, num_samples: {num_samples}, conf: {conf}')
 
@@ -49,7 +49,8 @@ def _get_estimate_bennett(
   lb = estimate - t
   ub = estimate + t
 
-  return Estimate(estimate, ub, lb, std, std_ub)
+  ans = Estimate(estimate, ub, lb, std, std_ub)
+  return ans
 
 class Estimator(abc.ABC):
   def __init__(self, population_size: int) -> None:
@@ -79,9 +80,13 @@ class WeightedMeanSingleEstimator(Estimator):
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, normalized: bool, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
+    if normalized:
+      statistics_mean = np.mean(statistics)
+      norm_statistics = np.linalg.norm(statistics)
+      statistics = statistics / norm_statistics
     agg_table = kwargs.get("agg_table")
     counts = np.array([sample.num_items[agg_table] if agg_table in sample.num_items else 0 for sample in samples])
     cstats = np.repeat(statistics, counts)
@@ -96,10 +101,15 @@ class WeightedMeanSetEstimator(Estimator):
     )
 
 class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, normalized: bool, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     # Statistics are already counts
     statistics = np.array([sample.statistic for sample in samples])
+
+    if normalized:
+      statistics_mean = np.mean(statistics)
+      norm_statistics = np.linalg.norm(statistics)
+      statistics = statistics / norm_statistics
 
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
     mean_est = _get_estimate_bennett(
@@ -109,7 +119,7 @@ class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
       len(statistics),
       conf
     )
-    inflation_factor = (num_sampled / len(samples)) * self._population_size
+    inflation_factor = (len(samples) / num_sampled) * self._population_size
     return Estimate(
       mean_est.estimate * inflation_factor,
       mean_est.upper_bound * inflation_factor,

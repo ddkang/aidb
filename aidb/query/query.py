@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
 
-from aidb.query.column_extractor import ColumnExtractor
 from aidb.utils.logger import logger
 
 import sqlglot.expressions as exp
@@ -337,8 +336,8 @@ class Query(object):
   # Get aggregation type
   def get_agg_type(self):
     logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
-    # if len(self.base_sql_no_aqp.args['expressions']) != 1:
-    #   raise Exception('Multiple expressions found')
+    if len(self.base_sql_no_aqp.args['expressions']) != 1:
+      raise Exception('Multiple expressions found')
     select_exp = self.base_sql_no_aqp.args['expressions'][0]
     if isinstance(select_exp, exp.Avg):
       return exp.Avg
@@ -347,7 +346,6 @@ class Query(object):
     elif isinstance(select_exp, exp.Sum):
       return exp.Sum
     else:
-      logger.debug('Unsupported aggregation', select_exp)
       return None
 
   def get_aggregated_column(self, agg_type):
@@ -363,28 +361,50 @@ class Query(object):
           return node.args['this'].args['this']
     return None
 
-  @cached_property
-  def _columns(self):
-    extractor = ColumnExtractor()
-    return extractor.extract(self.base_sql_no_aqp)
-
   def is_approx_agg_query(self):
     return True if self.get_agg_type() else False
 
-  def get_confidence(self):
-    return 95
+  # AQP extraction
+  def get_keyword_arg(self, exp_type):
+    value = None
+    for node, _, key in self._expression.walk():
+      if isinstance(node, exp_type):
+        # FIXME: this is only for AQP
+        if value is not None:
+          raise Exception('Multiple AQP keywords found')
+        else:
+          value = float(node.args['this'].args['this'])
+    return value
 
-  def get_error_target(self):
-    return 0.1
+  @cached_property
+  def _error_target(self):
+    return self.get_keyword_arg(exp.ErrorTarget)
 
-  def get_table_of_column(self, col_name, tables_info, tables_in_query):
-    tables_of_column = []
-    for table in tables_in_query:
-      if col_name in tables_info[table]:
-        tables_of_column.append(table)
-    if len(tables_of_column) == 0:
-      raise Exception(f"Column - {col_name} is not present in any table")
-    elif len(tables_of_column) > 1:
-      raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
-    else:
-      return tables_of_column[0]
+  @cached_property
+  def _confidence(self):
+    return self.get_keyword_arg(exp.Confidence)
+
+  # Validate AQP
+  def validate_aqp(self):
+    if self._error_target and self._confidence is None:
+      raise Exception('AQP target found but no confidence')
+
+    if self._error_target is None and self._confidence is not None:
+      raise Exception('No AQP targets found but confidence found')
+
+    # Only accept select statements
+    if not isinstance(self.base_sql_no_aqp, exp.Select):
+      raise Exception('Not a select statement')
+
+    # Count the number of columns, distinct aggregates
+    expression_counts = defaultdict(int)
+    for expression in self.base_sql_no_aqp.args['expressions']:
+      expression_counts[type(expression)] += 1
+    if len(expression_counts) > 1:
+      raise Exception('Multiple expression types found')
+
+    if self._error_target is not None:
+      if exp.Avg not in expression_counts and exp.Sum not in expression_counts \
+          and exp.Count not in expression_counts:
+        raise Exception('Supported aggregates are not found in approximate aggregation query')
+    return True

@@ -7,8 +7,8 @@ from aidb.engine import Engine
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 
-def register_inference_services(engine: Engine, data_dir: str, service_concerned='*'):
-  csv_fnames = glob.glob(f'{data_dir}/inference/{service_concerned}.csv')
+def register_inference_services(engine: Engine, data_dir: str):
+  csv_fnames = glob.glob(f'{data_dir}/inference/*.csv')
   csv_fnames.sort()  # TODO: sort by number
   for csv_fname in csv_fnames:
     base_fname = os.path.basename(csv_fname)

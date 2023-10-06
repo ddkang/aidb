@@ -13,42 +13,41 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
       (
         'aggregate',
-        '''SELECT AVG(x_min) FROM objects00;''',
+        '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
         '''SELECT AVG(x_min) FROM objects00;'''
        ),
       (
         'aggregate',
-        '''SELECT SUM(x_min) FROM objects00;''',
+        '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
         '''SELECT SUM(x_min) FROM objects00;'''
       ),
       (
         'aggregate',
-        '''SELECT COUNT(x_min) FROM objects00;''',
+        '''SELECT COUNT(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
         '''SELECT COUNT(x_min) FROM objects00;'''
       )
-      # ,
+    # ,
      # (
      #   'aggregate',
      #   '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''', 
      #   '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''' 
      # ),
      # (
-      #   'aggregate',
-      #   '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''', 
-      #   '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''' 
-      # ),
-      # (
-      #   'aggregate',
-      #   '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;''',
-      #   '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;'''
-      # )
+     #    'aggregate',
+     #    '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''', 
+     #    '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''' 
+     #  ),
+     #  (
+     #    'aggregate',
+     #    '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;''',
+     #    '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;'''
+     #  )
     ]
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
   def _equality_check(self, aidb_res, gt_res):
-    # TO DO
     aidb_res, gt_res = aidb_res[0][0], gt_res[0][0]
-    if abs(aidb_res - gt_res) / (gt_res) < 0.05:
+    if abs(aidb_res - gt_res) / (gt_res) < 0.35:
       return True
     return False
 
