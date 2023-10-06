@@ -20,8 +20,9 @@ class FullScanEngine(BaseEngine):
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
+      
       # The bound inference service is responsible for populating the database
-      bs_res = await bound_service.infer(inp_df)
+      await bound_service.infer(inp_df)
 
       inference_services_executed.add(bound_service.service.name)
 
