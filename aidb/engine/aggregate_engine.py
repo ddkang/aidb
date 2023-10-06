@@ -103,7 +103,6 @@ class ApproximateAggregateEngine(BaseEngine):
 
   async def execute_aggregate_query(self, query: Query, dialect=None):
     # Get the base SQL query, columns
-    query.validate_aqp()
     tables_in_query = query.tables_in_query
     agg_type = query.get_agg_type()
     agg_on_column = query.get_aggregated_column(agg_type)

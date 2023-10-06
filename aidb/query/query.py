@@ -43,13 +43,16 @@ class Query(object):
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
 
+
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
+
   @cached_property
   def sql_query_text(self):
     return self.base_sql_no_aqp.sql()
+
 
   @cached_property
   def base_sql_no_aqp(self):
@@ -102,6 +105,7 @@ class Query(object):
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
+
 
   @cached_property
   def tables_in_query(self):
@@ -331,6 +335,7 @@ class Query(object):
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 
+
   # Get aggregation type
   def get_agg_type(self):
     logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
@@ -346,6 +351,7 @@ class Query(object):
     else:
       return None
 
+
   def get_aggregated_column(self, agg_type):
     """
     returns the column name that is aggregated in the query.
@@ -359,8 +365,10 @@ class Query(object):
           return node.args['this'].args['this']
     return None
 
+
   def is_approx_agg_query(self):
-    return True if self.get_agg_type() else False
+    return True if self.get_agg_type() and self.validate_aqp() else False
+
 
   # AQP extraction
   def get_keyword_arg(self, exp_type):
@@ -373,13 +381,16 @@ class Query(object):
           value = float(node.args['this'].args['this'])
     return value
 
+
   @cached_property
   def _error_target(self):
     return self.get_keyword_arg(exp.ErrorTarget)
 
+
   @cached_property
   def _confidence(self):
     return self.get_keyword_arg(exp.Confidence)
+
 
   # Validate AQP
   def validate_aqp(self):
