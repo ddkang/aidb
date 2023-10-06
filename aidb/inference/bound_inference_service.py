@@ -165,6 +165,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           # FIXME: figure out where to put the column renaming
           for idx, col in enumerate(self.binding.output_columns):
             row_results.rename(columns={row_results.columns[idx]: col}, inplace=True)
+          
           tables = self.get_tables(self.binding.output_columns)
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
