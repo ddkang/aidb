@@ -4,14 +4,9 @@ import unittest
 from unittest import IsolatedAsyncioTestCase
 from sqlalchemy.sql import text
 
-
-# from tests.db_utils.db_setup import (create_db, setup_db, setup_config_tables,
-                                    # insert_data_in_tables, clear_all_tables)
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
 from tests.utils import setup_gt_and_aidb_engine
-
-# from aidb.engine.engine import Engine
 
 
 DB_URL = "sqlite+aiosqlite://"

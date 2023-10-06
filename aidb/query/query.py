@@ -253,7 +253,6 @@ class Query(object):
               FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
                               Expression(t2, right_value)))
         filtering_clauses.append(or_connected_clauses)
-        print(f'filtering_clauses: {repr(filtering_clauses)}')
       return filtering_clauses
     else:
       return []
@@ -269,7 +268,6 @@ class Query(object):
     elif len(tables_of_column) > 1:
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
-      print(f'tables of column: {tables_of_column}')
       return tables_of_column[0]
 
 
@@ -286,7 +284,6 @@ class Query(object):
         table_name = self.table_aliases_to_name[table_name]
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
-    print(f"{table_name}.{node.args['this'].args['this']}")
     return f"{table_name}.{node.args['this'].args['this']}"
 
 
