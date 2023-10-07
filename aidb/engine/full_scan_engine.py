@@ -16,12 +16,11 @@ class FullScanEngine(BaseEngine):
 
 
   def _get_required_bound_services_order(self, query: Query) -> List[BoundInferenceService]:
-    service_ordering = self._config.inference_topological_order
-    bound_service_list = query.inference_engines_required_for_query
-    bound_service_list_ordered = []
-    for bound_service in service_ordering:
-      if bound_service in bound_service_list:
-        bound_service_list_ordered.append(bound_service)
+    bound_service_list_ordered = [
+        bound_service
+        for bound_service in self._config.inference_topological_order
+        if bound_service in query.inference_engines_required_for_query
+    ]
     return bound_service_list_ordered
 
 
