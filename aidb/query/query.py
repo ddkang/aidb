@@ -22,21 +22,17 @@ class Query(object):
   sql_str: str
   config: Config
 
-
   @cached_property
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
-
 
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
-
   @cached_property
   def sql_query_text(self):
     return self._expression.sql()
-
 
   @cached_property
   def _tables(self) -> Dict[str, Dict[str, str]]:
@@ -49,7 +45,6 @@ class Query(object):
       for column in table.columns:
         _tables[table_name][column.name] = column.type
     return _tables
-
 
   @cached_property
   def table_name_to_aliases(self):
@@ -76,12 +71,10 @@ class Query(object):
             table_alias[str.lower(tbl_name)] = str.lower(tbl_alias)
     return table_alias
 
-
   @cached_property
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
-
 
   @cached_property
   def tables_in_query(self):
@@ -91,11 +84,9 @@ class Query(object):
         table_list.add(node.args["this"].args["this"])
     return table_list
 
-
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
     return predicate_name
-
 
   def _get_sympify_form(self, node, predicate_count, predicate_mappings):
     if node is None:
@@ -121,12 +112,12 @@ class Query(object):
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
       return f"({e1} | {e2})", p2
     elif isinstance(node, exp.GT) or \
-            isinstance(node, exp.LT) or \
-            isinstance(node, exp.GTE) or \
-            isinstance(node, exp.LTE) or \
-            isinstance(node, exp.EQ) or \
-            isinstance(node, exp.Like) or \
-            isinstance(node, exp.NEQ):
+        isinstance(node, exp.LT) or \
+        isinstance(node, exp.GTE) or \
+        isinstance(node, exp.LTE) or \
+        isinstance(node, exp.EQ) or \
+        isinstance(node, exp.Like) or \
+        isinstance(node, exp.NEQ):
       # TODO: chained comparison operators not supported
       assert "this" in node.args and "expression" in node.args
       predicate_name = self._get_predicate_name(predicate_count)
@@ -135,13 +126,11 @@ class Query(object):
     else:
       raise NotImplementedError
 
-
   def _get_original_predicate(self, predicate_name, predicate_mappings) -> FilteringPredicate:
     if predicate_name[0] == "~":
       return FilteringPredicate(True, predicate_mappings[predicate_name[1:]])
     else:
       return FilteringPredicate(False, predicate_mappings[predicate_name])
-
 
   def _get_or_clause_representation(self, or_expression, predicate_mappings) -> List[FilteringPredicate]:
     connected_by_ors = list(or_expression.args)
@@ -152,7 +141,6 @@ class Query(object):
       for s in connected_by_ors:
         predicates_in_ors.append(self._get_original_predicate(str(s), predicate_mappings))
     return predicates_in_ors
-
 
   def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
     List[FilteringPredicate]]:
@@ -166,6 +154,25 @@ class Query(object):
       or_expressions_connected_by_ands_repr.append(connected_by_ors)
     return or_expressions_connected_by_ands_repr
 
+
+  @cached_property
+  def columns_in_query(self):
+    """
+    nested queries are not supported for the time being
+    * is supported
+    """
+    column_set = set()
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          column_set.add(self._get_normalized_col_name_from_col_exp(node))
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            for col, _ in self._tables[table].items():
+              column_set.add(f"{table}.{col}")
+        else:
+          raise Exception('Unsupported column type')
+    return column_set
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
@@ -234,7 +241,6 @@ class Query(object):
     else:
       return []
 
-
   def _get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
@@ -246,7 +252,6 @@ class Query(object):
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
       return tables_of_column[0]
-
 
   def _get_normalized_col_name_from_col_exp(self, node):
     """
@@ -262,7 +267,6 @@ class Query(object):
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
-
 
   @cached_property
   def inference_engines_required_for_filtering_predicates(self):
@@ -287,7 +291,6 @@ class Query(object):
             inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
-
 
   @cached_property
   def tables_in_filtering_predicates(self):
