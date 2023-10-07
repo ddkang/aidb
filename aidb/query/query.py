@@ -339,8 +339,6 @@ class Query(object):
   # Get aggregation type
   def get_agg_type(self):
     logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
-    if len(self.base_sql_no_aqp.args['expressions']) != 1:
-      raise Exception('Multiple expressions found')
     select_exp = self.base_sql_no_aqp.args['expressions'][0]
     if isinstance(select_exp, exp.Avg):
       return exp.Avg

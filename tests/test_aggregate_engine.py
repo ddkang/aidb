@@ -25,23 +25,46 @@ queries = [
         'aggregate',
         '''SELECT COUNT(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
         '''SELECT COUNT(x_min) FROM objects00;'''
+      ),
+      (
+         'aggregate',
+         '''SELECT AVG(x_min) FROM objects00 
+            WHERE frame < 10000 
+            ERROR_TARGET 0.01 CONFIDENCE 95;''', 
+         '''SELECT AVG(x_min) FROM objects00 
+            WHERE frame < 10000;''' 
+      ),
+      (
+        'aggregate',
+        '''SELECT AVG(x_min) FROM objects00 
+            WHERE object_name='car' AND frame < 10000
+            ERROR_TARGET 0.01 CONFIDENCE 95;''',
+        '''SELECT AVG(x_min) FROM objects00 
+            WHERE object_name='car' AND frame < 10000;'''
+      ),
+     (
+       'aggregate',
+       '''SELECT AVG(x_min) FROM objects00 
+          WHERE object_id > 0 
+          ERROR_TARGET 0.01 CONFIDENCE 95;''', 
+       '''SELECT AVG(x_min) FROM objects00 
+          WHERE object_id > 0;''' 
+     ),
+     (
+        'aggregate',
+        '''SELECT COUNT(frame) FROM counts03 
+            WHERE frame >= 1000
+            ERROR_TARGET 0.01 CONFIDENCE 95;''',
+        '''SELECT COUNT(frame) FROM counts03
+            WHERE frame >= 1000;''',
+      ),
+     (
+        'aggregate',
+        '''SELECT COUNT(frame) FROM lights01 
+           WHERE light_1 = 'green' ERROR_TARGET 0.01 CONFIDENCE 95;''', 
+        '''SELECT COUNT(frame) FROM lights01 
+           WHERE light_1 = 'green';''' 
       )
-    # ,
-     # (
-     #   'aggregate',
-     #   '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''', 
-     #   '''SELECT AVG(x_min) FROM objects00 WHERE object_id > 0;''' 
-     # ),
-     # (
-     #    'aggregate',
-     #    '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''', 
-     #    '''SELECT COUNT(frame) FROM lights01 WHERE light_1 = 'green';''' 
-     #  ),
-     #  (
-     #    'aggregate',
-     #    '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;''',
-     #    '''SELECT AVG(x.x_min) FROM (SELECT COUNT(frame) as c FROM ligths01 group by light_1)x;'''
-     #  )
     ]
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):

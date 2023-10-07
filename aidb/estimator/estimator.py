@@ -87,7 +87,7 @@ class WeightedMeanSetEstimator(Estimator):
       norm_statistics = np.linalg.norm(statistics)
       statistics = statistics / norm_statistics
     agg_table = kwargs.get("agg_table")
-    counts = np.array([sample.num_items[agg_table] if agg_table in sample.num_items else 0 for sample in samples])
+    counts = np.array([sample.num_items[agg_table] if agg_table in sample.num_items else 0 for sample in samples]).astype(int)
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
     wstats = DescrStatsW(cstats, weights=weights, ddof=0)
