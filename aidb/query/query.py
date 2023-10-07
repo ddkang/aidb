@@ -1,3 +1,4 @@
+import collections
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
@@ -21,7 +22,6 @@ class Query(object):
   """
   sql_str: str
   config: Config
-
 
   @cached_property
   def _tokens(self):
@@ -81,6 +81,38 @@ class Query(object):
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
+
+
+  @cached_property
+  def column_name_to_aliases(self):
+    """
+    finds the mapping of table names and aliases present in the query.
+
+    for e.g. for the query:
+    SELECT t2.id as id, t2.frame as frame, t2.column5
+    FROM table_2 t2 JOIN blob_ids b
+    ON t2.frame = b.frame
+    WHERE b.frame > 102 and column1 > 950
+
+    it will return {t2.id: id, t2.frame: frame}
+
+    :return: mapping of table names and alias
+    """
+    column_alias = {}
+    for alias_exp in self._expression.find_all(exp.Alias):
+      for node, _, _ in alias_exp.walk():
+        if isinstance(node, exp.Alias) and "alias" in node.args and "this" in node.args:
+          if isinstance(node.args["this"], exp.Column):
+            col_name = node.args["this"].args["this"].args["this"]
+            col_alias = node.args["alias"].args["this"]
+            column_alias[str.lower(col_name)] = str.lower(col_alias)
+    return column_alias
+
+
+  @cached_property
+  def column_aliases_to_name(self):
+    column_name_to_alias = self.column_name_to_aliases
+    return {v: k for k, v in column_name_to_alias.items()}
 
 
   @cached_property
@@ -265,48 +297,116 @@ class Query(object):
 
 
   @cached_property
-  def inference_engines_required_for_filtering_predicates(self):
+  def inference_engines_related_filtering_predicates(self) -> Dict[str, List[List[FilteringClause]]]:
     """
-    Inference services required to run to satisfy the columns present in each filtering predicate
-    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-    it returns [[color], [], [object]]
+    Map filtering predicates to subsequent inference services required
+    because filtering predicates will be executed after all required services are executed.
+
+    This method determines the necessary inference services for each filtering predicate
+    and returns a dictionary mapping service names to the predicates that require them.
     """
-    inference_engines_required_predicates = []
+    inference_engines_required_predicates = collections.defaultdict(list)
+    service_order = self.config.inference_topological_order
     for filtering_predicate in self.filtering_predicates:
-      inference_engines_required = set()
+      max_service_index = -1
       for or_connected_predicate in filtering_predicate:
         if or_connected_predicate.left_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+            bound_service = self.config.column_by_service[originated_from]
+            max_service_index = max(max_service_index, service_order.index(bound_service))
+
         if or_connected_predicate.right_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
-      inference_engines_required_predicates.append(inference_engines_required)
+            bound_service = self.config.column_by_service[originated_from]
+            max_service_index = max(max_service_index, service_order.index(bound_service))
+
+      if max_service_index != -1:
+        if max_service_index + 1 < len(service_order):
+          service_name = service_order[max_service_index + 1].service.name
+          inference_engines_required_predicates[service_name].append(filtering_predicate)
+
     return inference_engines_required_predicates
 
 
-  @cached_property
-  def tables_in_filtering_predicates(self):
+  def get_satisfied_filtering_predicates(self, filtering_predicates, tables) -> List[List[FilteringClause]]:
     """
+    Get satisfied filtering predicates based on the table in query
     Tables needed to satisfy the columns present in each filtering predicate
-    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-    it returns [[color], [blob], [object]]
     """
-    tables_required_predicates = []
-    for filtering_predicate in self.filtering_predicates:
-      tables_required = set()
+    filtering_predicates_satisfied = []
+    for filtering_predicate in filtering_predicates:
+      satisfied = True
       for or_connected_predicate in filtering_predicate:
         if or_connected_predicate.left_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
-          tables_required.add(originated_from.split('.')[0])
+          if originated_from.split('.')[0] not in tables:
+            satisfied = False
+            break
         if or_connected_predicate.right_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
-          tables_required.add(originated_from.split('.')[0])
-      tables_required_predicates.append(tables_required)
-    return tables_required_predicates
+          if originated_from.split('.')[0] not in tables:
+            satisfied = False
+            break
+      if satisfied:
+        filtering_predicates_satisfied.append(filtering_predicate)
+    return filtering_predicates_satisfied
+
+
+  def _extract_column_names(self) -> List[str]:
+    '''
+    extract all used column names in query, return in format {table_name}.{col_name}
+    '''
+    column_names = set()
+    for expression in self._expression.find_all(exp.Column):
+      if isinstance(expression.args['this'], exp.Star):
+        for table_name in self.tables_in_query:
+          for column_name in self._tables[table_name].keys():
+            column_names.add(f'{table_name}.{column_name}')
+        continue
+      table_name = expression.text("table")
+      column_name = expression.text("this")
+
+      if table_name in self.table_aliases_to_name:
+        table_name = self.table_aliases_to_name[expression.text("table")]
+
+      if column_name in self.column_aliases_to_name:
+        column_name = self.column_aliases_to_name[column_name]
+
+      if table_name == '':
+        table_name = self._get_table_of_column(column_name)
+
+      column_names.add(f'{table_name}.{column_name}')
+    return list(column_names)
+
+
+  @cached_property
+  def inference_engines_required_for_query(self):
+    """
+    Inference services required for sql query, will return a list of inference service
+    """
+    column_names = self._extract_column_names()
+    stack = column_names.copy()
+    visited = set(stack)
+    inference_engines_required = set()
+
+    while stack:
+      col = stack.pop()
+
+      if col in self.config.column_by_service:
+        inference = self.config.column_by_service[col]
+
+        if inference not in inference_engines_required:
+          inference_engines_required.add(inference)
+
+          for inference_col in inference.binding.input_columns + inference.binding.output_columns:
+            if inference_col not in visited:
+              stack.append(inference_col)
+              visited.add(inference_col)
+
+    return list(inference_engines_required)

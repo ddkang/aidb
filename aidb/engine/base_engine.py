@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 import sqlalchemy
@@ -261,48 +261,50 @@ class BaseEngine():
     return " AND ".join(and_connected)
 
 
-  def get_input_query_for_inference_service(self, bound_service: BoundInferenceService, user_query: Query,
-                                            already_executed_inference_services: set):
+  def get_input_query_for_inference_service(
+      self,
+      bound_service: BoundInferenceService,
+      user_query,
+      rep_table_name: Optional[str] = None,
+      filtered_index_list: Optional[List[int]] = None
+  ):
     """
     this function returns the input query to fetch the input records for an inference service
     input query will also contain the predicates that can be currently satisfied using the inference services
     that are already executed
     """
-    filtering_predicates = user_query.filtering_predicates
+
     column_to_root_column = self._config.columns_to_root_column
-    inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
-    tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
-    binding = bound_service.binding
-    inp_cols = binding.input_columns
+    inp_cols = bound_service.binding.input_columns
     root_inp_cols = [column_to_root_column.get(
       col, col) for col in inp_cols]
+
+    if rep_table_name:
+      root_inp_cols.append(f'{rep_table_name}.blob_id')
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
     join_str = self._get_inner_join_query(inp_tables)
 
-    # filtering predicates that can be satisfied by the currently executed inference engines
-    filtering_predicates_satisfied = []
-    for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
-                       tables_in_filtering_predicates):
-      if len(already_executed_inference_services.intersection(e)) == len(e) and len(
-          set(inp_tables).intersection(t)) == len(
-        t):
-        filtering_predicates_satisfied.append(p)
+    service_name = bound_service.service.name
+    filtering_predicates = user_query.inference_engines_related_filtering_predicates[service_name]
+    filtering_predicates_satisfied = user_query.get_satisfied_filtering_predicates(filtering_predicates, inp_tables)
 
     where_str = self._get_where_str(filtering_predicates_satisfied)
     for k, v in column_to_root_column.items():
       where_str = where_str.replace(k, v)
 
-    if len(filtering_predicates_satisfied) > 0:
-      inp_query_str = f'''
-              SELECT {inp_cols_str}
-              {join_str}
-              WHERE {where_str};
-            '''
-    else:
-      inp_query_str = f'''
-              SELECT {inp_cols_str}
-              {join_str};
+    # FIXME: for different database, the IN grammar maybe different
+    if filtered_index_list:
+      filtered_index_list = tuple(filtered_index_list)
+      filter_condition = f"{rep_table_name}.blob_id IN {format(filtered_index_list)}"
+      where_str = f"{where_str} AND {filter_condition}" if where_str else filter_condition
+
+    where_clause = f"WHERE {where_str}" if where_str else ""
+    inp_query_str = f'''
+                SELECT {inp_cols_str}
+                {join_str}
+                {where_clause};
             '''
     return inp_query_str
+
