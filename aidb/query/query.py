@@ -310,3 +310,23 @@ class Query(object):
           tables_required.add(originated_from.split('.')[0])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
+
+
+  @cached_property
+  def columns_in_query(self):
+    """
+    nested queries are not supported for the time being
+    * is supported
+    """
+    column_set = set()
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          column_set.add(self._get_normalized_col_name_from_col_exp(node))
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            for col, _ in self._tables[table].items():
+              column_set.add(f"{table}.{col}")
+        else:
+          raise Exception('Unsupported column type')
+    return column_set
