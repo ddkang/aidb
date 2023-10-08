@@ -1,5 +1,5 @@
-import numpy as np
 import abc
+import numpy as np
 import pandas as pd
 
 
@@ -18,7 +18,7 @@ class VectorDatabase(abc.ABC):
     :param similarity: similarity function
     :param recreate_index: whether to recreate index
     '''
-    pass
+    raise NotImplementedError
 
 
   @abc.abstractmethod
@@ -26,7 +26,7 @@ class VectorDatabase(abc.ABC):
     '''
     Delete index by index name from vector database if it exists
     '''
-    pass
+    raise NotImplementedError
 
 
   @abc.abstractmethod
@@ -35,7 +35,7 @@ class VectorDatabase(abc.ABC):
     Insert data into index
     :param data: data to be inserted, usually contains id and embedding, metadata is optional
     '''
-    pass
+    raise NotImplementedError
 
 
   @abc.abstractmethod
@@ -44,7 +44,7 @@ class VectorDatabase(abc.ABC):
     Get embeddings by id and return results
     :param ids: ids of data
     '''
-    pass
+    raise NotImplementedError
 
 
   @abc.abstractmethod
@@ -59,7 +59,7 @@ class VectorDatabase(abc.ABC):
     :param query_embeddings: embeddings to be queried
     :param top_k: top k nearest neighbors
     '''
-    pass
+    raise NotImplementedError
 
 
   @abc.abstractmethod
@@ -76,4 +76,4 @@ class VectorDatabase(abc.ABC):
     :param reps: cluster representatives sequential idx
     :param top_k: top k nearest neighbors
     '''
-    pass
+    raise NotImplementedError

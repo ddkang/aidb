@@ -30,9 +30,8 @@ def table_name_for_rep_and_topk(blob_tables: List[str]):
   blob_table_postfix = ''
   for idx, blob_table in enumerate(blob_tables):
     # Special characters are not allowed in table names
-    column = column.replace('.', '__')
     blob_table_postfix += f'__{blob_table}__'
   # limit to 10 characters to avoid long names in the table names
   hash_length = 10
   table_input_hash = hashlib.sha1(blob_table_postfix.encode()).hexdigest()[:hash_length]
-  return f"{REP_PREFIX}__{table_input_hash}", f"{TOPK_PREFIX}__{table_input_hash}"
+  return f'{REP_PREFIX}__{table_input_hash}", f"{TOPK_PREFIX}__{table_input_hash}'

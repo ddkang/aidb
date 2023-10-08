@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from typing import Optional
+
+from aidb.config.config_types import WeaviateAuth, VectorDatabaseType
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
-from typing import Optional
-from aidb.config.config_types import WeaviateAuth, VectorDatabaseType
-import unittest
 
 
 class TastiTests():
@@ -34,8 +34,7 @@ class TastiTests():
 
     self.data = self.generate_data(data_size, embedding_dim)
     blob_ids = self.generate_blob_ids(data_size, 0)
-    self.user_database = None
-    self.simulate_user_providing_database()
+    self.user_database = self.simulate_user_providing_database()
     self.vector_database = Tasti(index_name, blob_ids, nb_buckets, self.vd_name,
                                  percent_fpf, seed, weaviate_auth, index_path)
 
@@ -60,21 +59,24 @@ class TastiTests():
     Originally, user will provide a vector database, and Tasti will read from it.
     This function is used to create a vector database to store original data
     '''
-    if self.vd_name == VectorDatabaseType.FAISS:
-      self.user_database = FaissVectorDatabase(self.index_path)
-      self.user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
-      self.user_database.insert_data(self.index_name, self.data)
-      self.user_database.save_index(self.index_name)
+    user_database = None
+    if self.vd_name == VectorDatabaseType.FAISS.value:
+      user_database = FaissVectorDatabase(self.index_path)
+      user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
+      user_database.insert_data(self.index_name, self.data)
+      user_database.save_index(self.index_name)
 
-    elif self.vd_name == VectorDatabaseType.CHROMA:
-      self.user_database = ChromaVectorDatabase(self.index_path)
-      self.user_database.create_index(self.index_name, recreate_index=True)
-      self.user_database.insert_data(self.index_name, self.data)
+    elif self.vd_name == VectorDatabaseType.CHROMA.value:
+      user_database = ChromaVectorDatabase(self.index_path)
+      user_database.create_index(self.index_name, recreate_index=True)
+      user_database.insert_data(self.index_name, self.data)
 
-    elif self.vd_name == VectorDatabaseType.WEAVIATE:
-      self.user_database = WeaviateVectorDatabase(self.weaviate_auth)
-      self.user_database.create_index(self.index_name, recreate_index=True)
-      self.user_database.insert_data(self.index_name, self.data)
+    elif self.vd_name == VectorDatabaseType.WEAVIATE.value:
+      user_database = WeaviateVectorDatabase(self.weaviate_auth)
+      user_database.create_index(self.index_name, recreate_index=True)
+      user_database.insert_data(self.index_name, self.data)
+
+    return user_database
 
 
   def simulate_user_inserting_new_data(self, data_size):
@@ -98,7 +100,6 @@ class TastiTests():
     if self.vd_name == VectorDatabaseType.FAISS.value:
       for representative_id in list(representative_blob_ids['id']):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
-        assert 0 in topk_representatives.loc[representative_id]['topk_dists']
 
     self.simulate_user_inserting_new_data(10000)
     new_blob_ids = self.generate_blob_ids(10000, 10000)

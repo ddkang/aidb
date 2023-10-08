@@ -1,9 +1,9 @@
-from typing import Optional
-from aidb.vector_database.vector_database import VectorDatabase
-import pandas as pd
 import faiss
-from aidb.utils.logger import logger
 import numpy as np
+import pandas as pd
+
+from aidb.vector_database.vector_database import VectorDatabase
+from aidb.utils.logger import logger
 
 
 class FaissVectorDatabase(VectorDatabase):
@@ -66,13 +66,14 @@ class FaissVectorDatabase(VectorDatabase):
     if index_name in self.index_list:
       raise Exception(f'Index {index_name} already exists, please use another name')
 
-    if index_factory == "HNSW":
+    if index_factory == 'HNSW':
       new_index = faiss.IndexHNSWFlat(embedding_dim, n_links, metric_type)
       new_index.hnsw.efSearch = ef_search
       new_index.hnsw.efConstruction = ef_construction
     else:
       new_index = faiss.index_factory(embedding_dim, index_factory, metric_type)
 
+    new_index = faiss.IndexIDMap2(new_index)
     # use to add data with ids
     self.index_list[index_name] = new_index
     if self.gpu_resources is not None:
@@ -123,8 +124,9 @@ class FaissVectorDatabase(VectorDatabase):
       raise Exception(f'FAISS index of type {connected_index} must be trained before adding vectors')
 
     embedding_list = np.array(list(data['values'])).astype('float32')
+    id_list = np.array(list(data['id'])).astype('int64')
 
-    self.index_list[index_name].add(embedding_list)
+    self.index_list[index_name].add_with_ids(embedding_list, id_list)
 
 
   def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
@@ -145,20 +147,14 @@ class FaissVectorDatabase(VectorDatabase):
       self,
       index_name: str,
       query_embeddings: np.ndarray,
-      top_k: int = 5,
-      filter_ids: Optional[np.ndarray] = None
+      top_k: int = 5
   ) -> (np.ndarray, np.ndarray):
     '''
     Query nearest k embeddings, return embeddings and ids
     :param filter_ids: will only select ids in this array
     '''
     connected_index = self._connect_by_index(index_name)
-
-    params = None
-    if filter_ids is not None:
-      id_selector = faiss.IDSelectorArray(filter_ids)
-      params = faiss.SearchParametersIVF(sel=id_selector)
-    all_topk_dists, all_topk_reps = connected_index.search(query_embeddings.astype('float32'), top_k, params=params)
+    all_topk_dists, all_topk_reps = connected_index.search(query_embeddings.astype('float32'), top_k)
 
     return np.array(all_topk_reps).astype('int64'), np.array(all_topk_dists).astype('float32')
 
@@ -173,10 +169,9 @@ class FaissVectorDatabase(VectorDatabase):
     '''
     create a new index storing all data, query topk representatives and distances for each blob id by doing filter
     '''
-    #TODO: maybe also change to create an index storing only cluster representatives
     self.create_index(index_name, embeddings.shape[1], recreate_index=True)
-    data = pd.DataFrame({'values': embeddings.tolist()})
+    data = pd.DataFrame({'id': reps.tolist(), 'values': embeddings[reps].tolist()})
     self.insert_data(index_name, data)
-    topk_reps, topk_dists = self.query_by_embedding(index_name, embeddings, top_k=top_k, filter_ids=reps)
+    topk_reps, topk_dists = self.query_by_embedding(index_name, embeddings, top_k=top_k)
     self.save_index(index_name)
     return topk_reps, topk_dists

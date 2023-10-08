@@ -1,12 +1,14 @@
-from typing import Dict,  Optional
+import numpy as np
 import pandas as pd
 import weaviate
+
+from typing import Dict,  Optional
+
+from aidb.config.config_types import WeaviateAuth
 from aidb.utils.logger import logger
-import numpy as np
+from aidb.vector_database.vector_database import VectorDatabase
 from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
-from aidb.vector_database.vector_database import VectorDatabase
-from aidb.config.config_types import WeaviateAuth
 
 class WeaviateVectorDatabase(VectorDatabase):
   def __init__(self, weaviate_auth: WeaviateAuth):
@@ -75,6 +77,13 @@ class WeaviateVectorDatabase(VectorDatabase):
     self.index_list.append(index_name)
 
 
+  def load_index(self):
+    '''
+    Read index from disk
+    '''
+    self.index_list = [c['class'] for c in self.weaviate_client.schema.get()['classes']]
+
+
   def delete_index(self, index_name: str):
     '''
     delete an index
@@ -119,6 +128,8 @@ class WeaviateVectorDatabase(VectorDatabase):
     '''
     Get data by id and return results
     '''
+    if reload:
+      self.load_index()
     index_name = self._check_index_validity(index_name)
     result = []
     for id in ids:

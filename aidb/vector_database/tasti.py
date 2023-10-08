@@ -1,13 +1,14 @@
-import pandas as pd
-from numba import njit, prange
-from tqdm import tqdm
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
-from typing import Optional
 import numpy as np
+import pandas as pd
+
 from dataclasses import dataclass
+from numba import njit, prange
+from typing import Optional
+
 from aidb.config.config_types import TastiConfig, VectorDatabaseType
+from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 
 @njit(parallel=True)
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
@@ -25,51 +26,31 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
 @dataclass
 class Tasti(TastiConfig):
   def __post_init__(self):
-    self.rep_index_name = f"{self.index_name}__representatives"
+    self.rep_index_name = f'{self.index_name}__representatives'
     self.rand = np.random.RandomState(self.seed)
-    self.do_filter = False
     self.initialize_vector_database()
-    self.validate_index_name()
-    self.initialize_embeddings()
 
 
   def initialize_vector_database(self):
     if self.vector_database_name == VectorDatabaseType.FAISS.value:
-      self.initialize_faiss()
+      if self.index_path is None:
+        raise ValueError('FAISS requires index path')
+      self.vector_database = FaissVectorDatabase(self.index_path)
+      self.vector_database.load_index(self.index_name)
     elif self.vector_database_name == VectorDatabaseType.CHROMA.value:
-      self.initialize_chroma()
+      if self.index_path is None:
+        raise ValueError('Chroma requires index path')
+      self.vector_database = ChromaVectorDatabase(self.index_path)
     elif self.vector_database_name == VectorDatabaseType.WEAVIATE.value:
-      self.initialize_weaviate()
+      if self.weaviate_auth.url is None:
+        raise ValueError('Weaviate requires URL to connect')
+      self.vector_database = WeaviateVectorDatabase(self.weaviate_auth)
     else:
       raise ValueError(f"{self.vector_database_name} is not supported, please use FAISS, Chroma, or Weaviate")
 
-
-  def initialize_faiss(self):
-    if self.index_path is None:
-      raise ValueError('FAISS requires index path')
-    self.vector_database = FaissVectorDatabase(self.index_path)
-    self.vector_database.load_index(self.index_name)
-    self.do_filter = True
-
-
-  def initialize_chroma(self):
-    if self.index_path is None:
-      raise ValueError('Chroma requires index path')
-    self.vector_database = ChromaVectorDatabase(self.index_path)
-
-
-  def initialize_weaviate(self):
-    if self.weaviate_auth.url is None:
-      raise ValueError('Weaviate requires URL to connect')
-    self.vector_database = WeaviateVectorDatabase(self.weaviate_auth)
-
-
-  def validate_index_name(self):
     if self.index_name not in self.vector_database.index_list:
-      raise ValueError(f"Index {self.index_name} doesn't exist in vector database")
+      raise ValueError(f'Index {self.index_name} doesn\'t exist in vector database')
 
-
-  def initialize_embeddings(self):
     self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name, self.blob_ids.values.reshape(1, -1)[0])
 
 
@@ -91,11 +72,11 @@ class Tasti(TastiConfig):
     reps[0] = random_reps[0]
     get_and_update_dists(self.embeddings[reps[0]], self.embeddings, min_dists)
 
-    for i in tqdm(range(1, num_random), desc='RandomBucketter'):
+    for i in range(1, num_random):
       reps[i] = random_reps[i]
       get_and_update_dists(self.embeddings[reps[i]], self.embeddings, min_dists)
 
-    for i in tqdm(range(num_random, buckets), desc='FPFBucketter'):
+    for i in range(num_random, buckets):
       reps[i] = np.argmax(min_dists)
       get_and_update_dists(self.embeddings[reps[i]], self.embeddings, min_dists)
 
@@ -138,11 +119,7 @@ class Tasti(TastiConfig):
     '''
     new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name, new_blob_ids.values.reshape(1, -1)[0],
                                                                reload=True)
-    if self.do_filter:
-      topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings,
-                                                                      top_k, filter_ids=self.reps)
-    else:
-      topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings, top_k)
+    topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings, top_k)
     topk_reps = self.blob_ids.iloc[np.concatenate(topk_reps)].values.reshape(-1, top_k)
     data = {'topk_reps': list(topk_reps), 'topk_dists': list(topk_dists)}
     return pd.DataFrame(data, index=new_blob_ids.squeeze())

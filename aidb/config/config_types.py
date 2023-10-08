@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property
-from typing import Dict, List, NamedTuple, Tuple, Optional
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import networkx as nx
-import sqlalchemy
-import pandas as pd
 import numpy as np
+import pandas as pd
+import sqlalchemy
 
 
 # TODO: Unclear if there's a way to do this with sqlalchemy types
@@ -119,10 +119,11 @@ class TastiConfig:
   :param blob_ids: blob index in blob table, it should be unique for each data record
   :param nb_buckets: number of buckets for FPF, it should be same as the number of buckets for oracle
   :param vector_database: vector database type, it should be FAISS, Chroma or Weaviate
-  :param weaviate_auth: Weaviate authentification
-  :param index_path: vector database(FAISS, Chroma) index path, path to store database
   :param percent_fpf: percent of randomly selected buckets in FPF
   :param seed: random seed
+  :param weaviate_auth: Weaviate authentification
+  :param index_path: vector database(FAISS, Chroma) index path, path to store database
+  :param reps: representative ids
   '''
   index_name: str
   blob_ids: pd.DataFrame
