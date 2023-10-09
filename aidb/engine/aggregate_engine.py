@@ -28,6 +28,7 @@ class ApproximateAggregateEngine(BaseEngine):
     else:
       raise NotImplementedError()
 
+
   def get_random_sampling_query(self, bound_service, query,
                                 inference_services_executed, num_samples):
     '''Function to return limited number of samples randomly'''
@@ -53,6 +54,7 @@ class ApproximateAggregateEngine(BaseEngine):
                 LIMIT {num_samples};
               '''
 
+
   def get_num_blob_ids_query(self, table, column):
     '''Function that returns a query, to get total number of blob ids'''
     num_ids_query = f'''
@@ -60,6 +62,7 @@ class ApproximateAggregateEngine(BaseEngine):
                     FROM {table};
                     '''
     return num_ids_query
+
 
   def search_sample_columns(self, sample, agg_on_columns):
     '''
@@ -71,6 +74,7 @@ class ApproximateAggregateEngine(BaseEngine):
     if all(sample[column].empty for column in agg_on_columns):
       return False
     return True
+
 
   async def get_sampled_blobs_with_stats(self, infer_output, agg_on_columns,
                                          agg_table, query, est_conn):
@@ -123,6 +127,7 @@ class ApproximateAggregateEngine(BaseEngine):
       )
     return sampled_blobs
 
+
   async def execute_aggregate_query(self, query: Query, dialect=None):
     '''
     Execute aggregation query using approximate processing
@@ -137,6 +142,7 @@ class ApproximateAggregateEngine(BaseEngine):
     conf = query._confidence / 100.
     alpha = 1. - conf
 
+
     def get_num_ids_query():
       inp_table = self._config.blob_tables[0]
       inp_col = self._config.blob_keys[inp_table][0]
@@ -146,6 +152,7 @@ class ApproximateAggregateEngine(BaseEngine):
       )
       return num_ids_query
     num_ids_query = get_num_ids_query()
+
 
     async with self._sql_engine.begin() as conn:
       self.num_blob_ids = await conn.execute(text(num_ids_query))
