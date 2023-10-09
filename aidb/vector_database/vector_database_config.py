@@ -11,12 +11,10 @@ class TastiConfig:
   '''
   :param index_name: vector database index name
   :param blob_ids: blob index in blob table, it should be unique for each data record
+  :param vector_database: initialized vector database, currently support FAISS, Chroma or Weaviate
   :param nb_buckets: number of buckets for FPF, it should be same as the number of buckets for oracle
-  :param vector_database: vector database type, it should be FAISS, Chroma or Weaviate
   :param percent_fpf: percent of randomly selected buckets in FPF
   :param seed: random seed
-  :param weaviate_auth: Weaviate authentification
-  :param index_path: vector database(FAISS, Chroma) index path, path to store database
   :param reps: representative ids
   '''
   index_name: str

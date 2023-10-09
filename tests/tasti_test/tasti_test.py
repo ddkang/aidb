@@ -1,5 +1,6 @@
 from enum import Enum
 import numpy as np
+import os
 import pandas as pd
 from typing import Optional
 
@@ -86,14 +87,14 @@ class TastiTests():
   def test(self):
     representative_blob_ids = self.tasti.get_representative_blob_ids()
     print('The shape of cluster representative ids', representative_blob_ids.shape)
-    #get culster representatives ids
+    # get culster representatives ids
     print(representative_blob_ids)
     topk_representatives = self.tasti.get_topk_representatives_for_all()
-    #get topk representatives and dists for all data
+    # get topk representatives and dists for all data
     print(topk_representatives)
 
 
-    #Chroma uses HNSW, which will not return exact search result
+    # Chroma uses HNSW, which will not return exact search result
     if self.vd_type == VectorDatabaseType.FAISS.value:
       for representative_id in list(representative_blob_ids['id']):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
@@ -130,10 +131,10 @@ if __name__ == '__main__':
     test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
          embedding_dim=128, nb_buckets=1000, index_path='./')
 
-    #too slow
+    # too slow
     print(f'Running Weaviate vector database')
     url = ''
-    api_key = ''
+    api_key = os.environ.get('WEAVIATE_API_KEY')
     weaviate_auth = WeaviateAuth(url, api_key=api_key)
-    test('weav', VectorDatabaseType.WEAVIATE.value, data_size=200,
+    test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
          embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
