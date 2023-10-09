@@ -13,6 +13,7 @@ class VectorDatabaseType(Enum):
   CHROMA = 'Chroma'
   WEAVIATE = 'Weaviate'
 
+
 class TastiTests():
   def __init__(
     self,
@@ -20,45 +21,34 @@ class TastiTests():
     data_size: int,
     embedding_dim: int,
     nb_buckets: int,
-    vector_database_type: str = 'FAISS',
+    vector_database_type: VectorDatabaseType,
     percent_fpf: float = 0.75,
     seed: int = 1234,
     weaviate_auth: Optional[WeaviateAuth] = None,
     index_path: Optional[str] = None,
   ):
     self.index_name = index_name
+    self.data_size = data_size
     self.embedding_dim = embedding_dim
     self.nb_buckets = nb_buckets
     self.total_data = 0
     self.vd_type = vector_database_type
     self.seed = seed
 
-    if vector_database_type == VectorDatabaseType.FAISS.value:
-      vector_database = FaissVectorDatabase(index_path)
-      vector_database.load_index(self.index_name)
-    elif vector_database_type == VectorDatabaseType.CHROMA.value:
-      vector_database = ChromaVectorDatabase(index_path)
-    elif vector_database_type == VectorDatabaseType.WEAVIATE.value:
-      vector_database = WeaviateVectorDatabase(weaviate_auth)
-    else:
-      raise ValueError(f"{vector_database_type} is not supported, please use FAISS, Chroma, or Weaviate")
-
-    self.data = self.generate_data(data_size, embedding_dim)
-    blob_ids = self.generate_blob_ids(data_size, 0)
+    self.data, blob_ids = self.generate_data(self.data_size, embedding_dim)
     self.user_database = self.simulate_user_providing_database(index_path, weaviate_auth)
 
-    self.vector_database = Tasti(index_name, blob_ids, vector_database, nb_buckets, percent_fpf, seed)
+    self.tasti = Tasti(index_name, blob_ids, self.user_database, nb_buckets, percent_fpf, seed)
 
 
   def generate_data(self, data_size, emb_size):
     np.random.seed(self.seed)
     embeddings = np.random.rand(data_size, emb_size)
     data = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size), 'values': embeddings.tolist()})
+    blob_ids = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size)})
     self.total_data += data_size
-    return data
+    return data, blob_ids
 
-  def generate_blob_ids(self, data_size, start):
-    return pd.DataFrame({'id': range(start, start + data_size)})
 
   def simulate_user_providing_database(self, index_path: Optional[str], weaviate_auth: Optional[WeaviateAuth]):
     '''
@@ -70,7 +60,7 @@ class TastiTests():
       user_database = FaissVectorDatabase(index_path)
       user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
-      user_database.save_index(self.index_name)
+      # user_database.save_index(self.index_name)
 
     elif self.vd_type == VectorDatabaseType.CHROMA.value:
       user_database = ChromaVectorDatabase(index_path)
@@ -86,18 +76,19 @@ class TastiTests():
 
 
   def simulate_user_inserting_new_data(self, data_size):
-    new_data = self.generate_data(data_size, self.embedding_dim)
+    new_data, blob_id = self.generate_data(data_size, self.embedding_dim)
     self.user_database.insert_data(self.index_name, new_data)
     if self.vd_type == 'FAISS':
       self.user_database.save_index(self.index_name)
+    return new_data, blob_id
 
 
   def test(self):
-    representative_blob_ids = self.vector_database.get_representative_blob_ids()
+    representative_blob_ids = self.tasti.get_representative_blob_ids()
     print('The shape of cluster representative ids', representative_blob_ids.shape)
     #get culster representatives ids
     print(representative_blob_ids)
-    topk_representatives = self.vector_database.get_topk_representatives_for_all()
+    topk_representatives = self.tasti.get_topk_representatives_for_all()
     #get topk representatives and dists for all data
     print(topk_representatives)
 
@@ -107,30 +98,42 @@ class TastiTests():
       for representative_id in list(representative_blob_ids['id']):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
 
-    self.simulate_user_inserting_new_data(10000)
-    new_blob_ids = self.generate_blob_ids(10000, 10000)
+    new_data, new_blob_ids = self.simulate_user_inserting_new_data(self.data_size)
     # get topk representatives and dists for new data based on stale representatives
-    print(self.vector_database.get_topk_representatives_for_new_embeddings(new_blob_ids))
+    print(self.tasti.get_topk_representatives_for_new_embeddings(new_blob_ids))
     # reselect cluster representatives, recompute topk representatives and dists for all data
-    print(self.vector_database.update_topk_representatives_for_all(new_blob_ids))
+    print(self.tasti.update_topk_representatives_for_all(new_blob_ids))
     # We can see the old cluster representative is kept
-    print('The total number of cluster representatives is:', len(self.vector_database.reps))
+    print('The total number of cluster representatives is:', len(self.tasti.reps))
 
-def test(vector_database):
-  index_name = 'Tasti'
-  data_size = 10000
-  embedding_dim = 128
-  nb_buckets = 1000
-  url = ''
-  api_key = ''
-  index_path = './'
-  weaviate_auth = WeaviateAuth(url, api_key=api_key)
-  tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database,
+
+def test(
+    index_name: str,
+    vector_database_type: VectorDatabaseType,
+    data_size: int,
+    embedding_dim: int,
+    nb_buckets: int,
+    index_path: Optional[str] = None,
+    weaviate_auth: Optional[WeaviateAuth] = None
+):
+  tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database_type,
                           weaviate_auth=weaviate_auth, index_path=index_path)
   tasti_test.test()
 
+
 if __name__ == '__main__':
-    test('FAISS')
-    # test('Chroma')
+    print(f'Running FAISS vector database')
+    test('faiss', VectorDatabaseType.FAISS.value, data_size=10000,
+         embedding_dim=128, nb_buckets=1000, index_path='./')
+
+    print(f'Running Chroma vector database')
+    test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
+         embedding_dim=128, nb_buckets=1000, index_path='./')
+
     #too slow
-    # test('Weaviate')
+    print(f'Running Weaviate vector database')
+    url = ''
+    api_key = ''
+    weaviate_auth = WeaviateAuth(url, api_key=api_key)
+    test('weav', VectorDatabaseType.WEAVIATE.value, data_size=200,
+         embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)

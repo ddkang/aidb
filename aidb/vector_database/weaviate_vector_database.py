@@ -68,6 +68,7 @@ class WeaviateVectorDatabase(VectorDatabase):
     Create a new index of vectordatabase
     :similarity: similarity function, it should be one of l2-squared, cosine and dot
     '''
+    index_name = self._sanitize_index_name(index_name)
     if recreate_index:
       self.delete_index(index_name)
 
@@ -94,7 +95,7 @@ class WeaviateVectorDatabase(VectorDatabase):
 
   def load_index(self):
     '''
-    Read index from disk
+    Reload index from weaviate
     '''
     self.index_list = [c['class'] for c in self.weaviate_client.schema.get()['classes']]
 
@@ -103,6 +104,7 @@ class WeaviateVectorDatabase(VectorDatabase):
     '''
     delete an index
     '''
+    index_name = self._sanitize_index_name(index_name)
     if index_name in self.index_list:
       self.weaviate_client.schema.delete_class(index_name)
       self.index_list.remove(index_name)
@@ -117,7 +119,6 @@ class WeaviateVectorDatabase(VectorDatabase):
 
 
   def _check_index_validity(self, index_name: str):
-
     index_name = self._sanitize_index_name(index_name)
     if index_name not in self.index_list:
       raise Exception(f'Couldn\'t find index {index_name}, please create it first')
