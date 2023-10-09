@@ -25,5 +25,6 @@ class TastiConfig:
   seed: int = 1234
   reps: Optional[np.ndarray] = field(default=None)
 
+  # Initialize supplementary parameters in Tasti; without this step, these parameters remain uninitialized
   def __post_init__(self):
     pass
