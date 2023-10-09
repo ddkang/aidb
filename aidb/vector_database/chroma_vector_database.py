@@ -1,7 +1,6 @@
 import chromadb
 import numpy as np
 import pandas as pd
-
 from typing import Dict, Optional
 
 from aidb.utils.logger import logger
@@ -14,6 +13,8 @@ class ChromaVectorDatabase(VectorDatabase):
     Authentication
     :param path: path to store vector database
     '''
+    if path is None:
+      raise ValueError('Chroma requires index path')
     self.path = path
     self.client = chromadb.PersistentClient(path=path)
     self.index_list = [collection.name for collection in self.client.list_collections()]

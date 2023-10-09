@@ -2,9 +2,7 @@ import abc
 import numpy as np
 import pandas as pd
 
-
 class VectorDatabase(abc.ABC):
-
   @abc.abstractmethod
   def create_index(
       self,

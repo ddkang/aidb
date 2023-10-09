@@ -1,14 +1,9 @@
 import numpy as np
 import pandas as pd
-
-from dataclasses import dataclass
 from numba import njit, prange
 from typing import Optional
 
-from aidb.config.config_types import TastiConfig, VectorDatabaseType
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
+from aidb.vector_database.vector_database_config import TastiConfig
 
 @njit(parallel=True)
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
@@ -23,34 +18,10 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
       min_dists[i] = dists
 
 
-@dataclass
 class Tasti(TastiConfig):
   def __post_init__(self):
     self.rep_index_name = f'{self.index_name}__representatives'
     self.rand = np.random.RandomState(self.seed)
-    self.initialize_vector_database()
-
-
-  def initialize_vector_database(self):
-    if self.vector_database_name == VectorDatabaseType.FAISS.value:
-      if self.index_path is None:
-        raise ValueError('FAISS requires index path')
-      self.vector_database = FaissVectorDatabase(self.index_path)
-      self.vector_database.load_index(self.index_name)
-    elif self.vector_database_name == VectorDatabaseType.CHROMA.value:
-      if self.index_path is None:
-        raise ValueError('Chroma requires index path')
-      self.vector_database = ChromaVectorDatabase(self.index_path)
-    elif self.vector_database_name == VectorDatabaseType.WEAVIATE.value:
-      if self.weaviate_auth.url is None:
-        raise ValueError('Weaviate requires URL to connect')
-      self.vector_database = WeaviateVectorDatabase(self.weaviate_auth)
-    else:
-      raise ValueError(f"{self.vector_database_name} is not supported, please use FAISS, Chroma, or Weaviate")
-
-    if self.index_name not in self.vector_database.index_list:
-      raise ValueError(f'Index {self.index_name} doesn\'t exist in vector database')
-
     self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name, self.blob_ids.values.reshape(1, -1)[0])
 
 

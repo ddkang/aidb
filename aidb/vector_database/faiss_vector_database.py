@@ -13,7 +13,8 @@ class FaissVectorDatabase(VectorDatabase):
     :param path: path to store vector database
     :param use_gpu: whether use gpu
     '''
-
+    if path is None:
+      raise ValueError('FAISS requires index path')
     self.index_list = dict()
     self.path = path
     if use_gpu:

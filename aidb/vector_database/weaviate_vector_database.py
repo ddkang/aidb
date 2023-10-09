@@ -1,20 +1,35 @@
+from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 import weaviate
-
 from typing import Dict,  Optional
 
-from aidb.config.config_types import WeaviateAuth
 from aidb.utils.logger import logger
 from aidb.vector_database.vector_database import VectorDatabase
 from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
+
+@dataclass
+class WeaviateAuth:
+  """
+  :param url: weaviate url
+  :param username: weaviate username
+  :param pwd: weaviate password
+  :param api_key: weaviate api key, user should choose input either username/pwd or api_key
+  """
+  url: Optional[str] = field(default=None)
+  username: Optional[str] = field(default=None)
+  pwd: Optional[str] = field(default=None)
+  api_key: Optional[str] = field(default=None)
+
 
 class WeaviateVectorDatabase(VectorDatabase):
   def __init__(self, weaviate_auth: WeaviateAuth):
     '''
     Authentication
     '''
+    if weaviate_auth.url is None:
+      raise ValueError('Weaviate requires URL to connect')
     auth_client_secret = self._get_auth_secret(weaviate_auth.username, weaviate_auth.pwd, weaviate_auth.api_key)
     self.weaviate_client = weaviate.Client(
       url=weaviate_auth.url,
