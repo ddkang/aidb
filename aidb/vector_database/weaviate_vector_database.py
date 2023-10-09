@@ -1,18 +1,35 @@
-from typing import Dict,  Optional
+from dataclasses import dataclass, field
+import numpy as np
 import pandas as pd
 import weaviate
+from typing import Dict,  Optional
+
 from aidb.utils.logger import logger
-import numpy as np
+from aidb.vector_database.vector_database import VectorDatabase
 from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
-from aidb.vector_database.vector_database import VectorDatabase
-from aidb.config.config_types import WeaviateAuth
+
+@dataclass
+class WeaviateAuth:
+  """
+  :param url: weaviate url
+  :param username: weaviate username
+  :param pwd: weaviate password
+  :param api_key: weaviate api key, user should choose input either username/pwd or api_key
+  """
+  url: Optional[str] = field(default=None)
+  username: Optional[str] = field(default=None)
+  pwd: Optional[str] = field(default=None)
+  api_key: Optional[str] = field(default=None)
+
 
 class WeaviateVectorDatabase(VectorDatabase):
   def __init__(self, weaviate_auth: WeaviateAuth):
     '''
     Authentication
     '''
+    if weaviate_auth.url is None:
+      raise ValueError('Weaviate requires URL to connect')
     auth_client_secret = self._get_auth_secret(weaviate_auth.username, weaviate_auth.pwd, weaviate_auth.api_key)
     self.weaviate_client = weaviate.Client(
       url=weaviate_auth.url,
@@ -51,6 +68,7 @@ class WeaviateVectorDatabase(VectorDatabase):
     Create a new index of vectordatabase
     :similarity: similarity function, it should be one of l2-squared, cosine and dot
     '''
+    index_name = self._sanitize_index_name(index_name)
     if recreate_index:
       self.delete_index(index_name)
 
@@ -75,10 +93,18 @@ class WeaviateVectorDatabase(VectorDatabase):
     self.index_list.append(index_name)
 
 
+  def load_index(self):
+    '''
+    Reload index from weaviate
+    '''
+    self.index_list = [c['class'] for c in self.weaviate_client.schema.get()['classes']]
+
+
   def delete_index(self, index_name: str):
     '''
     delete an index
     '''
+    index_name = self._sanitize_index_name(index_name)
     if index_name in self.index_list:
       self.weaviate_client.schema.delete_class(index_name)
       self.index_list.remove(index_name)
@@ -93,7 +119,6 @@ class WeaviateVectorDatabase(VectorDatabase):
 
 
   def _check_index_validity(self, index_name: str):
-
     index_name = self._sanitize_index_name(index_name)
     if index_name not in self.index_list:
       raise Exception(f'Couldn\'t find index {index_name}, please create it first')
@@ -119,6 +144,8 @@ class WeaviateVectorDatabase(VectorDatabase):
     '''
     Get data by id and return results
     '''
+    if reload:
+      self.load_index()
     index_name = self._check_index_validity(index_name)
     result = []
     for id in ids:

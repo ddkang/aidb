@@ -1,9 +1,10 @@
-from typing import Dict, Optional
-from aidb.vector_database.vector_database import VectorDatabase
-import pandas as pd
 import chromadb
-from aidb.utils.logger import logger
 import numpy as np
+import pandas as pd
+from typing import Dict, Optional
+
+from aidb.utils.logger import logger
+from aidb.vector_database.vector_database import VectorDatabase
 
 
 class ChromaVectorDatabase(VectorDatabase):
@@ -12,6 +13,8 @@ class ChromaVectorDatabase(VectorDatabase):
     Authentication
     :param path: path to store vector database
     '''
+    if path is None:
+      raise ValueError('Chroma requires index path')
     self.path = path
     self.client = chromadb.PersistentClient(path=path)
     self.index_list = [collection.name for collection in self.client.list_collections()]
@@ -36,7 +39,7 @@ class ChromaVectorDatabase(VectorDatabase):
     if similarity not in ['l2', 'cosine', 'ip']:
       raise Exception('Similarity function must be one of euclidean, cosine and dotproduct')
 
-    metadata = {"hnsw:space": similarity}
+    metadata = {'hnsw:space': similarity}
 
     if index_name in self.index_list:
       raise Exception(f'Index {index_name} already exists, please use another name')

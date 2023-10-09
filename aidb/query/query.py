@@ -23,6 +23,7 @@ class Query(object):
   sql_str: str
   config: Config
 
+
   @cached_property
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
