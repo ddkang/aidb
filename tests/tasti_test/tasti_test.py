@@ -60,7 +60,7 @@ class TastiTests():
       user_database = FaissVectorDatabase(index_path)
       user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
-      # user_database.save_index(self.index_name)
+      user_database.save_index(self.index_name)
 
     elif self.vd_type == VectorDatabaseType.CHROMA.value:
       user_database = ChromaVectorDatabase(index_path)
