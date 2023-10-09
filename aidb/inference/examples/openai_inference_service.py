@@ -1,5 +1,3 @@
-import pandas as pd
-import requests
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 
@@ -8,13 +6,6 @@ class OpenAIAudio(HTTPInferenceService):
     '''
     :param str token: The token to use for authentication.
     :param str infer_type: 'transcriptions'|'translations'.
-
-    For `infer_one`, input should have 1 row, with keys following format 
-    at https://platform.openai.com/docs/api-reference/audio/createTranscription
-    or https://platform.openai.com/docs/api-reference/audio/createTranslation
-
-    output has 1 row, and 1 column, with key
-    - `text`: returned text transcription or translation.
     '''
     assert infer_type in [
         "transcriptions",
@@ -38,15 +29,6 @@ class OpenAIImage(HTTPInferenceService):
     '''
     :param str token: The token to use for authentication.
     :param str infer_type: 'generations'|'edits'|'variations'
-
-    For `infer_one`, input should have 1 row, with keys following format
-    at https://platform.openai.com/docs/api-reference/images/create
-    or https://platform.openai.com/docs/api-reference/images/createEdit
-    or https://platform.openai.com/docs/api-reference/images/createVariation
-
-    output has 1 row, and 2 columns, with keys
-    - `created`: timestamp of when the image was created.
-    - `url`/`b64_json`: url or base64-encoded image output, depending on input `response_format`.
     '''
     assert infer_type in [
         "generations",
@@ -66,31 +48,10 @@ class OpenAIImage(HTTPInferenceService):
     )
 
 
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    request = input.to_dict()
-    response = requests.post(self._url, json=request, headers=self._headers)
-    response.raise_for_status()
-    response = response.json()
-    if 'b64_json' in response['data'][0]:
-      response['data'] = [r['b64_json'] for r in response['data']]
-    elif 'url' in response['data'][0]:
-      response['data'] = [r['url'] for r in response['data']]
-    output = pd.DataFrame(response)
-    if self._copy_input:
-      output = output.assign(**input)
-    return output
-
-
 class OpenAIText(HTTPInferenceService):
   def __init__(self, token: str):
     '''
     :param str token: The token to use for authentication.
-
-    For `infer_one`, input should have 1 row.
-      Format should follow https://platform.openai.com/docs/api-reference/chat/create
-
-    outputs may have multiple rows. Columns containing all `choices` from generated text,
-      following https://platform.openai.com/docs/api-reference/chat/object
     '''
     super().__init__(
       name='openai_text',
@@ -103,22 +64,3 @@ class OpenAIText(HTTPInferenceService):
       batch_supported=False,
       is_single=False,
     )
-
-
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    request = input.to_dict()
-    response = requests.post(self._url, json=request, headers=self._headers)
-    response.raise_for_status()
-    response = response.json()
-    choices = response['choices']
-    for choice in choices:
-      choice['created'] = response['created']
-      choice['id'] = response['id']
-      choice['model'] = response['model']
-      choice['role'] = choice['message']['role']
-      choice['content'] = choice['message']['content']
-      del choice['message']
-    output = pd.DataFrame(response['choices'])
-    if self._copy_input:
-      output = output.assign(**input)
-    return output

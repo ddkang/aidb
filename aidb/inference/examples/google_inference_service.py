@@ -1,6 +1,3 @@
-import pandas as pd
-import requests
-
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 class GoogleVisionAnnotate(HTTPInferenceService):
@@ -31,56 +28,3 @@ class GoogleVisionAnnotate(HTTPInferenceService):
     )
     self._project_id = project_id
     self.infer_type = infer_type
-
-
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    input_dict = input.to_dict()
-    input_json = {
-      'requests': [{
-        'features': input_dict['features'],
-      },],
-      'parent': f'projects/{self._project_id}'
-    }
-    if 'imageContext' in input_dict:
-      input_json['requests'][0]['imageContext'] = input_dict['imageContext']
-    match self.infer_type:
-      case "files":
-        if 'pages' in input_dict:
-          input_json['requests'][0]['pages'] = input_dict['pages']
-        if 'gcsSource' in input_dict:
-          input_json['requests'][0]['inputConfig'] = {
-            'gcsSource': {
-              'uri': input_dict['gcsSource']
-            }
-          }
-        elif 'content' in input_dict:
-          input_json['requests'][0]['inputConfig'] = {
-            'content': input_dict['content']
-          }
-        else:
-          raise ValueError('input must contain gcsSource or content')
-        if 'mimeType' in input_dict:
-          input_json['requests'][0]['inputConfig']['mimeType'] = input_dict['mimeType']
-      case "images": 
-        if 'image' in input_dict:
-          input_json['requests'][0]['image'] = {
-            'content': input_dict['image']
-          }
-        elif 'gcsImageUri' in input_dict:
-          input_json['requests'][0]['image'] = {
-            'source': {
-              'gcsImageUri': input_dict['gcsImageUri']
-            }
-          }
-        elif 'imageUri' in input_dict:
-          input_json['requests'][0]['image'] = {
-            'source': {
-              'imageUri': input_dict['imageUri']
-            }
-          }
-        else:
-          raise ValueError('input must contain image, gcsImageUri, or imageUri')
-    response = requests.post(self._url, json=input_json, headers=self._headers)
-    response.raise_for_status()
-    response = response.json()
-    return response
