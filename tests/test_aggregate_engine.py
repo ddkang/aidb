@@ -27,6 +27,11 @@ queries = [
         '''SELECT COUNT(x_min) FROM objects00;'''
       ),
       (
+        'aggregate',
+        '''SELECT COUNT(*) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
+        '''SELECT COUNT(*) FROM objects00;'''
+      ),
+      (
          'aggregate',
          '''SELECT AVG(x_min) FROM objects00 
             WHERE frame < 10000 
@@ -91,8 +96,6 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-
-      print(aidb_res, gt_res, 'aidb_res, gt_res')
       assert self._equality_check(aidb_res, gt_res)
 
     del gt_engine

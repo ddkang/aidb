@@ -18,10 +18,11 @@ from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
 
 def is_aqp_exp(node):
   return isinstance(node, exp.ErrorTarget) \
-    or isinstance(node, exp.RecallTarget) \
-    or isinstance(node, exp.PrecisionTarget) \
-    or isinstance(node, exp.Confidence) \
-    or isinstance(node, exp.Budget)
+      or isinstance(node, exp.RecallTarget) \
+      or isinstance(node, exp.PrecisionTarget) \
+      or isinstance(node, exp.Confidence) \
+      or isinstance(node, exp.Budget)
+
 
 def _remove_aqp(node):
   if is_aqp_exp(node):
@@ -38,21 +39,17 @@ class Query(object):
   sql_str: str
   config: Config
 
-
   @cached_property
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
-
 
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
-
   @cached_property
   def sql_query_text(self):
     return self.base_sql_no_aqp.sql()
-
 
   @cached_property
   def base_sql_no_aqp(self):
@@ -60,7 +57,6 @@ class Query(object):
     if _exp_no_aqp is None:
       raise Exception('SQL contains no non-AQP statements')
     return _exp_no_aqp
-
 
   @cached_property
   def _tables(self) -> Dict[str, Dict[str, str]]:
@@ -73,7 +69,6 @@ class Query(object):
       for column in table.columns:
         _tables[table_name][column.name] = column.type
     return _tables
-
 
   @cached_property
   def table_name_to_aliases(self):
@@ -100,12 +95,10 @@ class Query(object):
             table_alias[str.lower(tbl_name)] = str.lower(tbl_alias)
     return table_alias
 
-
   @cached_property
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
-
 
   @cached_property
   def tables_in_query(self):
@@ -115,11 +108,9 @@ class Query(object):
         table_list.add(node.args["this"].args["this"])
     return table_list
 
-
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
     return predicate_name
-
 
   def _get_sympify_form(self, node, predicate_count, predicate_mappings):
     if node is None:
@@ -132,17 +123,22 @@ class Query(object):
       predicate_mappings[predicate_name] = node
       return predicate_name, predicate_count + 1
     elif isinstance(node, exp.Not):
-      e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
+      e1, p1 = self._get_sympify_form(
+          node.args['this'], predicate_count, predicate_mappings)
       return f"~({e1})", p1
     elif isinstance(node, exp.And):
       assert "this" in node.args and "expression" in node.args
-      e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
-      e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
+      e1, p1 = self._get_sympify_form(
+          node.args['this'], predicate_count, predicate_mappings)
+      e2, p2 = self._get_sympify_form(
+          node.args['expression'], p1, predicate_mappings)
       return f"({e1} & {e2})", p2
     elif isinstance(node, exp.Or):
       assert "this" in node.args and "expression" in node.args
-      e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
-      e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
+      e1, p1 = self._get_sympify_form(
+          node.args['this'], predicate_count, predicate_mappings)
+      e2, p2 = self._get_sympify_form(
+          node.args['expression'], p1, predicate_mappings)
       return f"({e1} | {e2})", p2
     elif isinstance(node, exp.GT) or \
             isinstance(node, exp.LT) or \
@@ -159,37 +155,36 @@ class Query(object):
     else:
       raise NotImplementedError
 
-
   def _get_original_predicate(self, predicate_name, predicate_mappings) -> FilteringPredicate:
     if predicate_name[0] == "~":
       return FilteringPredicate(True, predicate_mappings[predicate_name[1:]])
     else:
       return FilteringPredicate(False, predicate_mappings[predicate_name])
 
-
   def _get_or_clause_representation(self, or_expression, predicate_mappings) -> List[FilteringPredicate]:
     connected_by_ors = list(or_expression.args)
     predicates_in_ors = []
     if len(connected_by_ors) <= 1:
-      predicates_in_ors.append(self._get_original_predicate(str(or_expression), predicate_mappings))
+      predicates_in_ors.append(self._get_original_predicate(
+          str(or_expression), predicate_mappings))
     else:
       for s in connected_by_ors:
-        predicates_in_ors.append(self._get_original_predicate(str(s), predicate_mappings))
+        predicates_in_ors.append(
+            self._get_original_predicate(str(s), predicate_mappings))
     return predicates_in_ors
 
-
   def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
-    List[FilteringPredicate]]:
+          List[FilteringPredicate]]:
     if '&' not in str(cnf_expression):
       return [self._get_or_clause_representation(cnf_expression, predicate_mappings)]
 
     or_expressions_connected_by_ands = list(cnf_expression.args)
     or_expressions_connected_by_ands_repr = []
     for or_expression in or_expressions_connected_by_ands:
-      connected_by_ors = self._get_or_clause_representation(or_expression, predicate_mappings)
+      connected_by_ors = self._get_or_clause_representation(
+          or_expression, predicate_mappings)
       or_expressions_connected_by_ands_repr.append(connected_by_ors)
     return or_expressions_connected_by_ands_repr
-
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
@@ -214,19 +209,22 @@ class Query(object):
       # predicate name (used for sympy package) to expression
       predicate_mappings = {}
       # predicate mapping will be filled by this function
-      sympy_representation, _ = self._get_sympify_form(self._expression.find(exp.Where), 0, predicate_mappings)
+      sympy_representation, _ = self._get_sympify_form(
+          self._expression.find(exp.Where), 0, predicate_mappings)
       sympy_expression = sympify(sympy_representation)
       cnf_expression = to_cnf(sympy_expression)
-      filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
+      filtering_predicates = self._get_filtering_predicate_cnf_representation(
+          cnf_expression, predicate_mappings)
       filtering_clauses = []
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
         for fp in or_connected_filtering_predicate:
           if isinstance(fp.predicate, exp.Column):
             # in case of boolean type columns
-            column_name = self._get_normalized_col_name_from_col_exp(fp.predicate)
+            column_name = self._get_normalized_col_name_from_col_exp(
+                fp.predicate)
             or_connected_clauses.append(
-              FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
+                FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
           else:
             t1, v1 = extract_column_or_value(fp.predicate.args["this"])
             t2, v2 = extract_column_or_value(fp.predicate.args["expression"])
@@ -241,23 +239,25 @@ class Query(object):
 
             if t1 == "literal" and t2 == "column":
               t_name, c_name = right_value.split('.')
-              left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
+              left_value = change_literal_type_to_col_type(
+                  self._tables[t_name][c_name], left_value)
               # change compare_value_2 to float or int
             elif t2 == "literal" and t1 == "column":
               t_name, c_name = left_value.split('.')
-              right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
+              right_value = change_literal_type_to_col_type(
+                  self._tables[t_name][c_name], right_value)
             elif t1 == "literal" and t2 == "literal":
               # both left and right cannot be literals
-              raise Exception("Comparisons among literals not supported in filtering predicate")
+              raise Exception(
+                  "Comparisons among literals not supported in filtering predicate")
 
             or_connected_clauses.append(
-              FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
-                              Expression(t2, right_value)))
+                FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
+                                Expression(t2, right_value)))
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
       return []
-
 
   def _get_table_of_column(self, col_name):
     tables_of_column = []
@@ -270,7 +270,6 @@ class Query(object):
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
       return tables_of_column[0]
-
 
   def _get_normalized_col_name_from_col_exp(self, node):
     """
@@ -287,7 +286,6 @@ class Query(object):
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
 
-
   @cached_property
   def inference_engines_required_for_filtering_predicates(self):
     """
@@ -303,15 +301,16 @@ class Query(object):
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+            inference_engines_required.add(
+                self.config.column_by_service[originated_from].service.name)
         if or_connected_predicate.right_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+            inference_engines_required.add(
+                self.config.column_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
-
 
   @cached_property
   def tables_in_filtering_predicates(self):
@@ -335,15 +334,9 @@ class Query(object):
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 
-
-  @cached_property
-  def columns_in_query(self):
-    """
-    nested queries are not supported for the time being
-    * is supported
-    """
+  def get_columns_in_expression_tree(self, exp_tree):
     column_set = set()
-    for node, _, _ in self._expression.walk():
+    for node, _, _ in exp_tree.walk():
       if isinstance(node, exp.Column):
         if isinstance(node.args['this'], exp.Identifier):
           column_set.add(self._get_normalized_col_name_from_col_exp(node))
@@ -355,8 +348,16 @@ class Query(object):
           raise Exception('Unsupported column type')
     return column_set
 
+  @cached_property
+  def columns_in_query(self):
+    """
+    nested queries are not supported for the time being
+    * is supported
+    """
+    return self.get_columns_in_expression_tree(self._expression)
 
   # Get aggregation type
+
   def get_agg_type(self):
     logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
     select_exp = self.base_sql_no_aqp.args['expressions'][0]
@@ -369,26 +370,20 @@ class Query(object):
     else:
       return None
 
-
-  def get_aggregated_column(self, agg_type):
+  def get_aggregated_columns(self, agg_type):
     """
     returns the column name that is aggregated in the query.
     for e.g. SELECT Avg(sentiment) from sentiments;
     will return sentiment
     """
     agg_exp_tree = self._expression.find(agg_type)
-    for node, _, key in agg_exp_tree.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          return node.args['this'].args['this']
-    return None
-
+    return list(self.get_columns_in_expression_tree(agg_exp_tree))
 
   def is_approx_agg_query(self):
     return True if self.get_agg_type() and self.validate_aqp() else False
 
-
   # AQP extraction
+
   def get_keyword_arg(self, exp_type):
     value = None
     for node, _, key in self._expression.walk():
@@ -399,18 +394,16 @@ class Query(object):
           value = float(node.args['this'].args['this'])
     return value
 
-
   @cached_property
   def _error_target(self):
     return self.get_keyword_arg(exp.ErrorTarget)
-
 
   @cached_property
   def _confidence(self):
     return self.get_keyword_arg(exp.Confidence)
 
-
   # Validate AQP
+
   def validate_aqp(self):
     if self._error_target and self._confidence is None:
       raise Exception('AQP target found but no confidence')
@@ -431,6 +424,7 @@ class Query(object):
 
     if self._error_target is not None:
       if exp.Avg not in expression_counts and exp.Sum not in expression_counts \
-          and exp.Count not in expression_counts:
-        raise Exception('Supported aggregates are not found in approximate aggregation query')
+              and exp.Count not in expression_counts:
+        raise Exception(
+            'Supported aggregates are not found in approximate aggregation query')
     return True
