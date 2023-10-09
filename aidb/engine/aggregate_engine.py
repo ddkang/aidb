@@ -12,7 +12,7 @@ from aidb.estimator.estimator import (Estimator, WeightedCountSetEstimator,
                                       WeightedMeanSetEstimator,
                                       WeightedSumSetEstimator)
 from aidb.query.query import Query
-from aidb.samplers.sampler import SampledBlob, SampledBlobId
+from aidb.samplers.sampler import SampledBlob
 from aidb.utils.constants import NUM_PILOT_SAMPLES
 from aidb.utils.logger import logger
 
@@ -31,14 +31,27 @@ class ApproximateAggregateEngine(BaseEngine):
   def get_random_sampling_query(self, bound_service, query,
                                 inference_services_executed, num_samples):
     '''Function to return limited number of samples randomly'''
-    inp_query_str = self.get_input_query_for_inference_service(
-        bound_service,
-        query,
-        inference_services_executed
-    )
-    return f'''{inp_query_str.replace(';', '')}
-              ORDER BY RANDOM()
-              LIMIT {num_samples};'''
+    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(
+                                              bound_service,
+                                              query,
+                                              inference_services_executed
+                                          )
+    if where_str:
+      return f'''
+                SELECT {inp_cols_str}
+                {join_str}
+                WHERE {where_str}
+                ORDER BY RANDOM()
+                LIMIT {num_samples};
+              '''
+
+    else:
+      return f'''
+                SELECT {inp_cols_str}
+                {join_str}
+                ORDER BY RANDOM()
+                LIMIT {num_samples};
+              '''
 
   def get_num_blob_ids_query(self, table, column):
     '''Function that returns a query, to get total number of blob ids'''
@@ -51,7 +64,7 @@ class ApproximateAggregateEngine(BaseEngine):
   def search_sample_columns(self, sample, agg_on_columns):
     '''
     Function to search if our aggregated columns of interest 
-    are in cooresponding sample taken, so that blob can be sampled.
+    are in corresponding sample taken, so that blob can be sampled.
     '''
     if any(column not in sample.columns for column in agg_on_columns):
       return False
@@ -72,16 +85,15 @@ class ApproximateAggregateEngine(BaseEngine):
     mass = 1.
     wt = 1. / (num_samples)
     for idx in range(num_samples):
-      sampled_blob_id = SampledBlobId(infer_output[idx], wt, mass)
       blob_table = {agg_table: infer_output[idx]}
       if not self.search_sample_columns(infer_output[idx], agg_on_columns):
         continue
 
       map_cols = {}
       for col in infer_output[idx].columns:
-        hier_col = col.split('.')
-        map_cols[col] = hier_col[1] if len(
-            hier_col) > 1 else hier_col[0]
+        table_column = col.split('.')
+        map_cols[col] = table_column[1] if len(
+            table_column) > 1 else table_column[0]
       infer_output[idx].rename(columns=map_cols, inplace=True)
       proxy_table = f'{agg_table}_proxy'
 
@@ -136,13 +148,8 @@ class ApproximateAggregateEngine(BaseEngine):
     num_ids_query = get_num_ids_query()
 
     async with self._sql_engine.begin() as conn:
-      self.num_blob_ids = await conn.run_sync(
-          lambda conn: pd.read_sql(
-              text(num_ids_query),
-              conn
-          )
-      )
-    self.num_blob_ids = int(self.num_blob_ids.iloc[0, 0])
+      self.num_blob_ids = await conn.execute(text(num_ids_query))
+    self.num_blob_ids = self.num_blob_ids.fetchone()[0]
 
     # Pilot run to determine required number of samples
     service_ordering = self._config.inference_topological_order

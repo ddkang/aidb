@@ -96,6 +96,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
+      print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
       assert self._equality_check(aidb_res, gt_res)
 
     del gt_engine

@@ -305,4 +305,4 @@ class BaseEngine():
               SELECT {inp_cols_str}
               {join_str};
             '''
-    return inp_query_str
+    return inp_query_str, inp_cols_str, join_str, where_str
