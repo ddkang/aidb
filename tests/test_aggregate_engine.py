@@ -70,7 +70,7 @@ queries = [
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
   def _equality_check(self, aidb_res, gt_res):
     aidb_res, gt_res = aidb_res[0][0], gt_res[0][0]
-    if abs(aidb_res - gt_res) / (gt_res) < 0.35:
+    if abs(aidb_res - gt_res) / (gt_res) < 0.3:
       return True
     return False
 

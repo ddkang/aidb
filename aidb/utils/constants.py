@@ -4,7 +4,8 @@ from typing import List
 
 CACHE_PREFIX = '__cache'
 CONFIG_PREFIX = '__config'
-PILOT_POPULATION_PERCENT = 10
+
+NUM_PILOT_SAMPLES = 500
 '''
 The schema of the blob metadata table is as follows:
   table_name: str
