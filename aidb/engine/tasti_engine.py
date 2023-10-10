@@ -206,4 +206,4 @@ class TastiEngine(FullScanEngine):
       await conn.run_sync(lambda conn: new_topk_for_all.to_sql(self.topk_table_name, conn,
                                                                if_exists='append', index=False))
 
-  #TODO: update topk table and representative table, query for new embeddings.
+  # TODO: update topk table and representative table, query for new embeddings.
