@@ -2,6 +2,9 @@ from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, in
 from aidb.engine import Engine
 
 
+MAX_DIFF_AIDB_GT_RESULT = 0.3
+
+
 async def setup_gt_and_aidb_engine(db_url, data_dir):
   # Set up the ground truth database
   gt_db_fname = 'aidb_gt'

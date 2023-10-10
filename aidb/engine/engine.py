@@ -13,7 +13,7 @@ class Engine(FullScanEngine, ApproximateAggregateEngine):
     # TODO: branch based on query type
     parsed_query = Query(query, self._config)
     
-    if parsed_query.is_approx_agg_query():
+    if parsed_query.is_approx_agg_query:
     	return asyncio_run(self.execute_aggregate_query(parsed_query, **kwargs))
 
     return asyncio_run(self.execute_full_scan(parsed_query, **kwargs))

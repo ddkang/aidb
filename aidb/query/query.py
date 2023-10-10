@@ -257,7 +257,7 @@ class Query(object):
       return []
 
 
-  def _get_table_of_column(self, col_name):
+  def get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
       if col_name in self._tables[table]:
@@ -282,7 +282,7 @@ class Query(object):
       if table_name in self.table_aliases_to_name:
         table_name = self.table_aliases_to_name[table_name]
     else:
-      table_name = self._get_table_of_column(node.args["this"].args["this"])
+      table_name = self.get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
 
 
@@ -334,7 +334,7 @@ class Query(object):
     return tables_required_predicates
 
 
-  def get_columns_in_expression_tree(self, exp_tree):
+  def _get_columns_in_expression_tree(self, exp_tree):
     column_set = set()
     for node, _, _ in exp_tree.walk():
       if isinstance(node, exp.Column):
@@ -355,7 +355,7 @@ class Query(object):
     nested queries are not supported for the time being
     * is supported
     """
-    return self.get_columns_in_expression_tree(self._expression)
+    return self._get_columns_in_expression_tree(self._expression)
 
 
   # Get aggregation type
@@ -371,6 +371,7 @@ class Query(object):
     else:
       return None
 
+
   def get_aggregated_columns(self, agg_type):
     """
     returns the column name that is aggregated in the query.
@@ -378,14 +379,16 @@ class Query(object):
     will return sentiment
     """
     agg_exp_tree = self._expression.find(agg_type)
-    return list(self.get_columns_in_expression_tree(agg_exp_tree))
+    return list(self._get_columns_in_expression_tree(agg_exp_tree))
 
+
+  @cached_property
   def is_approx_agg_query(self):
     return True if self.get_agg_type() and self.validate_aqp() else False
 
 
   # AQP extraction
-  def get_keyword_arg(self, exp_type):
+  def _get_keyword_arg(self, exp_type):
     value = None
     for node, _, key in self._expression.walk():
       if isinstance(node, exp_type):
@@ -397,22 +400,22 @@ class Query(object):
 
 
   @cached_property
-  def _error_target(self):
-    return self.get_keyword_arg(exp.ErrorTarget)
+  def error_target(self):
+    return self._get_keyword_arg(exp.ErrorTarget)
 
 
   @cached_property
-  def _confidence(self):
-    return self.get_keyword_arg(exp.Confidence)
+  def confidence(self):
+    return self._get_keyword_arg(exp.Confidence)
 
 
   # Validate AQP
   def validate_aqp(self):
-    if self._error_target and self._confidence is None:
-      raise Exception('AQP target found but no confidence')
+    if not self.error_target:
+      raise Exception('AQP error target not found')
 
-    if self._error_target is None and self._confidence is not None:
-      raise Exception('No AQP targets found but confidence found')
+    if not self.confidence:
+      raise Exception('AQP confidence not found')
 
     # Only accept select statements
     if not isinstance(self.base_sql_no_aqp, exp.Select):
@@ -423,11 +426,17 @@ class Query(object):
     for expression in self.base_sql_no_aqp.args['expressions']:
       expression_counts[type(expression)] += 1
     if len(expression_counts) > 1:
+
+      # Raise exception if nested queries are found
       raise Exception('Multiple expression types found')
 
-    if self._error_target is not None:
-      if exp.Avg not in expression_counts and exp.Sum not in expression_counts \
-              and exp.Count not in expression_counts:
-        raise Exception(
-            'Supported aggregates are not found in approximate aggregation query')
+    if exp.Avg not in expression_counts and exp.Sum not in expression_counts \
+            and exp.Count not in expression_counts:
+      raise Exception(
+          'Supported aggregates are not found in approximate aggregation query')
+
+    for expression in [exp.Avg, exp.Count, exp.Sum]:
+      if expression_counts[expression] > 1:
+        raise Exception('Multiple aggregations are not yet supported')
+
     return True

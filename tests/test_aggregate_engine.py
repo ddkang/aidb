@@ -6,7 +6,7 @@ from sqlalchemy.sql import text
 
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, MAX_DIFF_AIDB_GT_RESULT
 
 
 DB_URL = "sqlite+aiosqlite://"
@@ -74,8 +74,9 @@ queries = [
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
   def _equality_check(self, aidb_res, gt_res):
+    assert len(aidb_res) == len(gt_res)
     aidb_res, gt_res = aidb_res[0][0], gt_res[0][0]
-    if abs(aidb_res - gt_res) / (gt_res) < 0.3:
+    if abs(aidb_res - gt_res) / (gt_res) < MAX_DIFF_AIDB_GT_RESULT:
       return True
     return False
 
