@@ -85,38 +85,6 @@ class Query(object):
 
 
   @cached_property
-  def column_name_to_aliases(self):
-    """
-    finds the mapping of table names and aliases present in the query.
-
-    for e.g. for the query:
-    SELECT t2.id as id, t2.frame as frame, t2.column5
-    FROM table_2 t2 JOIN blob_ids b
-    ON t2.frame = b.frame
-    WHERE b.frame > 102 and column1 > 950
-
-    it will return {t2.id: id, t2.frame: frame}
-
-    :return: mapping of table names and alias
-    """
-    column_alias = {}
-    for alias_exp in self._expression.find_all(exp.Alias):
-      for node, _, _ in alias_exp.walk():
-        if isinstance(node, exp.Alias) and "alias" in node.args and "this" in node.args:
-          if isinstance(node.args["this"], exp.Column):
-            col_name = node.args["this"].args["this"].args["this"]
-            col_alias = node.args["alias"].args["this"]
-            column_alias[str.lower(col_name)] = str.lower(col_alias)
-    return column_alias
-
-
-  @cached_property
-  def column_aliases_to_name(self):
-    column_name_to_alias = self.column_name_to_aliases
-    return {v: k for k, v in column_name_to_alias.items()}
-
-
-  @cached_property
   def tables_in_query(self):
     table_list = set()
     for node, _, _ in self._expression.walk():
