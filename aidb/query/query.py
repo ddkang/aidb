@@ -311,14 +311,14 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       max_service_index = -1
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
+        if or_connected_predicate.left_exp.type == 'column':
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           if originated_from in self.config.column_by_service:
             bound_service = self.config.column_by_service[originated_from]
             max_service_index = max(max_service_index, service_order.index(bound_service))
 
-        if or_connected_predicate.right_exp.type == "column":
+        if or_connected_predicate.right_exp.type == 'column':
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           if originated_from in self.config.column_by_service:
@@ -342,13 +342,13 @@ class Query(object):
     for filtering_predicate in filtering_predicates:
       satisfied = True
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
+        if or_connected_predicate.left_exp.type == 'column':
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           if originated_from.split('.')[0] not in tables:
             satisfied = False
             break
-        if or_connected_predicate.right_exp.type == "column":
+        if or_connected_predicate.right_exp.type == 'column':
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           if originated_from.split('.')[0] not in tables:
@@ -359,31 +359,24 @@ class Query(object):
     return filtering_predicates_satisfied
 
 
-  def _extract_column_names(self) -> List[str]:
-    '''
-    extract all used column names in query, return in format {table_name}.{col_name}
-    '''
-    column_names = set()
-    for expression in self._expression.find_all(exp.Column):
-      if isinstance(expression.args['this'], exp.Star):
-        for table_name in self.tables_in_query:
-          for column_name in self._tables[table_name].keys():
-            column_names.add(f'{table_name}.{column_name}')
-        continue
-      table_name = expression.text("table")
-      column_name = expression.text("this")
-
-      if table_name in self.table_aliases_to_name:
-        table_name = self.table_aliases_to_name[expression.text("table")]
-
-      if column_name in self.column_aliases_to_name:
-        column_name = self.column_aliases_to_name[column_name]
-
-      if table_name == '':
-        table_name = self._get_table_of_column(column_name)
-
-      column_names.add(f'{table_name}.{column_name}')
-    return list(column_names)
+  @cached_property
+  def columns_in_query(self):
+    """
+    nested queries are not supported for the time being
+    * is supported
+    """
+    column_set = set()
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          column_set.add(self._get_normalized_col_name_from_col_exp(node))
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            for col, _ in self._tables[table].items():
+              column_set.add(f"{table}.{col}")
+        else:
+          raise Exception('Unsupported column type')
+    return column_set
 
 
   @cached_property
@@ -391,9 +384,8 @@ class Query(object):
     """
     Inference services required for sql query, will return a list of inference service
     """
-    column_names = self._extract_column_names()
-    stack = column_names.copy()
-    visited = set(stack)
+    visited = self.columns_in_query.copy()
+    stack = list(visited)
     inference_engines_required = set()
 
     while stack:
@@ -405,7 +397,7 @@ class Query(object):
         if inference not in inference_engines_required:
           inference_engines_required.add(inference)
 
-          for inference_col in inference.binding.input_columns + inference.binding.output_columns:
+          for inference_col in inference.binding.input_columns:
             if inference_col not in visited:
               stack.append(inference_col)
               visited.add(inference_col)

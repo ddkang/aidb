@@ -11,7 +11,7 @@ from aidb.config.config_types import InferenceBinding
 from aidb.inference.bound_inference_service import (
     BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
-from aidb.query.query import FilteringClause, Query
+from aidb.query.query import Query
 from aidb.query.utils import predicate_to_str
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.logger import logger
@@ -253,18 +253,10 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
-    and_connected = []
-    for fp in filtering_predicates:
-      and_connected.append(" OR ".join(
-        [predicate_to_str(p) for p in fp]))
-    return " AND ".join(and_connected)
-
-
   def get_input_query_for_inference_service(
       self,
       bound_service: BoundInferenceService,
-      user_query,
+      user_query: Query,
       rep_table_name: Optional[str] = None,
       filtered_index_list: Optional[List[int]] = None
   ):
@@ -290,17 +282,19 @@ class BaseEngine():
     filtering_predicates = user_query.inference_engines_related_filtering_predicates[service_name]
     filtering_predicates_satisfied = user_query.get_satisfied_filtering_predicates(filtering_predicates, inp_tables)
 
-    where_str = self._get_where_str(filtering_predicates_satisfied)
-    for k, v in column_to_root_column.items():
-      where_str = where_str.replace(k, v)
+    and_connected = []
+    for fp in filtering_predicates_satisfied:
+      and_connected.append(' OR '.join([predicate_to_str(p) for p in fp]))
 
     # FIXME: for different database, the IN grammar maybe different
     if filtered_index_list:
-      filtered_index_list = tuple(filtered_index_list)
-      filter_condition = f"{rep_table_name}.blob_id IN {format(filtered_index_list)}"
-      where_str = f"{where_str} AND {filter_condition}" if where_str else filter_condition
+      and_connected.append(f'{rep_table_name}.blob_id IN {format(tuple(filtered_index_list))}')
 
-    where_clause = f"WHERE {where_str}" if where_str else ""
+    where_str = ' AND '.join(and_connected)
+    for k, v in column_to_root_column.items():
+      where_str = where_str.replace(k, v)
+
+    where_clause = f'WHERE {where_str}' if where_str else ''
     inp_query_str = f'''
                 SELECT {inp_cols_str}
                 {join_str}
