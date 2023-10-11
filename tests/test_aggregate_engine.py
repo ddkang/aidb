@@ -6,10 +6,14 @@ from sqlalchemy.sql import text
 
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine, MAX_DIFF_AIDB_GT_RESULT
+from tests.utils import setup_gt_and_aidb_engine
+from aidb.query.query import Query
 
 
 DB_URL = "sqlite+aiosqlite://"
+#DB_URL = "mysql+aiomysql://aidb:password@localhost"
+# DB_URL="postgresql+asyncpg://sravya:aidb@localhost:5432"
+
 queries = [
       (
         'aggregate',
@@ -73,10 +77,10 @@ queries = [
     ]
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
-  def _equality_check(self, aidb_res, gt_res):
+  def _equality_check(self, aidb_res, gt_res, error_target):
     assert len(aidb_res) == len(gt_res)
     aidb_res, gt_res = aidb_res[0][0], gt_res[0][0]
-    if abs(aidb_res - gt_res) / (gt_res) < MAX_DIFF_AIDB_GT_RESULT:
+    if abs(aidb_res - gt_res) / (gt_res) <= error_target * 20:
       return True
     return False
 
@@ -98,7 +102,8 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
-      assert self._equality_check(aidb_res, gt_res)
+      error_target = Query(aidb_query, aidb_engine._config).error_target
+      assert self._equality_check(aidb_res, gt_res, error_target)
 
     del gt_engine
     p.terminate()

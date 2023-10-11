@@ -4,7 +4,6 @@ from typing import List
 
 CACHE_PREFIX = '__cache'
 CONFIG_PREFIX = '__config'
-
 NUM_PILOT_SAMPLES = 1000
 
 REP_PREFIX = '__rep'
