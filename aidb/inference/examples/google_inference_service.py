@@ -34,4 +34,3 @@ class GoogleVisionAnnotate(HTTPInferenceService):
         response_keys_to_columns=response_keys_to_columns,
     )
     self._project_id = project_id
-    self.infer_type = infer_type
