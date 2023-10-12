@@ -1,4 +1,4 @@
-from flatten_json import flatten, unflatten
+from flatten_json import flatten, unflatten_list
 from typing import Dict, List, Tuple, Union
 
 import pandas as pd
@@ -40,14 +40,21 @@ class HTTPInferenceService(CachedInferenceService):
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     # Turns the input into a list
-    input_with_keys_required_by_inference_service = {}
+    request = {}
     for k, v in input.to_dict().items():
-      input_with_keys_required_by_inference_service[self._columns_to_input_keys[k]] = v
-    response = requests.post(self._url, json=unflatten(input_with_keys_required_by_inference_service), headers=self._headers)
+      if k in self._columns_to_input_keys:
+        key = self._columns_to_input_keys[k]
+        key = '_'.join(key) if isinstance(key, tuple) else key
+        request[key] = v
+    response = requests.post(self._url, json=unflatten_list(request), headers=self._headers)
     response.raise_for_status()
-    response = response.json()
-    output = pd.DataFrame(flatten(response))
-    output = output.replace(self._response_keys_to_columns)
+    response = flatten(response.json())
+    output = {}
+    for k, v in response.items():
+      k = tuple(k.split('_'))
+      if k in self._response_keys_to_columns:
+        output[self._response_keys_to_columns[k]] = v
+    output = pd.DataFrame([output])
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
       output = output.assign(**input)

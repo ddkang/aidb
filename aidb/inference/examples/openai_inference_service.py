@@ -1,8 +1,15 @@
+from typing import Dict, Union
+
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 
 class OpenAIAudio(HTTPInferenceService):
-  def __init__(self, token: str, infer_type: str='transcriptions'):
+  def __init__(
+      self,
+      token: str,
+      columns_to_input_keys: Dict[str, Union[str, tuple]],
+      response_keys_to_columns: Dict[Union[str, tuple], str],
+      infer_type: str='transcriptions'):
     '''
     :param str token: The token to use for authentication.
     :param str infer_type: 'transcriptions'|'translations'.
@@ -21,11 +28,19 @@ class OpenAIAudio(HTTPInferenceService):
       copy_input=False,
       batch_supported=False,
       is_single=False,
+      columns_to_input_keys=columns_to_input_keys,
+      response_keys_to_columns=response_keys_to_columns,
     )
 
 
 class OpenAIImage(HTTPInferenceService):
-  def __init__(self, token: str, infer_type: str='generations'):
+  def __init__(
+      self, 
+      token: str, 
+      columns_to_input_keys: Dict[str, Union[str, tuple]],
+      response_keys_to_columns: Dict[Union[str, tuple], str],
+      infer_type: str='generations'
+    ):
     '''
     :param str token: The token to use for authentication.
     :param str infer_type: 'generations'|'edits'|'variations'
@@ -45,11 +60,18 @@ class OpenAIImage(HTTPInferenceService):
       copy_input=False,
       batch_supported=False,
       is_single=False,
+      columns_to_input_keys=columns_to_input_keys,
+      response_keys_to_columns=response_keys_to_columns,
     )
 
 
 class OpenAIText(HTTPInferenceService):
-  def __init__(self, token: str):
+  def __init__(
+      self, 
+      token: str,
+      columns_to_input_keys: Dict[str, Union[str, tuple]],
+      response_keys_to_columns: Dict[Union[str, tuple], str],
+    ):
     '''
     :param str token: The token to use for authentication.
     '''
@@ -63,4 +85,6 @@ class OpenAIText(HTTPInferenceService):
       copy_input=False,
       batch_supported=False,
       is_single=False,
+      columns_to_input_keys=columns_to_input_keys,
+      response_keys_to_columns=response_keys_to_columns,
     )

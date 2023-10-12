@@ -1,9 +1,14 @@
+from typing import Dict, Union
+
 from aidb.inference.http_inference_service import HTTPInferenceService
+
 
 class GoogleVisionAnnotate(HTTPInferenceService):
   def __init__(
       self,
       token: str,
+      columns_to_input_keys: Dict[str, Union[str, tuple]],
+      response_keys_to_columns: Dict[Union[str, tuple], str],
       project_id: str,
       infer_type: str='images',
   ):
@@ -25,6 +30,8 @@ class GoogleVisionAnnotate(HTTPInferenceService):
         copy_input=False,
         batch_supported=False,
         is_single=False,
+        columns_to_input_keys=columns_to_input_keys,
+        response_keys_to_columns=response_keys_to_columns,
     )
     self._project_id = project_id
     self.infer_type = infer_type
