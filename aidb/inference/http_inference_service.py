@@ -39,21 +39,33 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    # Turns the input into a list
     request = {}
+    separator = '.'
     for k, v in input.to_dict().items():
       if k in self._columns_to_input_keys:
         key = self._columns_to_input_keys[k]
-        key = '_'.join(key) if isinstance(key, tuple) else key
+        key = separator.join(key) if isinstance(key, tuple) else key
         request[key] = v
-    response = requests.post(self._url, json=unflatten_list(request), headers=self._headers)
+    request_unflatten = unflatten_list(request, separator)
+
+    response = requests.post(self._url, json=request_unflatten, headers=self._headers)
     response.raise_for_status()
-    response = flatten(response.json())
+    response = response.json()
+
+    # some response may be a list of indefinite length
+    # but users may want to specify the maximum via _response_keys_to_columns
+    response_is_list = isinstance(response, list)
+    if response_is_list:
+      response = {'_': response} # only hf returns a list
+    response_flatten = flatten(response, separator)
     output = {}
-    for k, v in response.items():
-      k = tuple(k.split('_'))
+    for k, v in response_flatten.items():
+      k = tuple(k.split(separator))
+      if response_is_list:
+        k = k[1:] # remove '_' for list
       if k in self._response_keys_to_columns:
         output[self._response_keys_to_columns[k]] = v
+
     output = pd.DataFrame([output])
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
