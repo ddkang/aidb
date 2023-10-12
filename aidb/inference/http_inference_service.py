@@ -32,35 +32,39 @@ class HTTPInferenceService(CachedInferenceService):
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
+    self.separator = '.'
 
 
   def signature(self) -> Tuple[List, List]:
     raise NotImplementedError()
+  
 
-
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+  def request(self, input: pd.Series) -> Dict:
     request = {}
-    separator = '.'
     for k, v in input.to_dict().items():
       if k in self._columns_to_input_keys:
         key = self._columns_to_input_keys[k]
-        key = separator.join(key) if isinstance(key, tuple) else key
+        key = self.separator.join(key) if isinstance(key, tuple) else key
         request[key] = v
-    request_unflatten = unflatten_list(request, separator)
+    request_unflatten = unflatten_list(request, self.separator)
 
     response = requests.post(self._url, json=request_unflatten, headers=self._headers)
     response.raise_for_status()
-    response = response.json()
+    return response.json()
+
+
+  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    response = self.request(input)
 
     # some response may be a list of indefinite length
     # but users may want to specify the maximum via _response_keys_to_columns
     response_is_list = isinstance(response, list)
     if response_is_list:
       response = {'_': response} # only hf returns a list
-    response_flatten = flatten(response, separator)
+    response_flatten = flatten(response, self.separator)
     output = {}
     for k, v in response_flatten.items():
-      k = tuple(k.split(separator))
+      k = tuple(k.split(self.separator))
       if response_is_list:
         k = k[1:] # remove '_' for list
       if k in self._response_keys_to_columns:
