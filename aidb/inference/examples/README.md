@@ -1,86 +1,103 @@
 # Example Inference Services 
 
-## [OpenAI API]()
+## OpenAI
 
 ### [Chat](https://platform.openai.com/docs/api-reference/chat)
 
-For input creation, please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column.
-> TODO: Input is a JSON object with keys inside keys. What's the best way of representing it? Currently I just assume user input columns have JSON objects as values. A better way might be to have something similar to PyTorch state dict, such as `messages.0.role`.
+You will need to specify the map from your input column keys to API JSON object input keys in tuple format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
 
-For output, it will contain columns `index`, `finish_reason`, `created`, `id`, `model`, `role`, `content`. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object).
-> TODO: Users probably do not need all the columns. We should probably consider having a way to let users specify which columns they want to keep. However, if there are a lot of columns, they might have to write a lot of code to specify.
+You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object). If an output JSON attribute is not inside the map keys, that attribute will be ignored.
 
 Example usage:
 ```python
 import pandas as pd
 from aidb.inference.examples.openai_inference_service import OpenAIText
-openai_text_request_dict = {
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Do you know Google Cloud Vision API?"
-    }
-  ],
-  "n": 3,
+
+map_input_to_request = {
+  'model': ('model',),
+  'role': ('messages', '0', 'role'),
+  'content': ('messages', '0', 'content'),
+  'n': ('n',)
 }
-openai_text_request_pd = pd.Series(openai_text_request_dict)
-openai_text = OpenAIText(OPENAI_KEY)
+
+map_response_to_output = {
+  ('id',): 'id',
+  ('object',): 'object',
+  ('created',): 'created',
+  ('model',): 'model',
+  ('choices', '0', 'index'): 'choices.0.index',
+  ('choices', '0', 'message', 'role'): 'choices.0.message.role',
+  ('choices', '0', 'message', 'content'): 'choices.0.message.content',
+  ('choices', '0', 'finish_reason'): 'choices.0.finish_reason',
+  ('choices', '1', 'index'): 'choices.1.index',
+  ('choices', '1', 'message', 'role'): 'choices.1.message.role',
+  ('choices', '1', 'message', 'content'): 'choices.1.message.content',
+  ('choices', '1', 'finish_reason'): 'choices.1.finish_reason'
+}
+
+openai_text = OpenAIText(OPENAI_KEY, map_input_to_request, map_response_to_output)
 openai_text_response_pd = openai_text.infer_one(openai_text_request_pd)
+openai_text_response_pd
 ```
 
-Input Series:
+Input:
 ```
-model                                           gpt-3.5-turbo
-messages    [{'role': 'user', 'content': 'Do you know Goog...
-n                                                           3
+model                             gpt-3.5-turbo
+role                                       user
+content    Do you know Google Cloud Vision API?
+n                                             2
 dtype: object
 ```
 
 Response:
-|	|index|	finish_reason|	created|	id|	model|	role|	content|
-|---|---|---|---|---|---|---|---|
-|0|	0|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a service provided by Google Cloud Platform that allows developers to easily integrate image analysis and recognition capabilities into their applications. The API enables tasks such as labeling images, detecting objects and faces, reading printed and handwritten text, and identifying similar images. It uses machine learning models developed by Google to deliver accurate results.|
-|1|	1|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a machine learning-based technology that allows developers to integrate image analysis features into their applications. It can perform tasks such as detecting objects, faces, and landmarks in images, as well as extracting text, sentiment analysis, and generating image descriptions.|
-|2|	2|	stop|	1696485393|	chatcmpl-86BdZSZgmJKol8D5izIOQKqZZ8iWJ|	gpt-3.5-turbo-0613|	assistant|	Yes, I am familiar with Google Cloud Vision API. It is a cloud-based machine learning API offered by Google that allows developers to integrate computer vision capabilities into their applications. The API provides various pre-trained models that can perform tasks such as labeling images, detecting faces, objects, and landmarks, OCR (optical character recognition), explicit content detection, and more.|
+| | id | object | created | model | choices_0_index | choices_0_message_role | choices_0_message_content | choices_0_finish_reason | choices_1_index | choices_1_message_role | choices_1_message_content | choices_1_finish_reason |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0  | chatcmpl-88fEubFsO7GN2st9FWaLq64zKEQpI | chat.completion | 1697075840 | gpt-3.5-turbo-0613 | 0 | assistant | Yes, I am familiar with Google Cloud Vision API. It is a machine learning based image analysis tool provided by Google Cloud Platform. It allows developers to easily integrate image recognition, object detection, and image understanding capabilities into their applications by using pre-trained models. The API can be used to identify objects, faces, and text in images, as well as detect explicit content and perform image sentiment analysis. | stop | 1 | assistant | Yes, I am familiar with Google Cloud Vision API. It is a machine learning service provided by Google Cloud that allows users to analyze and understand the content of images. It can detect objects, faces, and text, as well as perform image sentiment analysis, logo detection, and image landmark recognition among other features. The API provides a RESTful interface for developers to integrate image analysis capabilities into their applications. | stop |
+
 
 ### [Images](https://platform.openai.com/docs/api-reference/images)
 
 We support [Create image](https://platform.openai.com/docs/api-reference/images/create), [Create image edit](https://platform.openai.com/docs/api-reference/images/createEdit) and [Create image variation](https://platform.openai.com/docs/api-reference/images/createVariation). Please refer to the corresponding request body for input creation.
-> TODO: Test `Create image edit` and `Create image variation`.
 
-Output will have two columns `created` and `data`.
+You still need to specify map from your input column keys to API JSON object input keys in tuple format. If an input column is not inside the map keys, that column will be ignored. You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. If an output JSON attribute is not inside the map keys, that attribute will be ignored.
 
 Example usage:
 ```python
 import pandas as pd
 from aidb.inference.examples.openai_inference_service import OpenAIImage
-openai_image_request_dict ={
-  "prompt": "Full body Miku smiling",
-  "n": 2,
-  "size": "512x512"
+
+map_input_to_request = {
+  'prompt': ('prompt',),
+  'n': ('n',),
+  'size': ('size',)
 }
-openai_image_request_pd = pd.Series(openai_image_request_dict)
-openai_image = OpenAIImage(OPENAI_KEY)
+
+map_response_to_output = {
+  ('created',): 'created',
+  ('data', '0', 'url'): 'data.0.url',
+  ('data', '1', 'url'): 'data.1.url'
+}
+
+openai_image = OpenAIImage(OPENAI_KEY, map_input_to_request, map_response_to_output)
 openai_image_response_pd = openai_image.infer_one(openai_image_request_pd)
+openai_image_response_pd
 ```
 
 Input Series:
 ```
-prompt    Full body Miku smiling
-n                              2
-size                     512x512
+prompt    Miku smiling
+n                    2
+size           512x512
 dtype: object
 ```
 
 Response:
-|  | created | data |
-| --- | --- | --- |
-|0|	1696526028|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-FSG2IoVXnPDW9BZzmPFbpmbD.png?st=2023-10-05T16%3A13%3A48Z&se=2023-10-05T18%3A13%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-05T16%3A36%3A11Z&ske=2023-10-06T16%3A36%3A11Z&sks=b&skv=2021-08-06&sig=qxcS2z0NfNjkTZbekbDr5GW4Atxo8/alqS6%2BABqahIM%3D |
-|1|	1696526028|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-aUkigAi9MXCdC2qBu8A8sDy0.png?st=2023-10-05T16%3A13%3A48Z&se=2023-10-05T18%3A13%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-05T16%3A36%3A11Z&ske=2023-10-06T16%3A36%3A11Z&sks=b&skv=2021-08-06&sig=CU6te7nynHR7nplAs4D%2B3Yoa4rTRdE%2BUnvx8jsba%2BTk%3D |
+| |	created | data_0_url | data_1_url|
+|---|---|---|---|
+|0|	1697076329|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-9ycIx6ZG6T68IYV12wXNlZhd.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=dyzFdHArfGMq%2B6hxHPQ5vhzQdpN3On5JkOag8cXmwXA%3D	| https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-AjvmDySJANPAc4Huviconivv.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=oSB/BJM2u70ITy%2B6jjsbNHehBlYcQD9nzwotT9uQIjE%3D |
 
 ### [Audio](https://platform.openai.com/docs/api-reference/audio)
-> TODO: Test audio.
+
 
 ## HuggingFace
 
