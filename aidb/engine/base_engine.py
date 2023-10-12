@@ -1,4 +1,5 @@
-from typing import List, Tuple
+from collections import defaultdict
+from typing import Dict, List, Tuple
 
 import pandas as pd
 import sqlalchemy
@@ -6,10 +7,12 @@ import sqlalchemy.ext.asyncio
 import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
-from aidb.config.config_types import Graph, InferenceBinding
+from aidb.config.config_types import InferenceBinding
 from aidb.inference.bound_inference_service import (
     BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
+from aidb.query.query import FilteringClause, Query
+from aidb.query.utils import predicate_to_str
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.logger import logger
 
@@ -53,11 +56,12 @@ class BaseEngine():
     ]
 
     if dialect not in supported_dialects:
-      logger.warning(f'Unsupported dialect: {dialect}. Defaulting to mysql')
+      logger.warning(
+        f'Unsupported dialect: {dialect}. Defaulting to mysql')
       dialect = 'mysql'
 
     return dialect
-  
+
 
   def _create_sql_engine(self):
     logger.info(f'Creating SQL engine for {self._dialect}')
@@ -75,7 +79,7 @@ class BaseEngine():
     )
 
     return engine
-  
+
 
   async def _infer_config(self) -> Config:
     '''
@@ -86,6 +90,7 @@ class BaseEngine():
     - Blob tables
     - Generated columns
     '''
+
     # We use an async engine, so we need a function that takes in a synchrnous connection
     def config_from_conn(conn):
       config = Config(
@@ -101,13 +106,13 @@ class BaseEngine():
       config.load_from_sqlalchemy(conn)
       return config
 
-
     async with self._sql_engine.begin() as conn:
       config: Config = await conn.run_sync(config_from_conn)
 
     if self._debug:
       import prettyprinter as pp
-      pp.install_extras(exclude=['django', 'ipython', 'ipython_repr_pretty'])
+      pp.install_extras(
+        exclude=['django', 'ipython', 'ipython_repr_pretty'])
       pp.pprint(config)
       print(config.blob_tables)
 
@@ -150,7 +155,8 @@ class BaseEngine():
     for idx, (table_name, df) in enumerate(raw_inputs[1:]):
       last_table_name = raw_inputs[idx][0]
       table_relations = self._config.relations_by_table[table_name]
-      join_keys = [fk for fk in table_relations if fk.startswith(last_table_name)]
+      join_keys = [
+        fk for fk in table_relations if fk.startswith(last_table_name)]
       final_df = final_df.merge(df, on=join_keys, how='inner')
 
     return final_df
@@ -174,3 +180,129 @@ class BaseEngine():
 
   def execute(self, query: str):
     raise NotImplementedError()
+
+
+  def _find_join_path(
+      self,
+      common_columns: Dict[Tuple[str, str], List[str]],
+      table_relations: Dict[str, List[str]],
+      table_names: List[str]
+  ) -> str:
+    """
+    Find the path to join tables based on common columns and create the JOIN part of an SQL query.
+    :param common_columns: Dict containing common column names between table pairs.
+    :param table_relations: Dict containing related tables.
+    :param table_names: List of table names to be joined.
+    """
+    join_strs = []
+    stack = [table_names[0]]
+    visited = {table_names[0]}
+    while stack:
+      current_table = stack.pop()
+      for neighbor_table in table_relations[current_table]:
+        if neighbor_table in visited:
+          continue
+        visited_col = []
+        join_condition = []
+        for visited_table in visited:
+          for col in common_columns[(neighbor_table, visited_table)]:
+            if col not in visited_col:
+              join_condition.append(
+                f'{visited_table}.{col} = {neighbor_table}.{col}')
+              visited_col.append(col)
+        join_strs.append(
+          f'INNER JOIN {neighbor_table} ON {" AND ".join(join_condition)}')
+        visited.add(neighbor_table)
+        stack.append(neighbor_table)
+    return f"FROM {table_names[0]}\n" + '\n'.join(join_strs)
+
+
+  def _get_tables(self, columns: List[str]) -> List[str]:
+    tables = set()
+    for col in columns:
+      table_name = col.split('.')[0]
+      tables.add(table_name)
+    return list(tables)
+
+
+  def _get_inner_join_query(self, table_names: List[str]):
+    """
+    Generate an SQL query to perform INNER JOIN operations on the provided tables.
+    :param selected_cols: List of column names to be selected in the SQL query.
+    :param table_names: List of table names to be joined.
+    """
+    table_number = len(table_names)
+    table_relations = defaultdict(list)
+    common_columns = {}
+    for i in range(table_number - 1):
+      table1 = self._config.tables[table_names[i]]
+      table1_cols = [col.name for col in table1.columns]
+      for j in range(i + 1, table_number):
+        table2 = self._config.tables[table_names[j]]
+        table2_cols = [col.name for col in table2.columns]
+        common = list(set(table1_cols).intersection(table2_cols))
+
+        common_columns[(table_names[i], table_names[j])] = common
+        common_columns[(table_names[j], table_names[i])] = common
+        if common:
+          table_relations[table_names[i]].append(table_names[j])
+          table_relations[table_names[j]].append(table_names[i])
+
+    join_path_str = self._find_join_path(
+      common_columns, table_relations, table_names)
+    return join_path_str
+
+
+  def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
+    and_connected = []
+    for fp in filtering_predicates:
+      and_connected.append(" OR ".join(
+        [predicate_to_str(p) for p in fp]))
+    return " AND ".join(and_connected)
+
+
+  def get_input_query_for_inference_service(self, bound_service: BoundInferenceService, user_query: Query,
+                                            already_executed_inference_services: set):
+    """
+    this function returns the input query to fetch the input records for an inference service
+    input query will also contain the predicates that can be currently satisfied using the inference services
+    that are already executed
+    """
+    filtering_predicates = user_query.filtering_predicates
+    column_to_root_column = self._config.columns_to_root_column
+    inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
+    tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
+    binding = bound_service.binding
+    inp_cols = binding.input_columns
+    root_inp_cols = [column_to_root_column.get(
+      col, col) for col in inp_cols]
+
+    inp_cols_str = ', '.join(root_inp_cols)
+    inp_tables = self._get_tables(root_inp_cols)
+    join_str = self._get_inner_join_query(inp_tables)
+
+    # filtering predicates that can be satisfied by the currently executed inference engines
+    filtering_predicates_satisfied = []
+    for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
+                       tables_in_filtering_predicates):
+      if len(already_executed_inference_services.intersection(e)) == len(e) and len(
+          set(inp_tables).intersection(t)) == len(
+        t):
+        filtering_predicates_satisfied.append(p)
+
+    where_str = self._get_where_str(filtering_predicates_satisfied)
+    for k, v in column_to_root_column.items():
+      where_str = where_str.replace(k, v)
+
+    if len(filtering_predicates_satisfied) > 0:
+      inp_query_str = f'''
+              SELECT {inp_cols_str}
+              {join_str}
+              WHERE {where_str};
+            '''
+    else:
+      inp_query_str = f'''
+              SELECT {inp_cols_str}
+              {join_str};
+            '''
+    return inp_query_str
