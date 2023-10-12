@@ -1,12 +1,14 @@
 # Example Inference Services 
 
+You will need to specify the map from your input column keys to API JSON object input keys in tuple format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
+
+You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object). If an output JSON attribute is not inside the map keys, that attribute will be ignored.
+
 ## OpenAI
 
 ### [Chat](https://platform.openai.com/docs/api-reference/chat)
 
-You will need to specify the map from your input column keys to API JSON object input keys in tuple format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
-
-You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object). If an output JSON attribute is not inside the map keys, that attribute will be ignored.
+Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create) amd [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object) for dataframe <-> json key map. OpenAI will only respond to one `messages`, so please only input 1 column. 
 
 Example usage:
 ```python
@@ -57,9 +59,7 @@ Response:
 
 ### [Images](https://platform.openai.com/docs/api-reference/images)
 
-We support [Create image](https://platform.openai.com/docs/api-reference/images/create), [Create image edit](https://platform.openai.com/docs/api-reference/images/createEdit) and [Create image variation](https://platform.openai.com/docs/api-reference/images/createVariation). Please refer to the corresponding request body for input creation.
-
-You still need to specify map from your input column keys to API JSON object input keys in tuple format. If an input column is not inside the map keys, that column will be ignored. You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. If an output JSON attribute is not inside the map keys, that attribute will be ignored.
+We support [Create image](https://platform.openai.com/docs/api-reference/images/create), [Create image edit](https://platform.openai.com/docs/api-reference/images/createEdit) and [Create image variation](https://platform.openai.com/docs/api-reference/images/createVariation). Please refer to the corresponding request body for dataframe <-> json key map.
 
 Example usage:
 ```python
@@ -103,18 +103,14 @@ Response:
 
 ### [NLP](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing)
 
-All HuggingFace NLP tasks are supported and they have the same input format. Your input should have 1 row and 1-3 columns `inputs`(required, a string), `parameters` (optional, a JSON object) and/or `options` (optional, a JSON object). Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters. You should only provide one row, otherwise HuggingFace will throw an error.
+All HuggingFace NLP tasks are supported. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters and dataframe <-> json key map.
 
 Example usage:
 ```python
-import pandas as pd
-from aidb.inference.examples.huggingface_inference_service import HFNLP
-hf_nlp_request_dict = {
-  "inputs": "Stanford PhD student Lvmin Zhang has created"
-}
-hf_nlp_request_pd = pd.Series(hf_nlp_request_dict)
-hf_nlp = HFNLP(HF_KEY, "gpt2")
+from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
+hf_nlp = HuggingFaceNLP(HF_KEY, {'inputs': 'inputs'}, {('0', 'generated_text', ): 'generated_text'}, "gpt2")
 hf_nlp_response_pd = hf_nlp.infer_one(hf_nlp_request_pd)
+hf_nlp_response_pd
 ```
 
 Input Series:
@@ -130,18 +126,49 @@ Response (this response is fake):
 
 ### [CV](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision)
 
-All HuggingFace CV tasks are supported and they only accept filename as input. The output could be multiple columns and multiple rows, depending on tasks. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters.
+All HuggingFace CV tasks are supported and they only accept filename as input. You do not need to provide a key map from input to request JSON because request is a binary. The response JSON could be a list of indefinite length. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters and response json -> output dataframe map.
 
 Example usage:
 ```python
 import pandas as pd
-from aidb.inference.examples.huggingface_inference_service import HFVisionAudio
-hf_cv_request_dict = {
-  "filename": "/path/to/image.png"
+from aidb.inference.examples.huggingface_inference_service import HuggingFaceVisionAudio
+
+map_response_to_output = {
+  ('0', 'score'): '0.score',
+  ('0', 'label'): '0.label',
+  ('0', 'box', 'xmin'): '0.box.xmin',
+  ('0', 'box', 'ymin'): '0.box.ymin',
+  ('0', 'box', 'xmax'): '0.box.xmax',
+  ('0', 'box', 'ymax'): '0.box.ymax',
+  ('1', 'score'): '1.score',
+  ('1', 'label'): '1.label',
+  ('1', 'box', 'xmin'): '1.box.xmin',
+  ('1', 'box', 'ymin'): '1.box.ymin',
+  ('1', 'box', 'xmax'): '1.box.xmax',
+  ('1', 'box', 'ymax'): '1.box.ymax',
+  ('2', 'score'): '2.score',
+  ('2', 'label'): '2.label',
+  ('2', 'box', 'xmin'): '2.box.xmin',
+  ('2', 'box', 'ymin'): '2.box.ymin',
+  ('2', 'box', 'xmax'): '2.box.xmax',
+  ('2', 'box', 'ymax'): '2.box.ymax',
+  ('3', 'score'): '3.score',
+  ('3', 'label'): '3.label',
+  ('3', 'box', 'xmin'): '3.box.xmin',
+  ('3', 'box', 'ymin'): '3.box.ymin',
+  ('3', 'box', 'xmax'): '3.box.xmax',
+  ('3', 'box', 'ymax'): '3.box.ymax',
+  ('4', 'score'): '4.score',
+  ('4', 'label'): '4.label',
+  ('4', 'box', 'xmin'): '4.box.xmin',
+  ('4', 'box', 'ymin'): '4.box.ymin',
+  ('4', 'box', 'xmax'): '4.box.xmax',
+  ('4', 'box', 'ymax'): '4.box.ymax'
 }
-hf_cv_request_pd = pd.Series(hf_cv_request_dict)
-hf_cv = HFVisionAudio(HF_KEY, "facebook/detr-resnet-50")
+
+hf_cv = HuggingFaceVisionAudio(HF_KEY, map_response_to_output, "facebook/detr-resnet-50")
 hf_cv_response_pd = hf_cv.infer_one(hf_cv_request_pd)
+hf_cv_response_pd
 ```
 
 Input Series:
@@ -151,42 +178,68 @@ dtype: object
 ```
 
 Response:
-|  | score | label | box |
-| --- | --- | --- | --- |
-|0|	0.998632|	tie	|{'xmin': 214, 'ymin': 254, 'xmax': 254, 'ymax': 426}|
-|1|	0.997547|	person	|{'xmin': 50, 'ymin': 26, 'xmax': 511, 'ymax': 509}|
-> TODO: box is a JSON object. There are probably better ways of representing it, but this varies between tasks.
+|   | 0.score  | 0.label | 0.box.xmin | 0.box.ymin | 0.box.xmax | 0.box.ymax | 1.score  | 1.label | 1.box.xmin | 1.box.ymin | 1.box.xmax | 1.box.ymax |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 0.998632 | tie     | 214        | 254        | 254        | 426        | 0.997547 | person  | 50         | 26         | 511        | 509        |
+
 
 ### [Audio](https://huggingface.co/docs/api-inference/detailed_parameters#audio)
-> TODO: Test audio.
+
 
 ## Google
-We support [files.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/files/annotate) and [images.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate). Please create corresponding [AnnotateFileRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateFileRequest) or [AnnotateImageRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateImageRequest) for input.
+We support [files.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/files/annotate) and [images.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate). Please visit [AnnotateFileRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateFileRequest) or [AnnotateImageRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateImageRequest) for input dataframe -> request json map.
 
-Output is a JSON object, in the same format as [BatchAnnotateFilesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateFilesResponse) and [BatchAnnotateImagesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateImagesResponse).
-> TODO: I currently reserve output as JSON because they are TOO MUCH and I'm not sure what we/users want.
+To convert response json to output dataframe, please refer to [BatchAnnotateFilesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateFilesResponse) or [BatchAnnotateImagesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateImagesResponse).
 
 Example usage:
 ```python
-import base64
 import pandas as pd
 from aidb.inference.examples.google_inference_service import GoogleVisionAnnotate
-with open("/path/to/image.jpg", "rb") as f:
-    image_bytes = f.read()
-image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-google_cv_request_dict = {
-  "image": image_base64,
-  "features": [{
-      "type": "IMAGE_PROPERTIES",
-    }, {
-      "type": "FACE_DETECTION"
-    }
-  ]
+
+map_input_to_request = {
+  'imageUri': ('requests', '0', 'image', 'source', 'imageUri'),
+  'type': ('requests', '0', 'features', '0', 'type'),
+  '0': ('requests',
+    '0',
+    'imageContext',
+    'cropHintsParams',
+    'aspectRatios',
+    '0'),
+  '1': ('requests',
+    '0',
+    'imageContext',
+    'cropHintsParams',
+    'aspectRatios',
+    '1'),
+  '2': ('requests',
+    '0',
+    'imageContext',
+    'cropHintsParams',
+    'aspectRatios',
+    '2'),
+  'parent': ('parent',)
 }
-google_cv_request_pd = pd.Series(google_cv_request_dict)
-google_cv = GoogleVisionAnnotate(GOOGLE_KEY, project_id="your_project_id")
+
+map_response_to_output = <omit, too long>
+
+google_cv = GoogleVisionAnnotate(GOOGLE_KEY, map_input_to_request, map_response_to_output, project_id="project-id")
 google_cv_response_pd = google_cv.infer_one(google_cv_request_pd)
+google_cv_response_pd
 ```
+
+Input Series:
+```
+imageUri    https://upload.wikimedia.org/wikipedia/commons/5/56/Donald_Trump_official_portrait.jpg
+type                                           FACE_DETECTION
+0                                                         0.8
+1                                                           1
+2                                                         1.2
+parent                        projects/coral-sanctuary-400802
+dtype: object
+```
+
+Response:
+\<omit, too long\>
 
 The way to obtain a Google API key is tricky. Please do
 ```bash
