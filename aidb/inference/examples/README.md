@@ -1,6 +1,6 @@
 # Example Inference Services 
 
-You will need to specify the map from your input column keys to API JSON object input keys in tuple format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
+You will need to specify the map from your input column keys to API JSON object input keys in string (1-layer conversion) or tuple (multi-layer conversion) format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
 
 You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object). If an output JSON attribute is not inside the map keys, that attribute will be ignored.
 
@@ -8,7 +8,7 @@ You will also need to specify the map from API JSON object output keys in tuple 
 
 ### [Chat](https://platform.openai.com/docs/api-reference/chat)
 
-Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create) amd [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object) for dataframe <-> json key map. OpenAI will only respond to one `messages`, so please only input 1 column. 
+Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create) and [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object) for dataframe <-> json key map. OpenAI will only respond to one `messages`, so please only input 1 column. 
 
 Example usage:
 ```python
