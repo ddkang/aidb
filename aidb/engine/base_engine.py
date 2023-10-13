@@ -257,7 +257,7 @@ class BaseEngine():
       self,
       bound_service: BoundInferenceService,
       user_query: Query,
-      rep_table_name: Optional[str] = None,
+      blob_id_table: Optional[str] = None,
       filtered_index_list: Optional[List[int]] = None
   ):
     """
@@ -271,8 +271,8 @@ class BaseEngine():
     root_inp_cols = [column_to_root_column.get(
       col, col) for col in inp_cols]
 
-    if rep_table_name:
-      root_inp_cols.append(f'{rep_table_name}.blob_id')
+    if blob_id_table:
+      root_inp_cols.append(f'{blob_id_table}.blob_id')
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
@@ -287,8 +287,10 @@ class BaseEngine():
       and_connected.append(' OR '.join([predicate_to_str(p) for p in fp]))
 
     # FIXME: for different database, the IN grammar maybe different
-    if filtered_index_list:
-      and_connected.append(f'{rep_table_name}.blob_id IN {format(tuple(filtered_index_list))}')
+    if len(filtered_index_list) > 1:
+      and_connected.append(f'{blob_id_table}.blob_id IN {format(tuple(filtered_index_list))}')
+    elif len(filtered_index_list) == 1:
+      and_connected.append(f'{blob_id_table}.blob_id = {filtered_index_list[0]}')
 
     where_str = ' AND '.join(and_connected)
     for k, v in column_to_root_column.items():
