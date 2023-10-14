@@ -1,20 +1,22 @@
 from collections import defaultdict
-from typing import List
 
 import pandas as pd
 import scipy
 import sqlglot.expressions as exp
 import statsmodels.stats.proportion
-from sqlalchemy.sql import text
-
 from aidb.engine.base_engine import BaseEngine
 from aidb.estimator.estimator import (Estimator, WeightedCountSetEstimator,
-                                      WeightedMeanSetEstimator,
-                                      WeightedSumSetEstimator)
+                                      WeightedMeanSetEstimator, WeightedSumSetEstimator)
 from aidb.query.query import Query
 from aidb.samplers.sampler import SampledBlob
-from aidb.utils.constants import NUM_PILOT_SAMPLES
-from aidb.utils.logger import logger
+from aidb.utils.constants import (ESTIMATE_AGG_RESULTS_MODE, FIND_NUM_SAMPLES_MODE,
+                                  NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT)
+from sqlalchemy.sql import text
+from sqlglot.generator import Generator
+
+
+def csv(*args, sep=", "):
+  return sep.join(arg for arg in args if arg)
 
 
 class ApproximateAggregateEngine(BaseEngine):
@@ -29,211 +31,202 @@ class ApproximateAggregateEngine(BaseEngine):
       raise NotImplementedError()
 
 
-  def get_random_sampling_query(self, bound_service, query,
-                                inference_services_executed, num_samples):
-    '''Function to return limited number of samples randomly'''
-    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(
-                                              bound_service,
-                                              query,
-                                              inference_services_executed
-                                          )
+  def query_select_exp(self, query, chunk_size, offset):
+    gen = Generator()
+    query_exp = query.get_expression()
+    query_limit = query.limit_cardinality
+    query_offset = query.offset_number
+    limit = chunk_size
+    if query_limit:
+      if offset + chunk_size <= query_limit:
+        limit = chunk_size
+      else:
+        limit = query_limit - offset
+    if query_offset:
+      offset += query_offset
+    select_all_str = csv(f"SELECT *", gen.sql(query_exp, "from"),
+                         *[gen.sql(sql) for sql in query_exp.args.get("laterals", [])],
+                         *[gen.sql(sql) for sql in query_exp.args.get("joins", [])], gen.sql(query_exp, "where"),
+                         gen.sql(query_exp, "group"), gen.sql(query_exp, "having"), gen.sql(query_exp, "order"),
+                         f" LIMIT {limit} ", f"OFFSET {offset}", sep="", )
+    return select_all_str
+
+
+  def get_select_exp_str(self, query):
+    gen = Generator()
+    query_exp = query.get_expression()
+    hint = gen.sql(query_exp, "hint")
+    distinct = " DISTINCT" if query_exp.args.get("distinct") else ""
+    expressions = gen.expressions(query_exp)
+    select = "SELECT" if expressions else ""
+    sep = gen.sep() if expressions else ""
+    return f"{select}{hint}{distinct}{sep}{expressions}"
+
+
+  def get_random_sampling_query(self, bound_service, query, inference_services_executed, num_samples):
+    """Function to return limited number of samples randomly"""
+    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(bound_service, query,
+                                                                                      inference_services_executed)
     if where_str:
       return f'''
-                SELECT {inp_cols_str}
-                {join_str}
-                WHERE {where_str}
-                ORDER BY RANDOM()
-                LIMIT {num_samples};
-              '''
-
+              SELECT {inp_cols_str}
+              {join_str}
+              WHERE {where_str}
+              ORDER BY RANDOM()
+              LIMIT {num_samples};
+            '''
     else:
       return f'''
-                SELECT {inp_cols_str}
-                {join_str}
-                ORDER BY RANDOM()
-                LIMIT {num_samples};
-              '''
+              SELECT {inp_cols_str}
+              {join_str}
+              ORDER BY RANDOM()
+              LIMIT {num_samples};
+            '''
 
 
   def get_num_blob_ids_query(self, table):
-    '''Function that returns a query, to get total number of blob ids'''
-    num_ids_query = f'''
-                    SELECT COUNT(*)
-                    FROM {table};
-                    '''
-    return num_ids_query
+    """Function that returns a query, to get total number of blob ids"""
+    return f'''
+            SELECT COUNT(*)
+            FROM {table};
+          '''
 
 
-  def search_sample_columns(self, sample, agg_on_columns):
+  def get_aggregation_query_for_chunk(self, query, limit, offset, select_exp_str):
     '''
-    Function to search if our aggregated columns of interest 
-    are in corresponding sample taken, so that blob can be sampled.
+    Returns aggregation queries on few chunks of data as per limit, offset
+    Eg: select avg(x_min)
+        from
+        (select x_min from objects00 limit 10 offset 20);
     '''
-    if any(column not in sample.columns for column in agg_on_columns):
-      return False
-    if all(sample[column].empty for column in agg_on_columns):
-      return False
-    return True
+    select_all_str = self.query_select_exp(query, limit, offset)
+    return f'{select_exp_str} FROM({select_all_str})'
 
 
-  def find_num_required_samples(self, estimator, sampled_blobs, conf, alpha, error_target,
-                                  agg_on_column_table):
-    pilot_estimate = estimator.estimate(
-        sampled_blobs,
-        NUM_PILOT_SAMPLES,
-        conf / 2,
-        True,
-        agg_table=agg_on_column_table
-    )
-    p_lb = statsmodels.stats.proportion.proportion_confint(
-        len(sampled_blobs),
-        NUM_PILOT_SAMPLES,
-        alpha / 2.)[0]
-    num_samples = int(
-        (scipy.stats.norm.ppf(alpha / 2) *
-         pilot_estimate.std_ub / error_target) ** 2 *
-        (1. / p_lb)
-    )
+  def find_num_required_samples(self, estimator, agg_stats, conf, alpha, error_target, num_success):
+    pilot_estimate = estimator.estimate(agg_stats, conf / 2., True, num_success=num_success,
+                                        num_sampled=NUM_PILOT_SAMPLES)
+    p_lb = statsmodels.stats.proportion.proportion_confint(num_success, NUM_PILOT_SAMPLES, alpha / 2)[0]
+    num_samples = int((scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 * (1. / p_lb))
     return num_samples
 
 
-  async def get_samples_of_concerned_services(self, inference_services_required, query, conn,
-                                          num_samples, inference_services_executed = set()):
-    samples_concerned = defaultdict(lambda: None)
+  async def populate_samples_of_concerned_services(self, inference_services_required, query, conn, num_samples):
+    """
+    Function to infer data corresponding to a subset of ids that satisfy query conditions
+    and group results service wise
+    """
+    num_ids_per_service = defaultdict(lambda: 0)
+    inference_services_executed = set()
     for bound_service in self._config.inference_topological_order:
       if bound_service not in inference_services_required:
         continue
-      out_query = self.get_random_sampling_query(
-          bound_service,
-          query,
-          inference_services_executed,
-          num_samples
-      )
+      table_sampling_query = self.get_random_sampling_query(bound_service, query, inference_services_executed,
+                                                            num_samples)
       async with self._sql_engine.begin() as conn:
-        out_df = await conn.run_sync(
-            lambda conn: pd.read_sql(
-                text(out_query),
-                conn
-            )
-        )
-      samples_concerned[bound_service.service.name] = await bound_service.infer(out_df)
+        sampled_df = await conn.run_sync(lambda conn: pd.read_sql(text(table_sampling_query), conn))
+      samples_from_service = await bound_service.infer(sampled_df)
+      num_ids_per_service[bound_service.service.name] = len(samples_from_service)
       inference_services_executed.add(bound_service.service.name)
-    samples = []
-    for inference_service in inference_services_required:
-      samples.extend(samples_concerned[inference_service.service.name])
-    return samples, inference_services_executed
+    return num_ids_per_service
 
 
-  async def get_sampled_blobs_with_stats(self, infer_output, agg_on_columns,
-                                         agg_table, query, est_conn):
-    '''
-    Given inference output as input, this function,
-    iterates through the list of dataframes,
-    executes query on them, computes statistic on relevant rows,
-    returns SampledBlobs that can be passes to estimator
-    '''
-    sampled_blobs = []
-    num_samples = len(infer_output)
-    mass = 1.
-    wt = 1. / (num_samples)
-    for idx in range(num_samples):
-      blob_table = {agg_table: infer_output[idx]}
-      if not self.search_sample_columns(infer_output[idx], agg_on_columns):
-        continue
+  async def execute_query_on_data_chunks(self, infer_ouput_length, est_conn, query):
+    """
+    Returns list of aggregation results on chunks of data
+    2D list with row - chunk id, col - agg type
+    """
+    aggregation_data = []
+    chunk_size = max(infer_ouput_length // NUM_SAMPLES_SPLIT, 1)
+    offset = 0
+    num_chunks_processed = 0
+    while num_chunks_processed < NUM_SAMPLES_SPLIT:
+      select_exp_str = self.get_select_exp_str(query)
+      new_query = self.get_aggregation_query_for_chunk(query, chunk_size, offset, select_exp_str)
+      chunk_statistics = await est_conn.execute(text(new_query))
+      chunk_statistics = chunk_statistics.fetchall()
 
-      map_cols = {}
-      for col in infer_output[idx].columns:
-        table_column = col.split('.')
-        map_cols[col] = table_column[1] if len(
-            table_column) > 1 else table_column[0]
-      infer_output[idx].rename(columns=map_cols, inplace=True)
-      proxy_table = f'{agg_table}_proxy'
-
-      await est_conn.run_sync(
-          lambda sync_conn: infer_output[idx].to_sql(
-              proxy_table,
-              con=sync_conn,
-              if_exists='replace',
-              index=False
-          )
-      )
-      new_query = query.sql_query_text.replace(agg_table, proxy_table)
-      res = await est_conn.execute(text(new_query))
-      res = res.fetchone()
-      statistic_ans = res[0]
-      if statistic_ans is None:
-        continue
-      sampled_blobs.append(
-          SampledBlob(
-              infer_output[idx],
-              wt,
-              mass,
-              blob_table,
-              statistic_ans,
-              {agg_table: len(infer_output[idx])}
-          )
-      )
-    return sampled_blobs
+      # since there are no nested queries, take index 0
+      aggregation_data.append(chunk_statistics[0])
+      offset += chunk_size
+      num_chunks_processed += 1
+    return aggregation_data, chunk_size
 
 
-  async def execute_aggregate_query(self, query: Query, dialect=None):
-    '''
-    Execute aggregation query using approximate processing
-    Supports single aggregations for now, 
-    to be extended to support multi-aggregations
-    '''
-    tables_in_query = query.tables_in_query
-    agg_type = query.get_agg_type()
-    agg_on_columns = query.get_aggregated_columns(agg_type)
-    agg_on_column_table = query.get_table_of_column(
-                            agg_on_columns[0].split('.')[1]) # support single aggregation queries 
-    inference_services_required = set()
-    for col in agg_on_columns:
-      inference_services_required.add(query.config.column_by_service[col])
+  def get_agg_results_on_chunks(self, query, num_ids_per_service, sampled_chunks, chunk_size):
+    """
+    Return aggregation results with weights, which can be approximated upon
+    """
+    results = defaultdict(lambda: defaultdict(lambda: None))
+    agg_col_index = 0
+    for agg_type, columns_per_agg in query.aggregated_columns_and_types:
+      for columns in columns_per_agg:
+        agg_stats = []
+        num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
+        mass = 1.
+        wt = 1. / (num_column_samples / chunk_size)
+        for chunk_statistics in sampled_chunks:
+          statistic_ans = chunk_statistics[agg_col_index]
+          if statistic_ans is None: continue
+          agg_stats.append(SampledBlob(wt, mass, statistic_ans, chunk_size))
+        results[agg_type].update({columns[0]: agg_stats})
+        agg_col_index += 1
+    return results
+
+
+  def get_estimates_on_data_chunks_agg_column_wise(
+      self, query, num_ids_per_service, agg_results_on_chunks, chunk_size, mode, num_samples=None
+  ):
+    results = []
     error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
+    for agg_type, columns_per_agg in query.aggregated_columns_and_types:
+      estimator = self._get_estimator(agg_type)
+      for columns in columns_per_agg:
+        agg_column_data = agg_results_on_chunks[agg_type][columns[0]]
+        num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
+        if mode == FIND_NUM_SAMPLES_MODE:
+          results.append(
+            self.find_num_required_samples(estimator, agg_column_data, conf, alpha, error_target, num_column_samples))
+        elif mode == ESTIMATE_AGG_RESULTS_MODE:
+          results.append(estimator.estimate(agg_column_data, conf, False, num_success=num_samples).estimate)
+    return results
 
-    async with self._sql_engine.begin() as conn:
-      # first blob table is only considered for now
-      self.num_blob_ids = await conn.execute(text(
-                            self.get_num_blob_ids_query(self._config.blob_tables[0])))
-    self.num_blob_ids = self.num_blob_ids.fetchone()[0]
+
+  async def execute_aggregate_query(self, query: Query):
+    """
+    Execute aggregation query using approximate processing
+    """
+    inference_services_required = set([query.config.column_by_service[column] for column in query.columns_in_query])
+    self.num_blob_ids = {}
+    for blob_table in self._config.blob_tables:
+      async with self._sql_engine.begin() as conn:
+        num_ids = await conn.execute(text(self.get_num_blob_ids_query(blob_table)))
+      self.num_blob_ids[blob_table] = num_ids.fetchone()[0]
 
     # Pilot run and inference to determine required number of samples
-    input_samples, inference_services_executed = await self.get_samples_of_concerned_services(
-                                                        inference_services_required,
-                                                        query,
-                                                        conn,
-                                                        NUM_PILOT_SAMPLES
-                                                )
     async with self._sql_engine.begin() as conn:
-      sampled_blobs = await self.get_sampled_blobs_with_stats(
-                        input_samples, agg_on_columns, agg_on_column_table, query, conn)
-    estimator = self._get_estimator(agg_type)
-    num_samples = self.find_num_required_samples(estimator, sampled_blobs,
-                        conf, alpha, error_target, agg_on_column_table)
-    if not num_samples:
-      logger.debug(f'Approx estimate is zero, going for full sampling')
-      num_samples = self.num_blob_ids
+      num_ids_per_service = await self.populate_samples_of_concerned_services(inference_services_required, query, conn,
+                                                                              NUM_PILOT_SAMPLES)
+      total_num_ids = sum(num_ids_per_service.values())
+      sampled_chunks, chunk_size = await self.execute_query_on_data_chunks(total_num_ids, conn, query)
 
-    
+    agg_results_on_chunks = self.get_agg_results_on_chunks(query, num_ids_per_service, sampled_chunks, chunk_size)
+    num_samples_per_agg_column = self.get_estimates_on_data_chunks_agg_column_wise(query, num_ids_per_service,
+                                                                                   agg_results_on_chunks, chunk_size,
+                                                                                   mode=FIND_NUM_SAMPLES_MODE)
+    num_samples = max(NUM_SAMPLES_SPLIT, max(num_samples_per_agg_column))
+
     # Final query execution on required number of samples
-    all_samples, _ = await self.get_samples_of_concerned_services(
-                            inference_services_required,
-                            query,
-                            conn,
-                            num_samples,
-                            inference_services_executed
-                        )
     async with self._sql_engine.begin() as conn:
-      all_blobs = await self.get_sampled_blobs_with_stats(
-                          all_samples, agg_on_columns, agg_on_column_table, query, conn)
-    all_samples_estimate = estimator.estimate(
-        all_blobs,
-        num_samples,
-        conf,
-        False,
-        agg_table=agg_on_column_table
-    )
-    return [(all_samples_estimate.estimate,)]
+      num_ids_per_service = await self.populate_samples_of_concerned_services(inference_services_required, query, conn,
+                                                                              num_samples)
+      sampled_chunks, chunk_size = await self.execute_query_on_data_chunks(total_num_ids, conn, query)
+
+    agg_results_on_chunks = self.get_agg_results_on_chunks(query, num_ids_per_service, sampled_chunks, chunk_size)
+    all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(query, num_ids_per_service,
+                                                                              agg_results_on_chunks, chunk_size,
+                                                                              mode=ESTIMATE_AGG_RESULTS_MODE,
+                                                                              num_samples=num_samples)
+    return [tuple(all_samples_estimates)]

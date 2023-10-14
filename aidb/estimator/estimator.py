@@ -55,10 +55,11 @@ def _get_estimate_bennett(
 
 class Estimator(abc.ABC):
   def __init__(self, population_size: int) -> None:
-    self._population_size = population_size
+    self._population_size = sum(population_size.values())
+
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
     pass
 
 # Single estimators
@@ -66,9 +67,10 @@ class Estimator(abc.ABC):
 
 class WeightedMeanSingleEstimator(Estimator):
   def __init__(self, population_size: int) -> None:
-    self._population_size = population_size
+    self._population_size = sum(population_size.values())
 
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+
+  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
@@ -83,16 +85,13 @@ class WeightedMeanSingleEstimator(Estimator):
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, normalized: bool, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], conf: float, normalized: bool, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     if normalized:
-      statistics_mean = np.mean(statistics)
       norm_statistics = np.linalg.norm(statistics)
       statistics = statistics / norm_statistics
-    agg_table = kwargs.get("agg_table")
-    counts = np.array([sample.num_items[agg_table]
-                       if agg_table in sample.num_items else 0 for sample in samples]).astype(int)
+    counts = np.array([sample.num_items for sample in samples]).astype(int)
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
     wstats = DescrStatsW(cstats, weights=weights, ddof=0)
@@ -106,13 +105,12 @@ class WeightedMeanSetEstimator(Estimator):
 
 
 class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, normalized: bool, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], conf: float, normalized: bool, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     # Statistics are already counts
     statistics = np.array([sample.statistic for sample in samples])
 
     if normalized:
-      statistics_mean = np.mean(statistics)
       norm_statistics = np.linalg.norm(statistics)
       statistics = statistics / norm_statistics
 
@@ -124,7 +122,8 @@ class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
         len(statistics),
         conf
     )
-    inflation_factor = (len(samples) / num_sampled) * self._population_size
+    num_success = kwargs.get("num_success")
+    inflation_factor = ( num_success / len(samples))
     return Estimate(
         mean_est.estimate * inflation_factor,
         mean_est.upper_bound * inflation_factor,
@@ -133,8 +132,7 @@ class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
         mean_est.std_ub
     )
 
+
 # Logic is exactly the same for the count estimator
-
-
 class WeightedSumSetEstimator(WeightedCountSetEstimator):
   pass

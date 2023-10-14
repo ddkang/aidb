@@ -1,9 +1,7 @@
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List
-
-from aidb.utils.logger import logger
 
 import sqlglot.expressions as exp
 from sqlglot import Parser, Tokenizer
@@ -117,6 +115,10 @@ class Query(object):
     return table_list
 
 
+  def get_expression(self):
+    return self._expression
+
+
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
     return predicate_name
@@ -179,7 +181,8 @@ class Query(object):
     return predicates_in_ors
 
 
-  def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[List[FilteringPredicate]]:
+  def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
+    List[FilteringPredicate]]:
     if '&' not in str(cnf_expression):
       return [self._get_or_clause_representation(cnf_expression, predicate_mappings)]
 
@@ -225,7 +228,8 @@ class Query(object):
           if isinstance(fp.predicate, exp.Column):
             # in case of boolean type columns
             column_name = self._get_normalized_col_name_from_col_exp(fp.predicate)
-            or_connected_clauses.append(FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
+            or_connected_clauses.append(
+              FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
           else:
             t1, v1 = extract_column_or_value(fp.predicate.args["this"])
             t2, v2 = extract_column_or_value(fp.predicate.args["expression"])
@@ -249,15 +253,16 @@ class Query(object):
               # both left and right cannot be literals
               raise Exception("Comparisons among literals not supported in filtering predicate")
 
-            or_connected_clauses.append(FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
-                                Expression(t2, right_value)))
+            or_connected_clauses.append(
+              FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
+                              Expression(t2, right_value)))
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
       return []
 
 
-  def get_table_of_column(self, col_name):
+  def _get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
       if col_name in self._tables[table]:
@@ -282,7 +287,7 @@ class Query(object):
       if table_name in self.table_aliases_to_name:
         table_name = self.table_aliases_to_name[table_name]
     else:
-      table_name = self.get_table_of_column(node.args["this"].args["this"])
+      table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
 
 
@@ -335,18 +340,32 @@ class Query(object):
 
 
   def _get_columns_in_expression_tree(self, exp_tree):
+    '''
+    Return column_set of columns in query and
+    ordered list of columns, expression wise
+    eg: SELECT AVG(col1), COUNT(*) FROM table1;
+        column_set = {col1, col2, col3, col4}
+        exp_wise_columns = [[col1], [col1, col2, col3, col4]]
+    '''
     column_set = set()
+    exp_wise_columns = []
     for node, _, _ in exp_tree.walk():
       if isinstance(node, exp.Column):
         if isinstance(node.args['this'], exp.Identifier):
-          column_set.add(self._get_normalized_col_name_from_col_exp(node))
+          normalized_col = self._get_normalized_col_name_from_col_exp(node)
+          column_set.add(normalized_col)
+          exp_wise_columns.append([normalized_col])
         elif isinstance(node.args['this'], exp.Star):
           for table in self.tables_in_query:
+            all_cols = []
             for col, _ in self._tables[table].items():
-              column_set.add(f"{table}.{col}")
+              table_column = f"{table}.{col}"
+              column_set.add(table_column)
+              all_cols.append(table_column)
+            exp_wise_columns.append(all_cols)
         else:
           raise Exception('Unsupported column type')
-    return column_set
+    return column_set, exp_wise_columns
 
 
   @cached_property
@@ -355,36 +374,37 @@ class Query(object):
     nested queries are not supported for the time being
     * is supported
     """
-    return self._get_columns_in_expression_tree(self._expression)
+    return self._get_columns_in_expression_tree(self._expression)[0]
 
 
-  # Get aggregation type
-  def get_agg_type(self):
-    logger.debug(f'base_sql_no_aqp: {repr(self.base_sql_no_aqp)}')
-    select_exp = self.base_sql_no_aqp.args['expressions'][0]
-    if isinstance(select_exp, exp.Avg):
-      return exp.Avg
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
-    else:
-      return None
-
-
-  def get_aggregated_columns(self, agg_type):
-    """
-    returns the column name that is aggregated in the query.
-    for e.g. SELECT Avg(sentiment) from sentiments;
-    will return sentiment
-    """
-    agg_exp_tree = self._expression.find(agg_type)
-    return list(self._get_columns_in_expression_tree(agg_exp_tree))
+  # Get aggregation types with columns corresponding
+  @cached_property
+  def aggregated_columns_and_types(self):
+    '''
+    Return aggregation types and corresponding columns,
+    even with multi aggregations
+    eg: SELECT avg(column1) from table1;
+    agg_type_with_cols = [(exp.Avg, [[column1]])]
+    SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    agg_type_with_cols = [(exp.Avg, [[col1], [col2]])
+            (exp.Count, [[col1, col2, col3, col4]])]
+    '''
+    select_exp = self.base_sql_no_aqp.args['expressions']
+    agg_type_with_cols = []
+    for expression in select_exp:
+      columns_in_expression = self._get_columns_in_expression_tree(expression)[1]
+      if isinstance(expression, exp.Avg):
+        agg_type_with_cols.append((exp.Avg, columns_in_expression))
+      elif isinstance(expression, exp.Count):
+        agg_type_with_cols.append((exp.Count, columns_in_expression))
+      elif isinstance(expression, exp.Sum):
+        agg_type_with_cols.append((exp.Sum, columns_in_expression))
+    return agg_type_with_cols
 
 
   @cached_property
   def is_approx_agg_query(self):
-    return True if self.get_agg_type() and self.validate_aqp() else False
+    return True if self.aggregated_columns_and_types and self.validate_aqp() else False
 
 
   # AQP extraction
@@ -397,6 +417,16 @@ class Query(object):
         else:
           value = float(node.args['this'].args['this'])
     return value
+
+
+  @cached_property
+  def limit_cardinality(self):
+    return self._get_keyword_arg(exp.Limit)
+
+
+  @cached_property
+  def offset_number(self):
+    return self._get_keyword_arg(exp.Offset)
 
 
   @cached_property
@@ -421,22 +451,12 @@ class Query(object):
     if not isinstance(self.base_sql_no_aqp, exp.Select):
       raise Exception('Not a select statement')
 
-    # Count the number of columns, distinct aggregates
+    # Count the number of distinct aggregates
     expression_counts = defaultdict(int)
     for expression in self.base_sql_no_aqp.args['expressions']:
       expression_counts[type(expression)] += 1
-    if len(expression_counts) > 1:
 
-      # Raise exception if nested queries are found
-      raise Exception('Multiple expression types found')
-
-    if exp.Avg not in expression_counts and exp.Sum not in expression_counts \
-            and exp.Count not in expression_counts:
-      raise Exception(
-          'Supported aggregates are not found in approximate aggregation query')
-
-    for expression in [exp.Avg, exp.Count, exp.Sum]:
-      if expression_counts[expression] > 1:
-        raise Exception('Multiple aggregations are not yet supported')
+    if exp.Avg not in expression_counts and exp.Sum not in expression_counts and exp.Count not in expression_counts:
+      raise Exception('Supported aggregates are not found in approximate aggregation query')
 
     return True
