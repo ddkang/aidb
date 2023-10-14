@@ -1,5 +1,3 @@
-from typing import List
-
 from aidb.engine.aggregate_engine import ApproximateAggregateEngine
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.utils.asyncio import asyncio_run
