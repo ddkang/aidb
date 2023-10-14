@@ -1,14 +1,16 @@
 from typing import Dict, Union
 
+import os
+
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 
 class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
-      token: str,
-      columns_to_input_keys: Dict[str, Union[str, tuple]],
-      response_keys_to_columns: Dict[Union[str, tuple], str],
+      token: str=None,
+      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
       infer_type: str='transcriptions'):
     '''
     :param str token: The token to use for authentication.
@@ -18,6 +20,8 @@ class OpenAIAudio(HTTPInferenceService):
         "transcriptions",
         "translations",
       ], "infer_type must be transcriptions or translations"
+    if token is None:
+      token = os.environ['OPENAI_API_KEY']
     super().__init__(
       name='openai_audio',
       url=f'https://api.openai.com/v1/audio/{infer_type}',
@@ -36,9 +40,9 @@ class OpenAIAudio(HTTPInferenceService):
 class OpenAIImage(HTTPInferenceService):
   def __init__(
       self, 
-      token: str, 
-      columns_to_input_keys: Dict[str, Union[str, tuple]],
-      response_keys_to_columns: Dict[Union[str, tuple], str],
+      token: str=None, 
+      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
       infer_type: str='generations'
     ):
     '''
@@ -50,6 +54,8 @@ class OpenAIImage(HTTPInferenceService):
         "edits",
         "variations",
       ], "infer_type must be generations, edits or variations"
+    if token is None:
+      token = os.environ['OPENAI_API_KEY']
     super().__init__(
       name='openai_image',
       url=f'https://api.openai.com/v1/images/{infer_type}',
@@ -68,13 +74,15 @@ class OpenAIImage(HTTPInferenceService):
 class OpenAIText(HTTPInferenceService):
   def __init__(
       self, 
-      token: str,
-      columns_to_input_keys: Dict[str, Union[str, tuple]],
-      response_keys_to_columns: Dict[Union[str, tuple], str],
+      token: str=None,
+      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
     ):
     '''
     :param str token: The token to use for authentication.
     '''
+    if token is None:
+      token = os.environ['OPENAI_API_KEY']
     super().__init__(
       name='openai_text',
       url='https://api.openai.com/v1/chat/completions',

@@ -1,4 +1,5 @@
 from typing import Dict, Union
+import os
 import requests
 import pandas as pd
 
@@ -8,14 +9,16 @@ from aidb.inference.http_inference_service import HTTPInferenceService
 class HuggingFaceNLP(HTTPInferenceService):
   def __init__(
       self,
-      token: str,
-      columns_to_input_keys: Dict[str, Union[str, tuple]],
-      response_keys_to_columns: Dict[Union[str, tuple], str],
-      model: str):
+      token: str=None,
+      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      model: str=None):
     '''
     :param str token: The token to use for authentication.
     :param str model: The model to use for inference.
     '''
+    if token is None:
+      token = os.environ['HF_API_KEY']
     super().__init__(
       name='huggingface_nlp',
       url=f'https://api-inference.huggingface.co/models/{model}',
@@ -34,13 +37,15 @@ class HuggingFaceNLP(HTTPInferenceService):
 class HuggingFaceVisionAudio(HTTPInferenceService):
   def __init__(
       self,
-      token: str,
-      response_keys_to_columns: Dict[Union[str, tuple], str],
-      model: str):
+      token: str=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      model: str=None):
     '''
     :param str token: The token to use for authentication.
     :param str model: The model to use for inference.
     '''
+    if token is None:
+      token = os.environ['HF_API_KEY']
     super().__init__(
       name='huggingface_nlp',
       url=f'https://api-inference.huggingface.co/models/{model}',

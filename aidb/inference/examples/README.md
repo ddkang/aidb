@@ -272,7 +272,7 @@ Response:
 
 The way to obtain a Google API key is tricky. Please do
 ```bash
-gloud init
-gloud auth application-default print-access-token
+gcloud init
+gcloud auth application-default print-access-token
 ```
 in your terminal. You may need additional steps as prompted.

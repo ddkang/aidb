@@ -1,15 +1,30 @@
 from typing import Dict, Union
 
+import subprocess
+
 from aidb.inference.http_inference_service import HTTPInferenceService
+
+
+def get_gcloud_access_token():
+    try:
+        command = "gcloud auth application-default print-access-token"
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        token = result.stdout.strip() 
+        return token
+
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while getting token: {str(e)}")
+        print(f"stderr: {e.stderr.strip()}")
+        return None
 
 
 class GoogleVisionAnnotate(HTTPInferenceService):
   def __init__(
       self,
-      token: str,
-      columns_to_input_keys: Dict[str, Union[str, tuple]],
-      response_keys_to_columns: Dict[Union[str, tuple], str],
-      project_id: str,
+      token: str=None,
+      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      project_id: str=None,
       infer_type: str='images',
   ):
     '''
@@ -19,6 +34,8 @@ class GoogleVisionAnnotate(HTTPInferenceService):
     assert infer_type in [
         "images", "files"
       ], "infer_type must be images or files"
+    if token is None:
+      token = get_gcloud_access_token()
     super().__init__(
         name='google_vision_image_annotate',
         url=f'https://vision.googleapis.com/v1/{infer_type}:annotate',
