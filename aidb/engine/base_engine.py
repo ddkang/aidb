@@ -2,9 +2,6 @@ from collections import defaultdict
 from typing import Dict, List, Tuple
 
 import pandas as pd
-import sqlalchemy
-import sqlalchemy.ext.asyncio
-import sqlalchemy.ext.automap
 
 from aidb.config.config import Config
 from aidb.config.config_types import InferenceBinding
@@ -14,7 +11,7 @@ from aidb.inference.inference_service import InferenceService
 from aidb.query.query import FilteringClause, Query
 from aidb.query.utils import predicate_to_str
 from aidb.utils.asyncio import asyncio_run
-from aidb.utils.logger import logger
+from aidb.utils.db import infer_dialect, create_sql_engine
 
 
 class BaseEngine():
@@ -27,8 +24,8 @@ class BaseEngine():
     self._connection_uri = connection_uri
     self._debug = debug
 
-    self._dialect = self._infer_dialect(connection_uri)
-    self._sql_engine = self._create_sql_engine()
+    self._dialect = infer_dialect(connection_uri)
+    self._sql_engine = create_sql_engine(connection_uri, debug)
 
     if infer_config:
       self._config: Config = asyncio_run(self._infer_config())
@@ -36,49 +33,6 @@ class BaseEngine():
 
   def __del__(self):
     asyncio_run(self._sql_engine.dispose())
-
-
-  # ---------------------
-  # Setup
-  # ---------------------
-  def _infer_dialect(self, connection_uri: str):
-    # Conection URIs have the following format:
-    # dialect+driver://username:password@host:port/database
-    # See https://docs.sqlalchemy.org/en/20/core/engines.html
-    dialect = connection_uri.split(':')[0]
-    if '+' in dialect:
-      dialect = dialect.split('+')[0]
-
-    supported_dialects = [
-      'mysql',
-      'postgresql',
-      'sqlite',
-    ]
-
-    if dialect not in supported_dialects:
-      logger.warning(
-        f'Unsupported dialect: {dialect}. Defaulting to mysql')
-      dialect = 'mysql'
-
-    return dialect
-
-
-  def _create_sql_engine(self):
-    logger.info(f'Creating SQL engine for {self._dialect}')
-    if self._dialect == 'mysql':
-      kwargs = {
-        'echo': self._debug,
-        'max_overflow': -1,
-      }
-    else:
-      kwargs = {}
-
-    engine = sqlalchemy.ext.asyncio.create_async_engine(
-      self._connection_uri,
-      **kwargs,
-    )
-
-    return engine
 
 
   async def _infer_config(self) -> Config:
