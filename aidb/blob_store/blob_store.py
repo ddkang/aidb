@@ -5,9 +5,9 @@ from enum import Enum
 
 
 class DocumentType(Enum):
-  PDF = 1
-  DOCX = 2
-  DOC = 3
+  PDF = "pdf"
+  DOCX = "docx"
+  DOC = "doc"
 
 
 @dataclass

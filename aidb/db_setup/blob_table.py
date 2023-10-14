@@ -1,15 +1,17 @@
 import pandas as pd
 import sqlalchemy
 import sqlalchemy.ext.asyncio
+
+from dataclasses import asdict
 from sqlalchemy import MetaData
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import text
-from typing import List
+from typing import List, Union
 
 from aidb.config.config_types import python_type_to_sqlalchemy_type
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
 from aidb.utils.db import create_sql_engine, infer_dialect
+from aidb.blob_store.blob_store import Blob
 
 
 class BaseTablesSetup(object):
@@ -19,6 +21,9 @@ class BaseTablesSetup(object):
     self._sql_engine = create_sql_engine(connection_uri)
 
   async def _create_table(self, table_name, table_columns):
+    """
+    creates the table in the database
+    """
     async with self._sql_engine.begin() as conn:
       metadata = MetaData(bind=conn)
       _ = sqlalchemy.Table(table_name, metadata, *[
@@ -27,18 +32,12 @@ class BaseTablesSetup(object):
       await conn.run_sync(lambda conn: metadata.create_all(conn))
 
   async def _setup_blob_config_table(self, table_name, table_columns):
-    def create_blob_metadata_table(conn):
-      Base = declarative_base()
-
-      class BlobTables(Base):
-        __tablename__ = BLOB_TABLE_NAMES_TABLE
-        table_name = sqlalchemy.Column(sqlalchemy.String, primary_key=True)
-        blob_key = sqlalchemy.Column(sqlalchemy.String, primary_key=True)
-
-      Base.metadata.create_all(conn)
-
+    """
+    setup the blob_key configuration table
+    """
+    await self._create_table(BLOB_TABLE_NAMES_TABLE,
+                             [("table_name", sqlalchemy.String(20), True), ("blob_key", sqlalchemy.String(20), True)])
     async with self._sql_engine.begin() as conn:
-      await conn.run_sync(create_blob_metadata_table)
       for c_name, _, is_pk in table_columns:
         if is_pk:
           # Insert into blob metadata table
@@ -48,16 +47,27 @@ class BaseTablesSetup(object):
           )
 
   async def _insert_data_in_table(self, table_name: str, data: pd.DataFrame):
+    """
+    inserts rows in the table
+    """
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: data.to_sql(table_name, conn, if_exists='append', index=False))
 
-  def insert_data(self, table_name, blob_data: pd.DataFrame, primary_key_cols: List[str]):
+  def insert_data(self, table_name, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
+    """
+    creates the blob table and the blob key configuration table
+    inserts the blob data in the blob table
+    """
+    assert len(primary_key_cols) > 0, "Primary key should be specified"
+    if not isinstance(blob_data, pd.DataFrame):
+      blob_data = pd.DataFrame(list(map(asdict, blob_data)))
+    assert blob_data.shape[0] > 0, "No blobs to insert in the blob table"
     table_columns = []
     for column in blob_data.columns:
       dtype = python_type_to_sqlalchemy_type(blob_data[column].dtype)
       if dtype == sqlalchemy.String:
-        # TODO: VAR CHAR lenth should be based on the number of characters
-        c_type = sqlalchemy.String(20)  # 20 characters long
+        # TODO: VAR CHAR length should be based on the number of characters
+        c_type = sqlalchemy.String(50)  # 50 characters long
       else:
         c_type = dtype
       table_columns.append((column, c_type, column in primary_key_cols))
