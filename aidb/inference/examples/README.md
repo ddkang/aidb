@@ -1,8 +1,37 @@
 # Example Inference Services 
 
-You will need to specify the map from your input column keys to API JSON object input keys in string (1-layer conversion) or tuple (multi-layer conversion) format. Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create). OpenAI will only respond to one `messages`, so please only input 1 column. If an input column is not inside the map keys, that column will be ignored.
+You will need to specify the mapping from the AIDB input columns to the JSON input format and the mapping from the JSON output format to the AIDB output columns. In order to nest fields in the JSON, you will need to use a tuple. In the case of a flat JSON, you can simply use strings as keys.
 
-You will also need to specify the map from API JSON object output keys in tuple format to your output column keys. Please refer to [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object). If an output JSON attribute is not inside the map keys, that attribute will be ignored.
+As an example, if you have AIDB input columns like this:
+| model | role | content | n |
+| --- | --- | --- | --- |
+| gpt-3.5-turbo | user | Do you know Google Cloud Vision API? | 2 |
+
+and you want to use the [OpenAI Chat API](https://platform.openai.com/docs/api-reference/chat) which want JSON input format like this:
+```json 
+{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Do you know Google Cloud Vision API?"
+    }
+  ],
+  "n": 2,
+}
+```
+
+You will need to specify the mapping from the AIDB input columns to the JSON input format like this:
+```python
+map_input_to_request = {
+  'model': ('model',),
+  'role': ('messages', '0', 'role'),
+  'content': ('messages', '0', 'content'),
+  'n': 'n'
+}
+```
+
+If an input column or an output JSON attribute is not inside the map keys, that column/attribute will be ignored.
 
 ## OpenAI
 
