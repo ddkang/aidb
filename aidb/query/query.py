@@ -266,65 +266,51 @@ class Query(object):
 
 
   @cached_property
-  def inference_engines_related_filtering_predicates(self) -> Dict[str, List[List[FilteringClause]]]:
+  def inference_engines_required_for_filtering_predicates(self):
     """
-    Map filtering predicates to subsequent inference services required
-    because filtering predicates will be executed after all required services are executed.
-
-    This method determines the necessary inference services for each filtering predicate
-    and returns a dictionary mapping service names to the predicates that require them.
+    Inference services required to run to satisfy the columns present in each filtering predicate
+    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
+    it returns [[color], [], [object]]
     """
-    inference_engines_required_predicates = collections.defaultdict(list)
-    service_order = self.config.inference_topological_order
+    inference_engines_required_predicates = []
     for filtering_predicate in self.filtering_predicates:
-      max_service_index = -1
+      inference_engines_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == 'column':
+        if or_connected_predicate.left_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           if originated_from in self.config.column_by_service:
-            bound_service = self.config.column_by_service[originated_from]
-            max_service_index = max(max_service_index, service_order.index(bound_service))
-
-        if or_connected_predicate.right_exp.type == 'column':
+            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+        if or_connected_predicate.right_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           if originated_from in self.config.column_by_service:
-            bound_service = self.config.column_by_service[originated_from]
-            max_service_index = max(max_service_index, service_order.index(bound_service))
-
-      if max_service_index != -1:
-        if max_service_index + 1 < len(service_order):
-          service_name = service_order[max_service_index + 1].service.name
-          inference_engines_required_predicates[service_name].append(filtering_predicate)
-
+            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+      inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
 
 
-  def get_satisfied_filtering_predicates(self, filtering_predicates, tables) -> List[List[FilteringClause]]:
+  @cached_property
+  def tables_in_filtering_predicates(self):
     """
-    Get satisfied filtering predicates based on the table in query
     Tables needed to satisfy the columns present in each filtering predicate
+    for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
+    it returns [[color], [blob], [object]]
     """
-    filtering_predicates_satisfied = []
-    for filtering_predicate in filtering_predicates:
-      satisfied = True
+    tables_required_predicates = []
+    for filtering_predicate in self.filtering_predicates:
+      tables_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == 'column':
+        if or_connected_predicate.left_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
-          if originated_from.split('.')[0] not in tables:
-            satisfied = False
-            break
-        if or_connected_predicate.right_exp.type == 'column':
+          tables_required.add(originated_from.split('.')[0])
+        if or_connected_predicate.right_exp.type == "column":
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
-          if originated_from.split('.')[0] not in tables:
-            satisfied = False
-            break
-      if satisfied:
-        filtering_predicates_satisfied.append(filtering_predicate)
-    return filtering_predicates_satisfied
+          tables_required.add(originated_from.split('.')[0])
+      tables_required_predicates.append(tables_required)
+    return tables_required_predicates
 
 
   @cached_property
@@ -371,3 +357,26 @@ class Query(object):
               visited.add(inference_col)
 
     return list(inference_engines_required)
+
+
+  def _get_keyword_arg(self, exp_type):
+    value = None
+    for node, _, key in self._expression.walk():
+      if isinstance(node, exp_type):
+        # FIXME: this is only for LIMIT query, modify later
+        if value is not None:
+          raise Exception('Multiple AQP keywords found')
+        else:
+          value = float(node.args['this'].args['this'])
+    return value
+
+
+  def get_limit_cardinality(self):
+    return self._get_keyword_arg(exp.Limit)
+
+
+  def is_limit_query(self):
+    cardinality = self.get_limit_cardinality()
+    if cardinality is None:
+      return False
+    return True

@@ -22,13 +22,19 @@ class FullScanEngine(BaseEngine):
     '''
     # The query is irrelevant since we do a full scan anyway
     bound_service_list = self._get_required_bound_services_order(query)
+    inference_services_executed = set()
     for bound_service in bound_service_list:
-      inp_query_str = self.get_input_query_for_inference_service(bound_service, query)
+      inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service,
+                                                                                query,
+                                                                                inference_services_executed)
+
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
 
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)
+
+      inference_services_executed.add(bound_service.service.name)
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
