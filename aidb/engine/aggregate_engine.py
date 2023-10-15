@@ -5,12 +5,12 @@ import scipy
 import sqlglot.expressions as exp
 import statsmodels.stats.proportion
 from aidb.engine.base_engine import BaseEngine
-from aidb.estimator.estimator import (Estimator, WeightedCountSetEstimator,
-                                      WeightedMeanSetEstimator, WeightedSumSetEstimator)
+from aidb.estimator.estimator import (
+  Estimator, WeightedCountSetEstimator, WeightedMeanSetEstimator, WeightedSumSetEstimator)
 from aidb.query.query import Query
 from aidb.samplers.sampler import SampledBlob
-from aidb.utils.constants import (ESTIMATE_AGG_RESULTS_MODE, FIND_NUM_SAMPLES_MODE,
-                                  NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT)
+from aidb.utils.constants import (
+  ESTIMATE_AGG_RESULTS_MODE, FIND_NUM_SAMPLES_MODE, NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT)
 from sqlalchemy.sql import text
 from sqlglot.generator import Generator
 
@@ -44,11 +44,19 @@ class ApproximateAggregateEngine(BaseEngine):
         limit = query_limit - offset
     if query_offset:
       offset += query_offset
-    select_all_str = csv(f"SELECT *", gen.sql(query_exp, "from"),
-                         *[gen.sql(sql) for sql in query_exp.args.get("laterals", [])],
-                         *[gen.sql(sql) for sql in query_exp.args.get("joins", [])], gen.sql(query_exp, "where"),
-                         gen.sql(query_exp, "group"), gen.sql(query_exp, "having"), gen.sql(query_exp, "order"),
-                         f" LIMIT {limit} ", f"OFFSET {offset}", sep="", )
+    select_all_str = csv(
+      f"SELECT *",
+      gen.sql(query_exp, "from"),
+      *[gen.sql(sql) for sql in query_exp.args.get("laterals", [])],
+      *[gen.sql(sql) for sql in query_exp.args.get("joins", [])],
+      gen.sql(query_exp, "where"),
+      gen.sql(query_exp, "group"),
+      gen.sql(query_exp, "having"),
+      gen.sql(query_exp, "order"),
+      f" LIMIT {limit} ",
+      f"OFFSET {offset}",
+      sep="",
+    )
     return select_all_str
 
 
@@ -65,8 +73,11 @@ class ApproximateAggregateEngine(BaseEngine):
 
   def get_random_sampling_query(self, bound_service, query, inference_services_executed, num_samples):
     """Function to return limited number of samples randomly"""
-    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(bound_service, query,
-                                                                                      inference_services_executed)
+    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(
+      bound_service,
+      query,
+      inference_services_executed
+    )
     if where_str:
       return f'''
               SELECT {inp_cols_str}
@@ -104,8 +115,13 @@ class ApproximateAggregateEngine(BaseEngine):
 
 
   def find_num_required_samples(self, estimator, agg_stats, conf, alpha, error_target, num_success):
-    pilot_estimate = estimator.estimate(agg_stats, conf / 2., True, num_success=num_success,
-                                        num_sampled=NUM_PILOT_SAMPLES)
+    pilot_estimate = estimator.estimate(
+      agg_stats,
+      conf / 2.,
+      True,
+      num_success=num_success,
+      num_sampled=NUM_PILOT_SAMPLES
+    )
     p_lb = statsmodels.stats.proportion.proportion_confint(num_success, NUM_PILOT_SAMPLES, alpha / 2)[0]
     num_samples = int((scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 * (1. / p_lb))
     return num_samples
@@ -121,8 +137,12 @@ class ApproximateAggregateEngine(BaseEngine):
     for bound_service in self._config.inference_topological_order:
       if bound_service not in inference_services_required:
         continue
-      table_sampling_query = self.get_random_sampling_query(bound_service, query, inference_services_executed,
-                                                            num_samples)
+      table_sampling_query = self.get_random_sampling_query(
+        bound_service,
+        query,
+        inference_services_executed,
+        num_samples
+      )
       async with self._sql_engine.begin() as conn:
         sampled_df = await conn.run_sync(lambda conn: pd.read_sql(text(table_sampling_query), conn))
       samples_from_service = await bound_service.infer(sampled_df)
@@ -175,7 +195,12 @@ class ApproximateAggregateEngine(BaseEngine):
 
 
   def get_estimates_on_data_chunks_agg_column_wise(
-      self, query, num_ids_per_service, agg_results_on_chunks, chunk_size, mode, num_samples=None
+      self,
+      query,
+      num_ids_per_service,
+      agg_results_on_chunks,
+      mode,
+      num_samples=None
   ):
     results = []
     error_target = query.error_target
@@ -188,7 +213,8 @@ class ApproximateAggregateEngine(BaseEngine):
         num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
         if mode == FIND_NUM_SAMPLES_MODE:
           results.append(
-            self.find_num_required_samples(estimator, agg_column_data, conf, alpha, error_target, num_column_samples))
+            self.find_num_required_samples(estimator, agg_column_data, conf, alpha, error_target, num_column_samples)
+          )
         elif mode == ESTIMATE_AGG_RESULTS_MODE:
           results.append(estimator.estimate(agg_column_data, conf, False, num_success=num_samples).estimate)
     return results
@@ -207,26 +233,40 @@ class ApproximateAggregateEngine(BaseEngine):
 
     # Pilot run and inference to determine required number of samples
     async with self._sql_engine.begin() as conn:
-      num_ids_per_service = await self.populate_samples_of_concerned_services(inference_services_required, query, conn,
-                                                                              NUM_PILOT_SAMPLES)
+      num_ids_per_service = await self.populate_samples_of_concerned_services(
+        inference_services_required,
+        query,
+        conn,
+        NUM_PILOT_SAMPLES
+      )
       total_num_ids = sum(num_ids_per_service.values())
       sampled_chunks, chunk_size = await self.execute_query_on_data_chunks(total_num_ids, conn, query)
 
     agg_results_on_chunks = self.get_agg_results_on_chunks(query, num_ids_per_service, sampled_chunks, chunk_size)
-    num_samples_per_agg_column = self.get_estimates_on_data_chunks_agg_column_wise(query, num_ids_per_service,
-                                                                                   agg_results_on_chunks, chunk_size,
-                                                                                   mode=FIND_NUM_SAMPLES_MODE)
+    num_samples_per_agg_column = self.get_estimates_on_data_chunks_agg_column_wise(
+      query,
+      num_ids_per_service,
+      agg_results_on_chunks,
+      mode=FIND_NUM_SAMPLES_MODE
+    )
     num_samples = max(NUM_SAMPLES_SPLIT, max(num_samples_per_agg_column))
 
     # Final query execution on required number of samples
     async with self._sql_engine.begin() as conn:
-      num_ids_per_service = await self.populate_samples_of_concerned_services(inference_services_required, query, conn,
-                                                                              num_samples)
+      num_ids_per_service = await self.populate_samples_of_concerned_services(
+        inference_services_required,
+        query,
+        conn,
+        num_samples
+      )
       sampled_chunks, chunk_size = await self.execute_query_on_data_chunks(total_num_ids, conn, query)
 
     agg_results_on_chunks = self.get_agg_results_on_chunks(query, num_ids_per_service, sampled_chunks, chunk_size)
-    all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(query, num_ids_per_service,
-                                                                              agg_results_on_chunks, chunk_size,
-                                                                              mode=ESTIMATE_AGG_RESULTS_MODE,
-                                                                              num_samples=num_samples)
+    all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(
+      query,
+      num_ids_per_service,
+      agg_results_on_chunks,
+      mode=ESTIMATE_AGG_RESULTS_MODE,
+      num_samples=num_samples
+    )
     return [tuple(all_samples_estimates)]
