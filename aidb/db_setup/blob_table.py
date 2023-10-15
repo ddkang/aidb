@@ -60,7 +60,7 @@ class BaseTablesSetup(object):
     """
     assert len(primary_key_cols) > 0, "Primary key should be specified"
     if not isinstance(blob_data, pd.DataFrame):
-      blob_data = pd.DataFrame(list(map(asdict, blob_data)))
+      blob_data = pd.DataFrame([b.to_dict() for b in blob_data])
     assert blob_data.shape[0] > 0, "No blobs to insert in the blob table"
     table_columns = []
     for column in blob_data.columns:

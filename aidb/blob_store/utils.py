@@ -19,7 +19,7 @@ def is_image_file(file: str):
 
 
 def is_document(file: str):
-  document_extension_filter = ['.doc', '.docx', '.pdf']
+  document_extension_filter = ['doc', 'docx', 'pdf']
   file_ext = get_file_extension(file)
   return file_ext in document_extension_filter
 

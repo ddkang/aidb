@@ -2,7 +2,7 @@ import unittest
 import os
 import sqlalchemy
 import sqlalchemy.ext.asyncio
-from aidb.blob_store.local_storage import LocalImageBlobStore
+from aidb.blob_store.local_storage import LocalImageBlobStore, LocalDocumentBlobStore
 from aidb.blob_store.aws_s3_storage import AwsS3ImageBlobStore
 from aidb.db_setup.blob_table import BaseTablesSetup
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
@@ -34,15 +34,23 @@ def clean_resources():
 
 class AidbDataStoreTests(IsolatedAsyncioTestCase):
 
-  async def test_local_storage_positive(self):
+  async def test_local_image_storage_positive(self):
     clean_resources()
     dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/data_store/')
+    data_dir = os.path.join(dirname, 'data/image_data_store/')
     local_image_store = LocalImageBlobStore(data_dir)
     image_blobs = local_image_store.get_blobs()
     await setup_blob_tables(image_blobs)
 
-  async def test_aws_storage_positive(self):
+  async def test_local_document_storage_positive(self):
+    clean_resources()
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/document_data_store/')
+    local_document_store = LocalDocumentBlobStore(data_dir)
+    document_blobs = local_document_store.get_blobs()
+    await setup_blob_tables(document_blobs)
+
+  async def test_aws_image_storage_positive(self):
     clean_resources()
     aws_image_store = AwsS3ImageBlobStore("bucket-name", "<your-aws-access-key>", "your-secret-key")
     image_blobs = aws_image_store.get_blobs()
