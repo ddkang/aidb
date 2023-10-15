@@ -365,7 +365,7 @@ class Query(object):
       if isinstance(node, exp_type):
         # FIXME: this is only for LIMIT query, modify later
         if value is not None:
-          raise Exception('Multiple AQP keywords found')
+          raise Exception('Multiple LIMIT keywords found')
         else:
           value = float(node.args['this'].args['this'])
     return value
