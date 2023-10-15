@@ -10,7 +10,6 @@ from aidb.query.query import Query
 from aidb.query.utils import predicate_to_str
 from aidb.utils.constants import table_name_for_rep_and_topk
 from aidb.vector_database.tasti import Tasti
-from aidb.vector_database.vector_database_config import TastiConfig
 
 
 class TastiEngine(FullScanEngine):
@@ -20,7 +19,7 @@ class TastiEngine(FullScanEngine):
       infer_config: bool = True,
       debug: bool = False,
       blob_mapping_table_name: Optional[str] = None,
-      tasti_config: Optional[TastiConfig] = None,
+      tasti_index: Optional[Tasti] = None,
   ):
     super().__init__(connection_uri, infer_config, debug)
 
@@ -29,10 +28,15 @@ class TastiEngine(FullScanEngine):
     self.topk_table_name = None
     # table for mapping blob keys to blob ids
     self.blob_mapping_table_name = blob_mapping_table_name
-    self.tasti_config = tasti_config
+    self.tasti_index = tasti_index
 
 
-  async def execute_tasti(self, query: Query, **kwargs):
+  async def get_proxy_scores_for_all_blobs(self, query: Query, **kwargs):
+    '''
+    1. create rep table and topk table if not exist, store the results from vector database
+    2. infer all bound services for all cluster representatives blobs
+    3. generate proxy score per predicate for all blobs based on topk rep ids and dists
+    '''
     bound_service_list = self._get_required_bound_services_order(query)
 
     blob_tables = set()
@@ -44,41 +48,28 @@ class TastiEngine(FullScanEngine):
     blob_tables = list(blob_tables)
 
     self.rep_table_name, self.topk_table_name = table_name_for_rep_and_topk(blob_tables)
-    reps_df = await self._get_cluster_rep_blob_ids()
+    if self.rep_table_name not in self._config.tables or self.topk_table_name not in self._config.tables:
+      await self.initialize_tasti()
+
     for bound_service in bound_service_list:
-      inp_query_str = self.get_input_query_for_inference_service(bound_service, query,
-                                                                 self.rep_table_name, list(reps_df.index))
+      inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service, self.rep_table_name)
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
       inp_df.set_index('blob_id', inplace=True, drop=True)
-      reps_df = reps_df.loc[inp_df.index]
       await bound_service.infer(inp_df)
 
-    score_query_str, score_connected = self._get_score_query_str(query, self.rep_table_name)
+    score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql(text(score_query_str), conn))
     score_df.set_index('blob_id', inplace=True, drop=True)
-    score_for_all_df = await self.get_score_for_all_blob_ids(score_df)
-    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
 
-     # FIXME: decide what to return
-    return reps_df, proxy_score_for_all_blobs
+    # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
+    # FIXME: fix it if there is a better design
+    score_df = score_df.groupby(level=0).mean()
+    score_for_all_df = await self.propagate_score_for_all_blob_ids(score_df)
 
-
-  async def _get_cluster_rep_blob_ids(self) -> pd.DataFrame:
-    if self.rep_table_name not in self._config.tables:
-      await self.initialize_tasti()
-
-    reps_query_str = f'''
-                SELECT {self.rep_table_name}.blob_id
-                FROM {self.rep_table_name};
-                '''
-
-    async with self._sql_engine.begin() as conn:
-      reps_df = await conn.run_sync(lambda conn: pd.read_sql(text(reps_query_str), conn))
-    reps_df.set_index('blob_id', inplace=True, drop=True)
-
-    return reps_df
+     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
+    return score_for_all_df, score_connected
 
 
   def _get_filter_predicate_score_map(self, query: Query) -> (Dict[str, str], List[List[str]]):
@@ -101,7 +92,10 @@ class TastiEngine(FullScanEngine):
     return filering_predicate_score_map, and_connected
 
 
-  def _get_score_query_str(self, query: Query, rep_table_name: str) -> (str, List[List[str]]):
+  def get_score_query_str(self, query: Query, rep_table_name: str) -> (str, List[List[str]]):
+    '''
+    Convert filtering condition into select clause, so we can use select result to compute proxy score for all blobs
+    '''
     filering_predicate_score_map, score_connected = self._get_filter_predicate_score_map(query)
     score_list = []
     # FIXME: for different database, the IN grammar maybe different
@@ -110,9 +104,9 @@ class TastiEngine(FullScanEngine):
     score_list.append(f'{rep_table_name}.blob_id')
     select_str = ', '.join(score_list)
     cols = list(filering_predicate_score_map.keys())
-    cols.append(f'{rep_table_name}.blob_id')
     tables = self._get_tables(cols)
-    join_str = self._get_inner_join_query(tables)
+    # some representative blobs may not have outputs from service, so left join is better
+    join_str = self._get_left_join_str(rep_table_name, tables)
     score_query_str = f'''
                       SELECT {select_str}
                       {join_str}
@@ -120,7 +114,7 @@ class TastiEngine(FullScanEngine):
     return score_query_str, score_connected
 
 
-  async def get_score_for_all_blob_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
+  async def propagate_score_for_all_blob_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
 
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
@@ -129,7 +123,6 @@ class TastiEngine(FullScanEngine):
 
     topk = len(topk_df.columns) // 2
     topk_indices = np.arange(topk)
-
     score_df_cols = score_df.columns
     all_dists = np.zeros((len(topk_df), topk))
     all_scores = np.zeros((len(topk_df), len(score_df_cols), topk))
@@ -165,25 +158,7 @@ class TastiEngine(FullScanEngine):
     return pd.DataFrame(y_pred, columns=score_df_cols, index=topk_df.index)
 
 
-  def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
-    '''
-    convert query result to score, return a Dataframe contains score column, the index is blob index
-    if A and B, then the score is min(score A, score B)
-    if A or B, then the score is max(score A, score B)
-    '''
-    proxy_score_all_blobs = np.zeros(len(score_for_all_df))
-    for idx, (index, row) in enumerate(score_for_all_df.iterrows()):
-      min_score = 1
-      for or_connected in score_connected:
-        max_score = 0
-        for score_name in or_connected:
-          max_score = max(max_score, row[score_name])
-        min_score = min(min_score, max_score)
-      proxy_score_all_blobs[idx] = min_score
-    return pd.Series(proxy_score_all_blobs, index=score_for_all_df.index)
-
-
-  def _create_tasti_table(self, topk:int, conn: sqlalchemy.engine.base.Connection):
+  def _create_tasti_table(self, topk:int,  conn: sqlalchemy.engine.base.Connection):
     '''
     create new rep_table and topk_table to store the results from vector database.
     rep_table is used to store cluster representatives ids and blob keys,
@@ -238,11 +213,10 @@ class TastiEngine(FullScanEngine):
     2. Creates Tasti tables and retrieves culster representative blob key columns.
     3. Inserts data into the representative table and topk table
     """
-    if self.tasti_config is None:
-      raise Exception('TASTI hasn\'t been initialized, please provide TASTI config')
-    tasti_index = Tasti(self.tasti_config)
-    rep_ids = tasti_index.get_representative_blob_ids()
-    topk_for_all = tasti_index.get_topk_representatives_for_all()
+    if self.tasti_index is None:
+      raise Exception('TASTI hasn\'t been initialized, please provide tasti_index')
+    rep_ids = self.tasti_index.get_representative_blob_ids()
+    topk_for_all = self.tasti_index.get_topk_representatives_for_all()
     new_topk_for_all = self._format_topk_for_all(topk_for_all)
     topk = max(topk_for_all['topk_reps'].str.len())
 
