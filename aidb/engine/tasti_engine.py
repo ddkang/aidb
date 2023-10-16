@@ -55,18 +55,18 @@ class TastiEngine(FullScanEngine):
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service, self.rep_table_name)
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
-      inp_df.set_index('blob_id', inplace=True, drop=True)
+      inp_df.set_index('vector_id', inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
     score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql(text(score_query_str), conn))
-    score_df.set_index('blob_id', inplace=True, drop=True)
+    score_df.set_index('vector_id', inplace=True, drop=True)
 
     # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
     # FIXME: fix it if there is a better design
     score_df = score_df.groupby(level=0).mean()
-    score_for_all_df = await self.propagate_score_for_all_blob_ids(score_df)
+    score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
      # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
     return score_for_all_df, score_connected
@@ -101,7 +101,7 @@ class TastiEngine(FullScanEngine):
     # FIXME: for different database, the IN grammar maybe different
     for fp in filering_predicate_score_map:
       score_list.append(f'IIF({fp}, 1, 0) AS {filering_predicate_score_map[fp]}')
-    score_list.append(f'{rep_table_name}.blob_id')
+    score_list.append(f'{rep_table_name}.vector_id')
     select_str = ', '.join(score_list)
     cols = list(filering_predicate_score_map.keys())
     tables = self._get_tables(cols)
@@ -114,12 +114,12 @@ class TastiEngine(FullScanEngine):
     return score_query_str, score_connected
 
 
-  async def propagate_score_for_all_blob_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
+  async def propagate_score_for_all_vector_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
 
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
       topk_df = await conn.run_sync(lambda conn: pd.read_sql(text(topk_query_str), conn))
-    topk_df.set_index('blob_id', inplace=True, drop=True)
+    topk_df.set_index('vector_id', inplace=True, drop=True)
 
     topk = len(topk_df.columns) // 2
     topk_indices = np.arange(topk)
@@ -176,7 +176,7 @@ class TastiEngine(FullScanEngine):
                                         )
 
     columns = []
-    columns.append(sqlalchemy.Column(f'blob_id', sqlalchemy.Integer, primary_key=True, autoincrement=False))
+    columns.append(sqlalchemy.Column(f'vector_id', sqlalchemy.Integer, primary_key=True, autoincrement=False))
     for i in range(topk):
       columns.append(sqlalchemy.Column(f'topk_reps_{str(i)}', sqlalchemy.Integer))
       columns.append(sqlalchemy.Column(f'topk_dists_{str(i)}', sqlalchemy.Float))
@@ -215,7 +215,7 @@ class TastiEngine(FullScanEngine):
     """
     if self.tasti_index is None:
       raise Exception('TASTI hasn\'t been initialized, please provide tasti_index')
-    rep_ids = self.tasti_index.get_representative_blob_ids()
+    rep_ids = self.tasti_index.get_representative_vector_ids()
     topk_for_all = self.tasti_index.get_topk_representatives_for_all()
     new_topk_for_all = self._format_topk_for_all(topk_for_all)
     topk = max(topk_for_all['topk_reps'].str.len())
@@ -223,7 +223,7 @@ class TastiEngine(FullScanEngine):
     rep_blob_query_str = f'''
                     SELECT *
                     FROM {self.blob_mapping_table_name}
-                    WHERE {self.blob_mapping_table_name}.blob_id IN {format(tuple(rep_ids.index))}
+                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))}
                     '''
 
     async with self._sql_engine.begin() as conn:

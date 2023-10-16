@@ -253,15 +253,15 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_select_join_str(self, bound_service: BoundInferenceService, blob_id_table: Optional[str] = None):
+  def _get_select_join_str(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
     column_to_root_column = self._config.columns_to_root_column
     binding = bound_service.binding
     inp_cols = binding.input_columns
     root_inp_cols = [column_to_root_column.get(col, col) for col in inp_cols]
 
     # used to select inp rows based on blob ids
-    if blob_id_table:
-      root_inp_cols.append(f'{blob_id_table}.blob_id')
+    if vector_id_table:
+      root_inp_cols.append(f'{vector_id_table}.vector_id')
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
@@ -324,7 +324,7 @@ class BaseEngine():
   def get_input_query_for_inference_service_filtered_index(
       self,
       bound_service: BoundInferenceService,
-      blob_id_table: str,
+      vector_id_table: str,
       filtered_id_list: Optional[List[int]] = None
   ):
     """
@@ -333,15 +333,15 @@ class BaseEngine():
     that are already executed
     """
 
-    _, select_join_str = self._get_select_join_str(bound_service, blob_id_table)
+    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
 
     # FIXME: for different database, the IN grammar maybe different
     if filtered_id_list is None:
       inp_query_str = select_join_str
     elif len(filtered_id_list) == 1:
-      inp_query_str = select_join_str + f'WHERE {blob_id_table}.blob_id = {filtered_id_list[0]}'
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]}'
     else:
-      inp_query_str = select_join_str + f'WHERE {blob_id_table}.blob_id IN {format(tuple(filtered_id_list))}'
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))}'
 
     return inp_query_str
 

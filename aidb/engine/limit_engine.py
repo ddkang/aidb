@@ -49,7 +49,7 @@ class LimitEngine(TastiEngine):
                                                                                   [index])
         async with self._sql_engine.begin() as conn:
           inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
-        inp_df.set_index('blob_id', inplace=True, drop=True)
+        inp_df.set_index('vector_id', inplace=True, drop=True)
         await bound_service.infer(inp_df)
 
       # FIXME: Currently, we select the whole database, need to rewrite sql text to select specific blob id
