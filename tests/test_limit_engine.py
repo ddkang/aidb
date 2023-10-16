@@ -1,7 +1,6 @@
 from multiprocessing import Process
-import numpy as np
 import os
-import pandas as pd
+from sqlalchemy.sql import text
 import time
 import unittest
 from unittest import IsolatedAsyncioTestCase
@@ -14,17 +13,8 @@ from tests.utils import setup_gt_and_aidb_engine
 
 DB_URL = 'sqlite+aiosqlite://'
 
-rep_ids = pd.DataFrame({'blob_id': range(1, 100, 2)})
-rep_ids.set_index('blob_id', inplace=True, drop=True)
-topk_reps = np.ones((1000, 5))
-for i in range(1000):
-  topk_reps[i, :] = np.random.choice(range(1, 100, 2), 5, replace=False)
-topk_dists = np.random.random((1000, 5))
-topk_for_all = pd.DataFrame({'topk_reps': list(topk_reps), 'topk_dists': list(topk_dists)})
-
-
 # DB_URL = 'mysql+aiomysql://aidb:aidb@localhost'
-class FullScanEngineTests(IsolatedAsyncioTestCase):
+class LimitEngineTests(IsolatedAsyncioTestCase):
 
   async def test_jackson_number_objects(self):
 
@@ -50,17 +40,33 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
     queries = [
-      '''SELECT * FROM colors02 WHERE frame >= 1000 and colors02.color = 'black' LIMIT 100;''',
-      '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2 = 'green' LIMIT 100;''',
-      '''SELECT * FROM objects00 WHERE object_name = 'car' OR frame < 100 LIMIT 100;''',
-      '''SELECT * FROM colors02 WHERE frame >= 1000 and colors02.color = 'black';''',
-      '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2 = 'green';''',
-      '''SELECT * FROM objects00 WHERE object_name = 'car' OR frame < 100;''',
+      (
+        '''SELECT * FROM colors02 WHERE frame >= 1000 and colors02.color = 'black' LIMIT 100;''',
+        '''SELECT * FROM colors02 WHERE frame >= 1000 and colors02.color = 'black';'''
+      ),
+      (
+        '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2 = 'green' LIMIT 100;''',
+        '''SELECT frame, light_1, light_2 FROM lights01 WHERE light_2 = 'green';'''
+      ),
+      (
+        '''SELECT * FROM objects00 WHERE object_name = 'car' OR frame < 100 LIMIT 100;''',
+        '''SELECT * FROM objects00 WHERE object_name = 'car' OR frame < 100;'''
+      )
     ]
-    for aidb_query in queries:
-      print(f'Executing {aidb_query}')
+
+    for aidb_query, exact_query in queries:
+      print(f'Running query {aidb_query} in limit engine')
       aidb_res = aidb_engine.execute(aidb_query)
-      print(f'The length of results is {len(aidb_res)}')
+
+      print(f'Running query {exact_query} in ground truth database')
+      async with gt_engine.begin() as conn:
+        gt_res = await conn.execute(text(exact_query))
+        gt_res = gt_res.fetchall()
+
+      print(f'There are {len(aidb_res)} elements in limit engine results '
+            f'and {len(gt_res)} elements in ground truth results')
+      assert len(set(aidb_res) - set(gt_res)) == 0
+
     del gt_engine
     p.terminate()
 
