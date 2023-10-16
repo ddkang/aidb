@@ -9,13 +9,10 @@ class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
       token: str=None,
+      default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
       infer_type: str='transcriptions'):
-    '''
-    :param str token: The token to use for authentication.
-    :param str infer_type: 'transcriptions'|'translations'.
-    '''
     assert infer_type in [
         "transcriptions",
         "translations",
@@ -29,6 +26,7 @@ class OpenAIAudio(HTTPInferenceService):
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {token}',
       },
+      default_args=default_args,
       copy_input=False,
       batch_supported=False,
       is_single=False,
@@ -41,14 +39,11 @@ class OpenAIImage(HTTPInferenceService):
   def __init__(
       self, 
       token: str=None, 
+      default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
       infer_type: str='generations'
     ):
-    '''
-    :param str token: The token to use for authentication.
-    :param str infer_type: 'generations'|'edits'|'variations'
-    '''
     assert infer_type in [
         "generations",
         "edits",
@@ -63,6 +58,7 @@ class OpenAIImage(HTTPInferenceService):
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {token}',
       },
+      default_args=default_args,
       copy_input=False,
       batch_supported=False,
       is_single=False,
@@ -75,12 +71,10 @@ class OpenAIText(HTTPInferenceService):
   def __init__(
       self, 
       token: str=None,
+      default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
     ):
-    '''
-    :param str token: The token to use for authentication.
-    '''
     if token is None:
       token = os.environ['OPENAI_API_KEY']
     super().__init__(
@@ -90,6 +84,7 @@ class OpenAIText(HTTPInferenceService):
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {token}',
       },
+      default_args=default_args,
       copy_input=False,
       batch_supported=False,
       is_single=False,

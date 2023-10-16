@@ -33,6 +33,24 @@ map_input_to_request = {
 
 If an input column or an output JSON attribute is not inside the map keys, that column/attribute will be ignored.
 
+You can optionally move some arguments to `default_args` during initialization. For example, if you want to use the same `model` for all requests to OpenAI Chat API, you can do:
+```python
+default_args = {
+  'model': 'gpt-3.5-turbo'
+}
+
+openai_text = OpenAIText(
+  token=OPENAI_KEY,
+  default_args=default_args,
+  columns_to_input_keys=map_input_to_request,
+  response_keys_to_columns=map_response_to_output)
+```
+
+If you do not provide token during initialization, AIDB will find token from environment variable. The corresponding environment variables for each different services are listed below.
+| OpenAI | HuggingFace | Google |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | `HF_API_KEY` | `gcloud auth application-default print-access-token` |
+
 ## OpenAI
 
 ### [Chat](https://platform.openai.com/docs/api-reference/chat)
@@ -66,7 +84,10 @@ map_response_to_output = {
   ('choices', '1', 'finish_reason'): 'choices.1.finish_reason'
 }
 
-openai_text = OpenAIText(OPENAI_KEY, map_input_to_request, map_response_to_output)
+openai_text = OpenAIText(
+  token=OPENAI_KEY, 
+  columns_to_input_keys=map_input_to_request, 
+  response_keys_to_columns=map_response_to_output)
 openai_text_response_pd = openai_text.infer_one(openai_text_request_pd)
 openai_text_response_pd
 ```

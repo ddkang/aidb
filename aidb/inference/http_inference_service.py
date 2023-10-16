@@ -13,6 +13,7 @@ class HTTPInferenceService(CachedInferenceService):
       *args,
       url: str=None,
       headers: Union[Dict, None]=None,
+      default_args: Union[Dict, None]=None,
       copy_input: bool=True,
       batch_supported: bool=False,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -28,6 +29,7 @@ class HTTPInferenceService(CachedInferenceService):
     super().__init__(*args, **kwargs)
     self._url = url
     self._headers = headers
+    self._default_args = default_args
     self._copy_input = copy_input
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
@@ -46,6 +48,10 @@ class HTTPInferenceService(CachedInferenceService):
         key = self._columns_to_input_keys[k]
         key = self._separator.join(key) if isinstance(key, tuple) else key
         request[key] = v
+    if self._default_args is not None:
+      for k, v in self._default_args.items():
+        if k not in request:
+          request[k] = v
     request_unflatten = unflatten_list(request, self._separator)
 
     response = requests.post(self._url, json=request_unflatten, headers=self._headers)
