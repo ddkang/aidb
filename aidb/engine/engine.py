@@ -1,7 +1,9 @@
-from aidb.engine.limit_engine import LimitEninge
+from aidb.engine.limit_engine import LimitEngine
 from aidb.utils.asyncio import asyncio_run
 from aidb.query.query import Query
-class Engine(LimitEninge):
+
+
+class Engine(LimitEngine):
   def execute(self, query: str, **kwargs):
     '''
     Executes a query and returns the results.

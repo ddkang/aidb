@@ -7,7 +7,7 @@ from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
 
 
-class LimitEninge(TastiEngine):
+class LimitEngine(TastiEngine):
   # TODO: design a better algorithm
   def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
     '''
@@ -40,6 +40,7 @@ class LimitEninge(TastiEngine):
     sorted_list = sorted(id_score, key=lambda x: x[1], reverse=True)
     desired_cardinality = int(query.get_limit_cardinality())
 
+    # TODO: rewrite query, use full scan to execute query
     bound_service_list = self._get_required_bound_services_order(query)
     for index, _ in sorted_list:
       for bound_service in bound_service_list:
