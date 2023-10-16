@@ -128,7 +128,10 @@ map_response_to_output = {
   ('data', '1', 'url'): 'data.1.url'
 }
 
-openai_image = OpenAIImage(OPENAI_KEY, map_input_to_request, map_response_to_output)
+openai_image = OpenAIImage(
+  token=OPENAI_KEY,
+  columns_to_input_keys=map_input_to_request,
+  response_keys_to_columns=map_response_to_output)
 openai_image_response_pd = openai_image.infer_one(openai_image_request_pd)
 openai_image_response_pd
 ```
@@ -158,7 +161,11 @@ All HuggingFace NLP tasks are supported. Please refer to [doc](https://huggingfa
 Example usage:
 ```python
 from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
-hf_nlp = HuggingFaceNLP(HF_KEY, {'inputs': 'inputs'}, {('0', 'generated_text', ): 'generated_text'}, "gpt2")
+hf_nlp = HuggingFaceNLP(
+  token=HF_KEY,
+  columns_to_input_keys={'inputs': 'inputs'},
+  response_keys_to_columns={('0', 'generated_text', ): 'generated_text'},
+  model="gpt2")
 hf_nlp_response_pd = hf_nlp.infer_one(hf_nlp_request_pd)
 hf_nlp_response_pd
 ```
@@ -216,7 +223,10 @@ map_response_to_output = {
   ('4', 'box', 'ymax'): '4.box.ymax'
 }
 
-hf_cv = HuggingFaceVisionAudio(HF_KEY, map_response_to_output, "facebook/detr-resnet-50")
+hf_cv = HuggingFaceVisionAudio(
+  token=HF_KEY,
+  response_keys_to_columns=map_response_to_output,
+  model="facebook/detr-resnet-50")
 hf_cv_response_pd = hf_cv.infer_one(hf_cv_request_pd)
 hf_cv_response_pd
 ```
@@ -240,6 +250,8 @@ Response:
 We support [files.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/files/annotate) and [images.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate). Please visit [AnnotateFileRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateFileRequest) or [AnnotateImageRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateImageRequest) for input dataframe -> request json map.
 
 To convert response json to output dataframe, please refer to [BatchAnnotateFilesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateFilesResponse) or [BatchAnnotateImagesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateImagesResponse).
+
+You must provide project id during initialization.
 
 Example usage:
 ```python
@@ -272,7 +284,11 @@ map_input_to_request = {
 
 map_response_to_output = <omit, too long>
 
-google_cv = GoogleVisionAnnotate(GOOGLE_KEY, map_input_to_request, map_response_to_output, project_id="project-id")
+google_cv = GoogleVisionAnnotate(
+  token=GOOGLE_KEY,
+  columns_to_input_keys=map_input_to_request,
+  response_keys_to_columns=map_response_to_output,
+  project_id='<project-id>')
 google_cv_response_pd = google_cv.infer_one(google_cv_request_pd)
 google_cv_response_pd
 ```
@@ -291,9 +307,12 @@ dtype: object
 Response:
 \<omit, too long\>
 
-The way to obtain a Google API key is tricky. Please do
-```bash
-gcloud init
-gcloud auth application-default print-access-token
-```
-in your terminal. You may need additional steps as prompted.
+The way to obtain a Google API key is tricky. Please
+1. initiate a project in [Google cloud console](ttps://console.cloud.google.com/welcome/new)
+1. install [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+1. run
+    ```bash
+    gcloud init
+    gcloud auth application-default print-access-token
+    ```
+    in your terminal. You may need additional steps as prompted.
