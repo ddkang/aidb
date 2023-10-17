@@ -63,7 +63,9 @@ class Tasti(TastiConfig):
     '''
     if self.reps is None:
       self._FPF()
-    return self.vector_ids.iloc[self.reps]
+    rep_id = self.vector_ids.iloc[self.reps]
+    rep_id.set_index('id', inplace=True, drop=True)
+    return rep_id
 
 
   def get_topk_representatives_for_all(self, top_k: int = 5) -> pd.DataFrame:
