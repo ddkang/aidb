@@ -6,16 +6,16 @@ from aidb.inference.http_inference_service import HTTPInferenceService
 
 
 def get_gcloud_access_token():
-    try:
-        command = "gcloud auth application-default print-access-token"
-        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        token = result.stdout.strip() 
-        return token
+  try:
+    command = "gcloud auth application-default print-access-token"
+    result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    token = result.stdout.strip() 
+    return token
 
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred while getting token: {str(e)}")
-        print(f"stderr: {e.stderr.strip()}")
-        return None
+  except subprocess.CalledProcessError as e:
+    print(f"An error occurred while getting token: {str(e)}")
+    print(f"stderr: {e.stderr.strip()}")
+    return None
 
 
 class GoogleVisionAnnotate(HTTPInferenceService):
