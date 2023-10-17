@@ -149,8 +149,6 @@ Response:
 |---|---|---|---|
 |0|	1697076329|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-9ycIx6ZG6T68IYV12wXNlZhd.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=dyzFdHArfGMq%2B6hxHPQ5vhzQdpN3On5JkOag8cXmwXA%3D	| https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-AjvmDySJANPAc4Huviconivv.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=oSB/BJM2u70ITy%2B6jjsbNHehBlYcQD9nzwotT9uQIjE%3D |
 
-### [Audio](https://platform.openai.com/docs/api-reference/audio)
-
 
 ## HuggingFace
 
@@ -241,9 +239,6 @@ Response:
 |   | 0.score  | 0.label | 0.box.xmin | 0.box.ymin | 0.box.xmax | 0.box.ymax | 1.score  | 1.label | 1.box.xmin | 1.box.ymin | 1.box.xmax | 1.box.ymax |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 0 | 0.998632 | tie     | 214        | 254        | 254        | 426        | 0.997547 | person  | 50         | 26         | 511        | 509        |
-
-
-### [Audio](https://huggingface.co/docs/api-inference/detailed_parameters#audio)
 
 
 ## Google
