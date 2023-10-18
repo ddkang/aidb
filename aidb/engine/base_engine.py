@@ -328,9 +328,12 @@ class BaseEngine():
       filtered_id_list: Optional[List[int]] = None
   ):
     """
-    this function returns the input query to fetch the input records for an inference service
-    input query will also contain the predicates that can be currently satisfied using the inference services
-    that are already executed
+    This function returns the input query to fetch the input records for an inference service.
+    If filtered_id_list is provided, input query will only select those blobs in the list.
+    And this query doesn't filter vector id on original predicate.
+    * param bound_service: bounded inference service, used to know input columns
+    * param vector_id_table: a table which contains a column named 'vector_id' and maps blob keys to vector id
+    * param filtered_id_list: list of vector ids which will be selected in the query
     """
 
     _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
