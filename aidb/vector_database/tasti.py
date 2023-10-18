@@ -22,7 +22,8 @@ class Tasti(TastiConfig):
   def __post_init__(self):
     self.rep_index_name = f'{self.index_name}__representatives'
     self.rand = np.random.RandomState(self.seed)
-    self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name, self.vector_ids.values.reshape(1, -1)[0])
+    self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
+                                                                self.vector_ids.values.reshape(1, -1)[0])
 
 
   # # TODO: Add memory efficient FPF Random Bucketter
@@ -74,7 +75,6 @@ class Tasti(TastiConfig):
     '''
     if self.reps is None:
       self._FPF()
-
     topk_reps, topk_dists = self.vector_database.execute(self.rep_index_name, self.embeddings, self.reps, top_k)
     topk_reps = self.vector_ids.iloc[np.concatenate(topk_reps)].values.reshape(-1, top_k)
     data = {'topk_reps': list(topk_reps), 'topk_dists': list(topk_dists)}

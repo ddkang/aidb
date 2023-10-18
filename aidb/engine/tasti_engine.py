@@ -200,7 +200,10 @@ class TastiEngine(FullScanEngine):
       f'topk_dists_{i}': topk_for_all['topk_dists'].str[i]
       for i in range(topk)
     })
-    return pd.DataFrame(new_topk_for_all)
+    new_topk_for_all.update({
+      'vector_id': [vector_id for vector_id in topk_for_all.index]
+    })
+    return pd.DataFrame(new_topk_for_all, index=topk_for_all.index)
 
 
   async def initialize_tasti(self):
