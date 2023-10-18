@@ -314,9 +314,9 @@ class BaseEngine():
       where_str = where_str.replace(k, v)
 
     if len(filtering_predicates_satisfied) > 0:
-      inp_query_str = select_join_str + f'WHERE {where_str}'
+      inp_query_str = select_join_str + f'WHERE {where_str};'
     else:
-      inp_query_str = select_join_str
+      inp_query_str = select_join_str + ';'
 
     return inp_query_str
 

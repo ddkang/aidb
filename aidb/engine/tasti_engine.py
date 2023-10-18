@@ -109,13 +109,12 @@ class TastiEngine(FullScanEngine):
     join_str = self._get_left_join_str(rep_table_name, tables)
     score_query_str = f'''
                       SELECT {select_str}
-                      {join_str}
+                      {join_str};
                       '''
     return score_query_str, score_connected
 
 
   async def propagate_score_for_all_vector_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
-
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
       topk_df = await conn.run_sync(lambda conn: pd.read_sql(text(topk_query_str), conn))
@@ -223,7 +222,7 @@ class TastiEngine(FullScanEngine):
     rep_blob_query_str = f'''
                     SELECT *
                     FROM {self.blob_mapping_table_name}
-                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))}
+                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
                     '''
 
     async with self._sql_engine.begin() as conn:
