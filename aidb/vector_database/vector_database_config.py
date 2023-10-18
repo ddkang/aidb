@@ -18,7 +18,7 @@ class TastiConfig:
   :param reps: representative ids
   '''
   index_name: str
-  blob_ids: pd.DataFrame
+  vector_ids: pd.DataFrame
   vector_database: VectorDatabase
   nb_buckets: int
   percent_fpf: float = 0.75
