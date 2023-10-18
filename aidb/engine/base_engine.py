@@ -342,9 +342,9 @@ class BaseEngine():
     if filtered_id_list is None:
       inp_query_str = select_join_str
     elif len(filtered_id_list) == 1:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]}'
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]};'
     else:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))}'
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))};'
 
     return inp_query_str
 
