@@ -17,27 +17,27 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'aggregate',
-    '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 0.05 CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00;'''
   ),
   (
     'aggregate',
-    '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 90;''',
+    '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 0.05 CONFIDENCE 95;''',
     '''SELECT SUM(x_min) FROM objects00;'''
   ),
   (
     'aggregate',
-    '''SELECT COUNT(*) FROM objects00 ERROR_TARGET 0.01 CONFIDENCE 80;''',
+    '''SELECT COUNT(*) FROM objects00 ERROR_TARGET 0.05 CONFIDENCE 95;''',
     '''SELECT COUNT(*) FROM objects00;'''
   ),
   (
     'aggregate',
-    '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000 ERROR_TARGET 0.01 CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000 ERROR_TARGET 0.05 CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000;'''
   ),
   (
     'aggregate',
-    '''SELECT AVG(x_min), COUNT(frame) FROM objects00 WHERE object_id > 0 ERROR_TARGET 0.01 CONFIDENCE 65;''',
+    '''SELECT AVG(x_min), COUNT(frame) FROM objects00 WHERE object_id > 0 ERROR_TARGET 0.01 CONFIDENCE 99;''',
     '''SELECT AVG(x_min), COUNT(frame) FROM objects00  WHERE object_id > 0;'''
   )
 ]
@@ -47,7 +47,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
   def _equality_check(self, aidb_res, gt_res, error_target):
     assert len(aidb_res) == len(gt_res)
     for aidb_item, gt_item in zip(aidb_res, gt_res):
-      if abs(aidb_item - gt_item) / (gt_item) <= error_target * 15:
+      if abs(aidb_item - gt_item) / (gt_item) <= error_target:
         return True
     return False
 

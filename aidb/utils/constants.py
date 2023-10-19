@@ -8,6 +8,8 @@ NUM_PILOT_SAMPLES = 1000
 NUM_SAMPLES_SPLIT = 20
 FIND_NUM_SAMPLES_MODE = 'find_num_required_samples'
 ESTIMATE_AGG_RESULTS_MODE = 'estimate_aggregation_results'
+ESTIMATE_NUM_SAMPLES_NORMAL_MODE = 'normal'
+ESTIMATE_NUM_SAMPLES_WILSON_MODE = 'wilson'
 
 REP_PREFIX = '__rep'
 TOPK_PREFIX = '__topk'
