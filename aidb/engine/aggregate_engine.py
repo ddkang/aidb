@@ -74,7 +74,7 @@ class ApproximateAggregateEngine(BaseEngine):
 
   def get_random_sampling_query(self, bound_service, query, inference_services_executed, num_samples):
     """Function to return limited number of samples randomly"""
-    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service(
+    _, inp_cols_str, join_str, where_str = self.get_input_query_for_inference_service_filter_service(
       bound_service,
       query,
       inference_services_executed

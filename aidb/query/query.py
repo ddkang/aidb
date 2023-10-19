@@ -407,13 +407,38 @@ class Query(object):
     return True if self.aggregated_columns_and_types and self.validate_aqp() else False
 
 
-  # AQP extraction
+  @cached_property
+  def inference_engines_required_for_query(self):
+    """
+    Inference services required for sql query, will return a list of inference service
+    """
+    visited = self.columns_in_query.copy()
+    stack = list(visited)
+    inference_engines_required = set()
+
+    while stack:
+      col = stack.pop()
+
+      if col in self.config.column_by_service:
+        inference = self.config.column_by_service[col]
+
+        if inference not in inference_engines_required:
+          inference_engines_required.add(inference)
+
+          for inference_col in inference.binding.input_columns:
+            if inference_col not in visited:
+              stack.append(inference_col)
+              visited.add(inference_col)
+
+    return list(inference_engines_required)
+
+
   def _get_keyword_arg(self, exp_type):
     value = None
     for node, _, key in self._expression.walk():
       if isinstance(node, exp_type):
         if value is not None:
-          raise Exception('Multiple AQP keywords found')
+          raise Exception(f'Multiple unexpected keywords found')
         else:
           value = float(node.args['this'].args['this'])
     return value
@@ -422,6 +447,12 @@ class Query(object):
   @cached_property
   def limit_cardinality(self):
     return self._get_keyword_arg(exp.Limit)
+
+
+  def is_limit_query(self):
+    if self.limit_cardinality is None:
+      return False
+    return True
 
 
   @cached_property
@@ -440,6 +471,7 @@ class Query(object):
 
 
   # Validate AQP
+
   def validate_aqp(self):
     if not self.error_target:
       raise Exception('AQP error target not found')
