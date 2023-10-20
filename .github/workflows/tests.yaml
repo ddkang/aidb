@@ -17,11 +17,7 @@ jobs:
         python-version: 3.8  # Specify the Python version you need
 
     - name: Install dependencies
-      run: pip install -e ../../setup.py
-
-    - name: Show dependencies
-      run: pip list
-
+      run: pip install -r requirements.txt
 
     - name: Run db setup tests
         run: python3 -m tests.tests_db_setup.py
