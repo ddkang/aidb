@@ -18,6 +18,7 @@ jobs:
 
     - name: Install dependencies
       run: pip install -r requirements.txt
+      run: conda install -c pytorch faiss-cpu=1.7.4 mkl=2021 blas=1.0=mkl
 
     - name: Run db setup tests
       run: python3 -m tests.tests_db_setup.py
