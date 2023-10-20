@@ -77,7 +77,7 @@ class HTTPSInferenceService(CachedInferenceService):
         output[self._response_keys_to_columns[k]] = v
       elif len(k) == 1 and k[0] in self._response_keys_to_columns:
         output[self._response_keys_to_columns[k[0]]] = v
-    output = pd.DataFrame([output])
+    return pd.DataFrame([output])
 
 
 
