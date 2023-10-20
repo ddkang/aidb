@@ -41,7 +41,7 @@ class HTTPInferenceService(CachedInferenceService):
     raise NotImplementedError()
   
 
-  def request(self, input: pd.Series) -> Dict:
+  def convert_input_to_request(self, input: pd.Series) -> Dict:
     request = {}
     for k, v in input.to_dict().items():
       if k in self._columns_to_input_keys:
@@ -52,16 +52,16 @@ class HTTPInferenceService(CachedInferenceService):
       for k, v in self._default_args.items():
         if k not in request:
           request[k] = v
-    request_unflatten = unflatten_list(request, self._separator)
+    return unflatten_list(request, self._separator)
 
-    response = requests.post(self._url, json=request_unflatten, headers=self._headers)
+
+  def request(self, request: Dict) -> Dict:
+    response = requests.post(self._url, json=request, headers=self._headers)
     response.raise_for_status()
     return response.json()
 
 
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    response = self.request(input)
-
+  def convert_response_to_output(self, response: Dict) -> pd.DataFrame:
     # some response may be a list of indefinite length
     # but users may want to specify the maximum via _response_keys_to_columns
     response_is_list = isinstance(response, list)
@@ -75,8 +75,15 @@ class HTTPInferenceService(CachedInferenceService):
         k = k[1:] # remove '_' for list
       if k in self._response_keys_to_columns:
         output[self._response_keys_to_columns[k]] = v
-
+      elif len(k) == 1 and k[0] in self._response_keys_to_columns:
+        output[self._response_keys_to_columns[k[0]]] = v
     output = pd.DataFrame([output])
+
+
+
+  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    output = self.convert_response_to_output(self.request(self.convert_input_to_request(input)))
+
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
       output = output.assign(**input)
