@@ -316,7 +316,9 @@ The way to obtain a Google API key is tricky. Please
 
 ## Local inference
 
-We provide example for running [GroundingDINO](https://github.com/continue-revolution/GroundingDINO) locally. Note that the [original repo](https://github.com/IDEA-Research/GroundingDINO) does not support batch inference, but this forked repo does. Since the acceptable input parameters and output formats for different inference API differ drastically, you will need to inherit `CachedInferenceService` and write your own input and output conversion inside `infer_one` and `infer_batch`.
+We provide example for running [GroundingDINO](https://github.com/continue-revolution/GroundingDINO) locally. Note that the [original repo](https://github.com/IDEA-Research/GroundingDINO) does not support batch inference, but this forked repo does. That said, you should make sure that your input images have the same shape if you want to run batch inference.
+
+Since the acceptable input parameters and output formats for different inference API differ drastically, you will need to inherit `CachedInferenceService` and write your own input and output conversion inside `infer_one` and `infer_batch`.
 
 Before running this inference, please
 ```bash
