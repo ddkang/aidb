@@ -2,7 +2,7 @@ from typing import Dict, Union
 
 import subprocess
 
-from aidb.inference.http_inference_service import HTTPInferenceService
+from aidb.inference.examples.https_inference_service import HTTPSInferenceService
 
 
 def get_gcloud_access_token():
@@ -18,7 +18,7 @@ def get_gcloud_access_token():
     return None
 
 
-class GoogleVisionAnnotate(HTTPInferenceService):
+class GoogleVisionAnnotate(HTTPSInferenceService):
   def __init__(
       self,
       token: str=None,

@@ -3,10 +3,10 @@ import os
 import requests
 import pandas as pd
 
-from aidb.inference.http_inference_service import HTTPInferenceService
+from aidb.inference.examples.https_inference_service import HTTPSInferenceService
 
 
-class HuggingFaceNLP(HTTPInferenceService):
+class HuggingFaceNLP(HTTPSInferenceService):
   def __init__(
       self,
       token: str=None,
@@ -32,7 +32,7 @@ class HuggingFaceNLP(HTTPInferenceService):
     )
 
 
-class HuggingFaceVisionAudio(HTTPInferenceService):
+class HuggingFaceVisionAudio(HTTPSInferenceService):
   def __init__(
       self,
       token: str=None,
