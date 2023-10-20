@@ -6,14 +6,15 @@ from aidb.inference.cached_inference_service import CachedInferenceService
 
 class PyTorchLocalDetection(CachedInferenceService):
   def __init__(
-    self,
-    name: str,
-    model_config_path: str,
-    model_checkpoint_path: str,
-    caption: str,
-    use_batch: bool, batch_size: int=0,
-    box_threshold: float=0.35,
-    col_name: str='image',
+      self,
+      name: str,
+      model_config_path: str,
+      model_checkpoint_path: str,
+      caption: str,
+      use_batch: bool,
+      batch_size: int=0,
+      box_threshold: float=0.35,
+      col_name: str='image',
   ):
     super().__init__(name=name, preferred_batch_size=batch_size)
     self._model = Model(model_config_path, model_checkpoint_path)
@@ -23,7 +24,7 @@ class PyTorchLocalDetection(CachedInferenceService):
     self._col_name = col_name
 
 
-  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+  def infer_one(self, input: pd.DataFrame) -> pd.DataFrame:
     image = [input[self._col_name].iloc[0]]
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
