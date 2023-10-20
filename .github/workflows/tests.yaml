@@ -1,0 +1,38 @@
+name: Run Tests
+
+on:
+  push: {}  # Remove the branch restriction to trigger the workflow for any branch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8  # Specify the Python version you need
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run db setup tests
+      run: python3 -m tests.tests_db_setup.py
+
+    - name: Run inference config tests
+      run: python3 -m tests.tests_inference_config_validity.py
+
+    - name: Run query columns test
+      run: python3 -m tests.tests_columns_in_query.py
+
+    - name: Run full scan tests
+      run: python3 -m tests.tests_full_scan_engine.py
+
+    - name: Run limit engine tests
+      run: python3 -m tests.test_limit_engine.py
+
+    - name: Run external tests
+      run: python3 -m external_tests.sqlglot_test.py
