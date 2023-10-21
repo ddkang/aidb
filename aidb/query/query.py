@@ -462,7 +462,7 @@ class Query(object):
 
   @cached_property
   def error_target(self):
-    return self._get_keyword_arg(exp.ErrorTarget)
+    return self._get_keyword_arg(exp.ErrorTarget) / 100.
 
 
   @cached_property

@@ -5,7 +5,7 @@ from aidb.query.query import Query
 valid_avg_sql = '''
 SELECT AVG(bar)
 FROM foo
-ERROR_TARGET 0.01
+ERROR_TARGET 1%
 CONFIDENCE 95;
 '''
 
@@ -13,7 +13,7 @@ CONFIDENCE 95;
 unsupported_agg_aqp_sql = '''
 SELECT MAX(bar)
 FROM foo
-ERROR_TARGET 0.01
+ERROR_TARGET 1%
 CONFIDENCE 95;
 '''
 
@@ -26,7 +26,7 @@ CONFIDENCE 95;
 agg_no_conf_sql = '''
 SELECT AVG(bar)
 FROM foo
-ERROR_TARGET 0.01;
+ERROR_TARGET 1%;
 '''
 
 not_select_sql = '''
