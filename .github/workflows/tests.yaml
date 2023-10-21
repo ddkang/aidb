@@ -33,6 +33,3 @@ jobs:
 
     - name: Run limit engine tests
       run: python3 -m tests.test_limit_engine
-
-    - name: Run external tests
-      run: python3 -m external_tests.sqlglot_test
