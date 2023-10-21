@@ -74,10 +74,10 @@ class HTTPSInferenceService(CachedInferenceService):
       if response_is_list:
         k = k[1:] # remove '_' for list
       if k in self._response_keys_to_columns:
-        output[self._response_keys_to_columns[k]] = v
+        output[self._response_keys_to_columns[k]] = v if isinstance(v, list) else [v]
       elif len(k) == 1 and k[0] in self._response_keys_to_columns:
-        output[self._response_keys_to_columns[k[0]]] = v
-    return pd.DataFrame([output])
+        output[self._response_keys_to_columns[k[0]]] = v if isinstance(v, list) else [v]
+    return pd.DataFrame(output)
 
 
 
