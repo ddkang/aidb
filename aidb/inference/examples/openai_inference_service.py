@@ -2,10 +2,10 @@ from typing import Dict, Union
 
 import os
 
-from aidb.inference.examples.https_inference_service import HTTPSInferenceService
+from aidb.inference.http_inference_service import HTTPInferenceService
 
 
-class OpenAIAudio(HTTPSInferenceService):
+class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
       token: str=None,
@@ -35,7 +35,7 @@ class OpenAIAudio(HTTPSInferenceService):
     )
 
 
-class OpenAIImage(HTTPSInferenceService):
+class OpenAIImage(HTTPInferenceService):
   def __init__(
       self, 
       token: str=None, 
@@ -67,7 +67,7 @@ class OpenAIImage(HTTPSInferenceService):
     )
 
 
-class OpenAIText(HTTPSInferenceService):
+class OpenAIText(HTTPInferenceService):
   def __init__(
       self, 
       token: str=None,

@@ -1,5 +1,4 @@
 import os
-import time
 import unittest
 
 from unittest import IsolatedAsyncioTestCase
@@ -24,7 +23,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
-    time.sleep(3)
+
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
 
     register_inference_services(aidb_engine, data_dir)

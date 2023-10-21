@@ -85,7 +85,7 @@ class TastiTests():
 
 
   def test(self):
-    representative_blob_ids = self.tasti.get_representative_vector_ids()
+    representative_blob_ids = self.tasti.get_representative_blob_ids()
     print('The shape of cluster representative ids', representative_blob_ids.shape)
     # get culster representatives ids
     print(representative_blob_ids)
@@ -96,7 +96,7 @@ class TastiTests():
 
     # Chroma uses HNSW, which will not return exact search result
     if self.vd_type == VectorDatabaseType.FAISS.value:
-      for representative_id in list(representative_blob_ids):
+      for representative_id in list(representative_blob_ids['id']):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
 
     new_data, new_blob_ids = self.simulate_user_inserting_new_data(self.data_size)
