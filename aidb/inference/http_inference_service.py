@@ -1,4 +1,4 @@
-from flatten_json import flatten, unflatten_list
+import json
 from typing import Dict, List, Tuple, Union
 
 import pandas as pd
@@ -13,11 +13,10 @@ class HTTPInferenceService(CachedInferenceService):
       *args,
       url: str=None,
       headers: Union[Dict, None]=None,
-      default_args: Union[Dict, None]=None,
       copy_input: bool=True,
       batch_supported: bool=False,
-      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
-      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      columns_to_input_keys: Union[Dict, None] = None,
+      response_keys_to_columns: Union[Dict, None]=None,
       **kwargs
   ):
     '''
@@ -29,54 +28,26 @@ class HTTPInferenceService(CachedInferenceService):
     super().__init__(*args, **kwargs)
     self._url = url
     self._headers = headers
-    self._default_args = default_args
     self._copy_input = copy_input
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
-    self._separator = '.'
 
 
   def signature(self) -> Tuple[List, List]:
     raise NotImplementedError()
-  
-
-  def request(self, input: pd.Series) -> Dict:
-    request = {}
-    for k, v in input.to_dict().items():
-      if k in self._columns_to_input_keys:
-        key = self._columns_to_input_keys[k]
-        key = self._separator.join(key) if isinstance(key, tuple) else key
-        request[key] = v
-    if self._default_args is not None:
-      for k, v in self._default_args.items():
-        if k not in request:
-          request[k] = v
-    request_unflatten = unflatten_list(request, self._separator)
-
-    response = requests.post(self._url, json=request_unflatten, headers=self._headers)
-    response.raise_for_status()
-    return response.json()
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    response = self.request(input)
-
-    # some response may be a list of indefinite length
-    # but users may want to specify the maximum via _response_keys_to_columns
-    response_is_list = isinstance(response, list)
-    if response_is_list:
-      response = {'_': response} # only hf returns a list
-    response_flatten = flatten(response, self._separator)
-    output = {}
-    for k, v in response_flatten.items():
-      k = tuple(k.split(self._separator))
-      if response_is_list:
-        k = k[1:] # remove '_' for list
-      if k in self._response_keys_to_columns:
-        output[self._response_keys_to_columns[k]] = v
-
-    output = pd.DataFrame([output])
+    # Turns the input into a list
+    input_with_keys_required_by_inference_service = {}
+    for k, v in input.to_dict().items():
+      input_with_keys_required_by_inference_service[self._columns_to_input_keys[k]] = v
+    response = requests.post(self._url, json=input_with_keys_required_by_inference_service, headers=self._headers)
+    response.raise_for_status()
+    response = response.json()
+    output = pd.DataFrame(response)
+    output = output.replace(self._response_keys_to_columns)
     # TODO: is this correct for zero or 2+ outputs?
     if self._copy_input:
       output = output.assign(**input)
