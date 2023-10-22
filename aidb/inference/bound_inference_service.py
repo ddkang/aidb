@@ -164,7 +164,17 @@ class CachedBoundInferenceService(BoundInferenceService):
             continue
           # FIXME: figure out where to put the column renaming
           for idx, col in enumerate(self.binding.output_columns):
-            row_results.rename(columns={row_results.columns[idx]: col}, inplace=True)
+            if col not in row_results.columns:
+              tbl, col_n = col.split('.')
+              for c in row_results.columns:
+                if c.split('.')[1] == col_n:
+                  row_results.rename(columns={c: col}, inplace=True)
+                  break
+
+          try:
+            row_results = row_results[list(self.binding.output_columns)]
+          except:
+            raise Exception("Column binding column not found in the inference results")
 
           tables = self.get_tables(self.binding.output_columns)
           for table in tables:

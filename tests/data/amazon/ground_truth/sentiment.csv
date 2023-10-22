@@ -1,1 +1,1 @@
-pk_blobs00.review_id,sentiment.label,sentiment.score
+pk_blobs00.review_id,pk_sentiment.label,sentiment.score

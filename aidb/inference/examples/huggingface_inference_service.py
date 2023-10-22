@@ -14,6 +14,7 @@ class HuggingFaceNLP(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      copy_input: bool=False,
       model: str=None):
     if token is None:
       token = os.environ['HF_API_KEY']
@@ -25,7 +26,7 @@ class HuggingFaceNLP(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=False,
+      copy_input=copy_input,
       batch_supported=False,
       is_single=False,
       columns_to_input_keys=columns_to_input_keys,
