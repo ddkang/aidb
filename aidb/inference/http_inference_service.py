@@ -83,11 +83,13 @@ class HTTPInferenceService(CachedInferenceService):
         key = self._columns_to_input_keys[k]
         key = self._separator.join(key) if isinstance(key, tuple) else key
         request[key] = v
+    request = unflatten_list(request, self._separator)
     if self._default_args is not None:
+      # FIXME: assume that request is a dict
       for k, v in self._default_args.items():
         if k not in request:
           request[k] = v
-    return unflatten_list(request, self._separator)
+    return request
 
 
   def request(self, request: Dict) -> Dict:
