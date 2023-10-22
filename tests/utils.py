@@ -29,3 +29,20 @@ async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index=None, blob_mapp
     tasti_index=tasti_index
   )
   return gt_engine, engine
+
+
+def command_line_utility(engine: Engine):
+  with open('/home/akash/Documents/aidb-new/assets/welcome.txt', 'r') as content_file:
+    content = content_file.read()
+    print(content)
+  print("Query AIDB using SQL....\n")
+  while True:
+    query = input(">>>")
+    if query.strip() == "exit":
+      return
+    else:
+      try:
+        results = engine.execute(query)
+        print(results)
+      except Exception as e:
+        print(e)

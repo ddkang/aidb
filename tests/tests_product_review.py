@@ -5,7 +5,7 @@ from aidb.engine import Engine
 from aidb.config.config_types import InferenceBinding
 import os
 
-from tests.utils import setup_aidb_engine
+from tests.utils import setup_aidb_engine, command_line_utility
 
 hf_key = "<Your API Key>"
 
@@ -38,3 +38,4 @@ if __name__ == '__main__':
   aidb_engine.bind_inference_service("sentiment_classification",
                                      InferenceBinding(("blobs00.review_id", "blobs00.review"),
                                                       ("sentiment.review_id", "sentiment.label", "sentiment.score")))
+  command_line_utility(aidb_engine)
