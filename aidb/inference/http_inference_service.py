@@ -67,7 +67,7 @@ class HTTPInferenceService(CachedInferenceService):
     # but users may want to specify the maximum via _response_keys_to_columns
     output = {v: [] for v in self._response_keys_to_columns.values()}
     for k, v in self._response_keys_to_columns.items():
-      if isinstance(k, str):
+      if not isinstance(k, tuple):
         k = (k,)
       retrieved = True
       response_copy = response.copy()
@@ -102,7 +102,6 @@ class HTTPInferenceService(CachedInferenceService):
         output[v] = response_copy
     if not any(isinstance(value, list) for value in output.values()):
       output = {k: [v] for k, v in output.items()}
-    print(output)
     return pd.DataFrame(output)
 
 
