@@ -56,9 +56,12 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
     )
 
 
-  def request(self, input: pd.Series) -> Dict:
-    filename = input['filename']
-    with open(filename, 'rb') as f:
+  def convert_input_to_request(self, input: pd.Series) -> Dict:
+    return input.to_dict()
+
+
+  def request(self, request: Dict) -> Dict:
+    with open(request['filename'], 'rb') as f:
       response = requests.post(self._url, data=f, headers=self._headers)
     response.raise_for_status()
     return response.json()
