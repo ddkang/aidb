@@ -1,13 +1,40 @@
-import pandas as pd
+import asyncio
+
 from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
+from aidb.engine import Engine
+from aidb.config.config_types import InferenceBinding
+import os
 
-hf_key = "<Your API KEY>"
+from tests.utils import setup_aidb_engine
 
-hf_nlp = HuggingFaceNLP(
-  token=hf_key,
-  columns_to_input_keys={'inputs': 'inputs'},
-  response_keys_to_columns={('0', '0', 'label', ): 'label', ('0', '0', 'score'): 'score'},
-  model="LiYuan/amazon-review-sentiment-analysis")
+hf_key = "<Your API Key>"
 
-hf_nlp_response_pd = hf_nlp.infer_one(pd.Series({"inputs": "this product is good"}))
-print(hf_nlp_response_pd)
+DB_URL = "sqlite+aiosqlite://"
+DB_NAME = 'aidb_test_amazon.sqlite'
+
+
+async def one_time_aidb_setup():
+  dirname = os.path.dirname(__file__)
+  data_dir = os.path.join(dirname, 'data/amazon')
+  await setup_aidb_engine(DB_URL, DB_NAME, data_dir)
+
+
+if __name__ == '__main__':
+  asyncio.run(one_time_aidb_setup())
+
+  aidb_engine = Engine(
+    f'{DB_URL}/{DB_NAME}',
+    debug=False,
+  )
+
+  sentiment_classification = HuggingFaceNLP(
+    name="sentiment_classification",
+    token=hf_key,
+    columns_to_input_keys={'review': 'inputs'},
+    response_keys_to_columns={('0', '0', 'label',): 'label', ('0', '0', 'score'): 'score'},
+    model="LiYuan/amazon-review-sentiment-analysis")
+
+  aidb_engine.register_inference_service(sentiment_classification)
+  aidb_engine.bind_inference_service("sentiment_classification",
+                                     InferenceBinding(("blobs00.review_id", "blobs00.review"),
+                                                      ("sentiment.review_id", "sentiment.label", "sentiment.score")))

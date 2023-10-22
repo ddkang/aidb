@@ -9,6 +9,7 @@ from aidb.inference.http_inference_service import HTTPInferenceService
 class HuggingFaceNLP(HTTPInferenceService):
   def __init__(
       self,
+      name: str="huggingface_nlp",
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -17,7 +18,7 @@ class HuggingFaceNLP(HTTPInferenceService):
     if token is None:
       token = os.environ['HF_API_KEY']
     super().__init__(
-      name='huggingface_nlp',
+      name=name,
       url=f'https://api-inference.huggingface.co/models/{model}',
       headers={
         'Content-Type': 'application/json; charset=utf-8',

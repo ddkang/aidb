@@ -14,10 +14,10 @@ class DbSetupTests(IsolatedAsyncioTestCase):
 
   async def test_positive(self):
     dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/jackson')
+    data_dir = os.path.join(dirname, 'data/amazon')
 
     # Set up the aidb database
-    aidb_db_fname = 'aidb_test.sqlite'
+    aidb_db_fname = 'aidb_test_amazon.sqlite'
     await create_db(DB_URL, aidb_db_fname)
 
     tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
