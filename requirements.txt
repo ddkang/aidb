@@ -40,3 +40,5 @@ tzdata==2023.3
 urllib3==2.0.4
 uvicorn==0.23.2
 weaviate-client==3.24.1
+flatten-json==0.1.13
+
