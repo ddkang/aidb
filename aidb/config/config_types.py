@@ -7,6 +7,9 @@ import networkx as nx
 import sqlalchemy
 
 
+AIDBListType = type('AIDBListType', (), {})
+
+
 # TODO: Unclear if there's a way to do this with sqlalchemy types
 class ColumnType(Enum):
   Integer = 'int'

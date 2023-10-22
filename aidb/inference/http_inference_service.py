@@ -1,9 +1,10 @@
-from flatten_json import flatten, unflatten_list
+from flatten_json import unflatten_list
 from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 import requests
 
+from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
 
 
@@ -64,19 +65,44 @@ class HTTPInferenceService(CachedInferenceService):
   def convert_response_to_output(self, response: Dict) -> pd.DataFrame:
     # some response may be a list of indefinite length
     # but users may want to specify the maximum via _response_keys_to_columns
-    response_is_list = isinstance(response, list)
-    if response_is_list:
-      response = {'_': response} # only hf returns a list
-    response_flatten = flatten(response, self._separator)
-    output = {}
-    for k, v in response_flatten.items():
-      k = tuple(k.split(self._separator))
-      if response_is_list:
-        k = k[1:] # remove '_' for list
-      if k in self._response_keys_to_columns:
-        output[self._response_keys_to_columns[k]] = v if isinstance(v, list) else [v]
-      elif len(k) == 1 and k[0] in self._response_keys_to_columns:
-        output[self._response_keys_to_columns[k[0]]] = v if isinstance(v, list) else [v]
+    output = {v: [] for v in self._response_keys_to_columns.values()}
+    for k, v in self._response_keys_to_columns.items():
+      if isinstance(k, str):
+        k = (k,)
+      retrieved = True
+      response_copy = response.copy()
+      for key in k:
+        if isinstance(key, AIDBListType):
+          if isinstance(response_copy, list):
+            continue
+          else:
+            retrieved = False
+            break
+        else: # isinstance(key, str)
+          if isinstance(key, str) and key.isnumeric(): # single instance in list
+            key = int(key)
+          if isinstance(response_copy, dict):
+            if key in response_copy:
+              response_copy = response_copy[key]
+            else:
+              retrieved = False
+              break
+          else: # isinstance(response_copy, list)
+            new_response_copy = []
+            for r in response_copy:
+              if key in r:
+                new_response_copy.append(r[key])
+            if len(new_response_copy) == 0:
+              retrieved = False
+              break
+            else:
+              response_copy = new_response_copy
+
+      if retrieved:
+        output[v] = response_copy
+    if not any(isinstance(value, list) for value in output.values()):
+      output = {k: [v] for k, v in output.items()}
+    print(output)
     return pd.DataFrame(output)
 
 
