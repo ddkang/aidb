@@ -1,5 +1,7 @@
 # Example Inference Services 
 
+## Remote API
+
 You will need to specify the mapping from the AIDB input columns to the JSON input format and the mapping from the JSON output format to the AIDB output columns. In order to nest fields in the JSON, you will need to use a tuple. In the case of a flat JSON, you can simply use strings as keys.
 
 As an example, if you have AIDB input columns like this:
@@ -51,9 +53,9 @@ If you do not provide token during initialization, AIDB will find token from env
 | --- | --- | --- |
 | `OPENAI_API_KEY` | `HF_API_KEY` | `gcloud auth application-default print-access-token` |
 
-## OpenAI
+### OpenAI
 
-### [Chat](https://platform.openai.com/docs/api-reference/chat)
+#### [Chat](https://platform.openai.com/docs/api-reference/chat)
 
 Please refer to [Request body](https://platform.openai.com/docs/api-reference/chat/create) and [The chat completion object](https://platform.openai.com/docs/api-reference/chat/object) for dataframe <-> json key map. OpenAI will only respond to one `messages`, so please only input 1 column. 
 
@@ -107,7 +109,7 @@ Response:
 | 0  | chatcmpl-88fEubFsO7GN2st9FWaLq64zKEQpI | chat.completion | 1697075840 | gpt-3.5-turbo-0613 | 0 | assistant | Yes, I am familiar with Google Cloud Vision API. It is a machine learning based image analysis tool provided by Google Cloud Platform. It allows developers to easily integrate image recognition, object detection, and image understanding capabilities into their applications by using pre-trained models. The API can be used to identify objects, faces, and text in images, as well as detect explicit content and perform image sentiment analysis. | stop | 1 | assistant | Yes, I am familiar with Google Cloud Vision API. It is a machine learning service provided by Google Cloud that allows users to analyze and understand the content of images. It can detect objects, faces, and text, as well as perform image sentiment analysis, logo detection, and image landmark recognition among other features. The API provides a RESTful interface for developers to integrate image analysis capabilities into their applications. | stop |
 
 
-### [Images](https://platform.openai.com/docs/api-reference/images)
+#### [Images](https://platform.openai.com/docs/api-reference/images)
 
 We support [Create image](https://platform.openai.com/docs/api-reference/images/create), [Create image edit](https://platform.openai.com/docs/api-reference/images/createEdit) and [Create image variation](https://platform.openai.com/docs/api-reference/images/createVariation). Please refer to the corresponding request body for dataframe <-> json key map.
 
@@ -150,9 +152,9 @@ Response:
 |0|	1697076329|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-9ycIx6ZG6T68IYV12wXNlZhd.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=dyzFdHArfGMq%2B6hxHPQ5vhzQdpN3On5JkOag8cXmwXA%3D	| https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-AjvmDySJANPAc4Huviconivv.png?st=2023-10-12T01%3A05%3A29Z&se=2023-10-12T03%3A05%3A29Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-12T01%3A58%3A02Z&ske=2023-10-13T01%3A58%3A02Z&sks=b&skv=2021-08-06&sig=oSB/BJM2u70ITy%2B6jjsbNHehBlYcQD9nzwotT9uQIjE%3D |
 
 
-## HuggingFace
+### HuggingFace
 
-### [NLP](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing)
+#### [NLP](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing)
 
 All HuggingFace NLP tasks are supported. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#natural-language-processing) for detailed meaning of each parameters and dataframe <-> json key map.
 
@@ -179,7 +181,7 @@ Response (this response is fake):
 | --- | --- |
 | 0	| Stanford PhD student Lvmin Zhang has created an elegant, non-nucleic acid that provides a direct replacement for the polyisopentocine and tritunocine monomers found in the A1, A2 and B1 |
 
-### [CV](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision)
+#### [CV](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision)
 
 All HuggingFace CV tasks are supported and they only accept filename as input. You do not need to provide a key map from input to request JSON because request is a binary. The response JSON could be a list of indefinite length. Please refer to [doc](https://huggingface.co/docs/api-inference/detailed_parameters#computer-vision) for detailed meaning of each parameters and response json -> output dataframe map.
 
@@ -241,7 +243,7 @@ Response:
 | 0 | 0.998632 | tie     | 214        | 254        | 254        | 426        | 0.997547 | person  | 50         | 26         | 511        | 509        |
 
 
-## Google
+### Google
 We support [files.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/files/annotate) and [images.annotate](https://cloud.google.com/vision/docs/reference/rest/v1/images/annotate). Please visit [AnnotateFileRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateFileRequest) or [AnnotateImageRequest](https://cloud.google.com/vision/docs/reference/rest/v1/AnnotateImageRequest) for input dataframe -> request json map.
 
 To convert response json to output dataframe, please refer to [BatchAnnotateFilesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateFilesResponse) or [BatchAnnotateImagesResponse](https://cloud.google.com/vision/docs/reference/rest/v1/BatchAnnotateImagesResponse).
@@ -311,3 +313,46 @@ The way to obtain a Google API key is tricky. Please
     gcloud auth application-default print-access-token
     ```
     in your terminal. You may need additional steps as prompted.
+
+## Local inference
+
+We provide example for running [GroundingDINO](https://github.com/continue-revolution/GroundingDINO) locally. Note that the [original repo](https://github.com/IDEA-Research/GroundingDINO) does not support batch inference, but this forked repo does. That said, you should make sure that your input images have the same shape if you want to run batch inference.
+
+Since the acceptable input parameters and output formats for different inference API differ drastically, you will need to inherit `CachedInferenceService` and write your own input and output conversion inside `infer_one` and `infer_batch`.
+
+Before running this inference, please
+```bash
+git clone https://github.com/continue-revolution/GroundingDINO
+cd GroundingDINO
+pip install -e .
+```
+
+Example usage:
+```python
+from aidb.inference.example.pytorch_local_inference import PyTorchLocalDetection
+groundingdino = PyTorchLocalDetection(
+  name='groundingdino',
+  model_config_path='path/to/GroundingDINO_SwinT_OGC.py',
+  model_checkpoint_path='path/to/groundingdino_swint_ogc.pth',
+  caption='your caption',
+  use_batch=True,
+  batch_size=16,
+  col_name='image',)
+outputs = groundingdino.infer_batch(inputs)
+```
+
+Input dataframe:
+|  | image |
+|---|---|
+| 0 | /path/to/image1.jpg |
+| 1 | /path/to/image2.jpg |
+| 2 | /path/to/image3.jpg |
+
+Output dataframe:
+||image|	min_x|	min_y|	max_x|	max_y|	confidence|
+|---|---|---|---|---|---|---|
+|0|	/path/to/image1.jpg|	438.916321|	5.441467	|1676.187744|	1076.021484|	0.865207|
+|1|	/path/to/iamge2.jpg|	632.179443|	111.547821|1376.579102|	1075.546387|	0.787911|
+|2|	/path/to/image3.jpg|	538.856323|	40.356171	|1008.120850|	681.444580|	0.505632|
+|3|	/path/to/image3.jpg|	539.465942|	40.187408	|1066.772583|	881.556763|	0.402371|
+
