@@ -1,3 +1,5 @@
+import time
+
 from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
 from aidb.engine import Engine
 
@@ -41,8 +43,14 @@ def command_line_utility(engine: Engine):
     if query.strip() == "exit":
       return
     else:
+      while query.strip()[-1] != ';':
+        q = input("")
+        query += f" {q.strip()}"
       try:
+        start_time = time.time()
         results = engine.execute(query)
+        end_time = time.time()
+        print(f"Query Execution Time = {int((end_time - start_time)*100)}")
         print(results)
       except Exception as e:
         print(e)
