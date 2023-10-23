@@ -33,12 +33,11 @@ class CachedBoundInferenceService(BoundInferenceService):
   _tables: Dict[str, Table]
   _dialect: str
 
-
   def convert_column_name(self, column_name: str):
     return column_name.replace('.', '__')
 
-
   def __post_init__(self):
+    self.count_inference = 0
     self._cache_table_name = cache_table_name_from_inputs(self.service.name, self.binding.input_columns)
     logger.debug('Cache table name', self._cache_table_name)
 
@@ -72,7 +71,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         metadata.create_all(conn)
 
       return table, columns
-    
+
     async def tmp():
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
@@ -93,7 +92,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     self._cache_query_stub = sqlalchemy.sql.select(self._cache_columns)
 
     output_cols = [
-       self._columns[col_name]
+      self._columns[col_name]
       for col_name in self.binding.output_columns
     ]
     output_tables = list(set([str(col.table) for col in output_cols]))
@@ -102,7 +101,6 @@ class CachedBoundInferenceService(BoundInferenceService):
     for table in output_tables[1:]:
       joined = joined.join(table)
     self._result_query_stub = sqlalchemy.sql.select(output_cols)
-
 
   def get_insert(self):
     dialect = self._dialect
@@ -115,7 +113,6 @@ class CachedBoundInferenceService(BoundInferenceService):
     else:
       raise NotImplementedError(f'Unknown dialect {dialect}')
 
-
   def get_tables(self, columns: List[str]) -> List[str]:
     tables = set()
     for col in columns:
@@ -123,6 +120,12 @@ class CachedBoundInferenceService(BoundInferenceService):
       tables.add(table_name)
     return list(tables)
 
+  async def _insert_in_cache_table(self, row, conn):
+    input_dic = {}
+    for col in self.binding.input_columns:
+      input_dic[self.convert_column_name(col)] = getattr(row, col)
+    insert = self.get_insert()(self._cache_table).values(**input_dic)
+    await conn.execute(insert)
 
   async def infer(self, inputs: pd.DataFrame):
     # FIXME: figure out where to put the column renaming
@@ -148,23 +151,37 @@ class CachedBoundInferenceService(BoundInferenceService):
     # - Batch the inserts for new data
     # - Batch the selection for cached results... How to do this?
     async with self._engine.begin() as conn:
-      for idx, (_, row) in enumerate(inputs.iterrows()):
+      for idx, (_, inp_row) in enumerate(inputs.iterrows()):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(row, col) for col in self.binding.input_columns]
+              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(inp_row, col) for col in
+                self.binding.input_columns]
             )
           )
           df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
           results.append(df)
         else:
-          row_results = self.service.infer_one(row)
+          row_results = self.service.infer_one(inp_row)
+          self.count_inference += 1
+
           if len(row_results) == 0:
             results.append(row_results)
             continue
+
           # FIXME: figure out where to put the column renaming
           for idx, col in enumerate(self.binding.output_columns):
-            row_results.rename(columns={row_results.columns[idx]: col}, inplace=True)
+            if col not in row_results.columns:
+              tbl, col_n = col.split('.')
+              for c in row_results.columns:
+                if c.split('.')[1] == col_n:
+                  row_results.rename(columns={c: col}, inplace=True)
+                  break
+
+          try:
+            row_results = row_results[list(self.binding.output_columns)]
+          except:
+            raise Exception("Column binding column not found in the inference results")
 
           tables = self.get_tables(self.binding.output_columns)
           for table in tables:
@@ -211,10 +228,11 @@ class CachedBoundInferenceService(BoundInferenceService):
 
             if self._dialect != "sqlite":
               await conn.execute(insert)
+
+          await self._insert_in_cache_table(inp_row, conn)
           results.append(row_results)
 
     return results
-
 
   def __hash__(self):
     return super().__hash__()
