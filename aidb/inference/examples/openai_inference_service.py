@@ -8,6 +8,7 @@ from aidb.inference.http_inference_service import HTTPInferenceService
 class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
+      name: str='openai_audio',
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -20,7 +21,7 @@ class OpenAIAudio(HTTPInferenceService):
     if token is None:
       token = os.environ['OPENAI_API_KEY']
     super().__init__(
-      name='openai_audio',
+      name=name,
       url=f'https://api.openai.com/v1/audio/{infer_type}',
       headers={
         'Content-Type': 'application/json',
@@ -37,7 +38,8 @@ class OpenAIAudio(HTTPInferenceService):
 
 class OpenAIImage(HTTPInferenceService):
   def __init__(
-      self, 
+      self,
+      name='openai_image', 
       token: str=None, 
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -52,7 +54,7 @@ class OpenAIImage(HTTPInferenceService):
     if token is None:
       token = os.environ['OPENAI_API_KEY']
     super().__init__(
-      name='openai_image',
+      name=name,
       url=f'https://api.openai.com/v1/images/{infer_type}',
       headers={
         'Content-Type': 'application/json',
@@ -69,7 +71,8 @@ class OpenAIImage(HTTPInferenceService):
 
 class OpenAIText(HTTPInferenceService):
   def __init__(
-      self, 
+      self,
+      name: str='openai_text',
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -78,7 +81,7 @@ class OpenAIText(HTTPInferenceService):
     if token is None:
       token = os.environ['OPENAI_API_KEY']
     super().__init__(
-      name='openai_text',
+      name=name,
       url='https://api.openai.com/v1/chat/completions',
       headers={
         'Content-Type': 'application/json',
