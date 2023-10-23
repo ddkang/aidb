@@ -33,11 +33,12 @@ class CachedBoundInferenceService(BoundInferenceService):
   _tables: Dict[str, Table]
   _dialect: str
 
+
   def convert_column_name(self, column_name: str):
     return column_name.replace('.', '__')
 
+
   def __post_init__(self):
-    self.count_inference = 0
     self._cache_table_name = cache_table_name_from_inputs(self.service.name, self.binding.input_columns)
     logger.debug('Cache table name', self._cache_table_name)
 
@@ -72,6 +73,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
       return table, columns
 
+
     async def tmp():
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
@@ -92,7 +94,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     self._cache_query_stub = sqlalchemy.sql.select(self._cache_columns)
 
     output_cols = [
-      self._columns[col_name]
+       self._columns[col_name]
       for col_name in self.binding.output_columns
     ]
     output_tables = list(set([str(col.table) for col in output_cols]))
@@ -101,6 +103,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     for table in output_tables[1:]:
       joined = joined.join(table)
     self._result_query_stub = sqlalchemy.sql.select(output_cols)
+
 
   def get_insert(self):
     dialect = self._dialect
@@ -113,6 +116,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     else:
       raise NotImplementedError(f'Unknown dialect {dialect}')
 
+
   def get_tables(self, columns: List[str]) -> List[str]:
     tables = set()
     for col in columns:
@@ -120,12 +124,14 @@ class CachedBoundInferenceService(BoundInferenceService):
       tables.add(table_name)
     return list(tables)
 
+
   async def _insert_in_cache_table(self, row, conn):
     input_dic = {}
     for col in self.binding.input_columns:
       input_dic[self.convert_column_name(col)] = getattr(row, col)
     insert = self.get_insert()(self._cache_table).values(**input_dic)
     await conn.execute(insert)
+
 
   async def infer(self, inputs: pd.DataFrame):
     # FIXME: figure out where to put the column renaming
@@ -163,7 +169,6 @@ class CachedBoundInferenceService(BoundInferenceService):
           results.append(df)
         else:
           row_results = self.service.infer_one(inp_row)
-          self.count_inference += 1
 
           if len(row_results) == 0:
             results.append(row_results)
@@ -233,6 +238,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           results.append(row_results)
 
     return results
+
 
   def __hash__(self):
     return super().__hash__()
