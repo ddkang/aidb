@@ -8,7 +8,9 @@ from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
 
 
-def convert_response_to_output(response, _response_keys_to_columns):
+def convert_response_to_output(
+    response: Union[Dict, List],
+    _response_keys_to_columns: Dict[Union[str, tuple], str]) -> Dict:
   output = {v: [] for v in _response_keys_to_columns.values()}
   for k, v in _response_keys_to_columns.items():
     if not isinstance(k, tuple):
@@ -81,14 +83,22 @@ class HTTPInferenceService(CachedInferenceService):
     for k, v in input.to_dict().items():
       if k in self._columns_to_input_keys:
         key = self._columns_to_input_keys[k]
-        key = self._separator.join(key) if isinstance(key, tuple) else key
+        if isinstance(key, tuple):
+          key = tuple(str(_k) for _k in key)
+          key = self._separator.join(key)
         request[key] = v
     request = unflatten_list(request, self._separator)
     if self._default_args is not None:
-      # FIXME: assume that request is a dict
-      for k, v in self._default_args.items():
-        if k not in request:
-          request[k] = v
+      if isinstance(request, dict):
+        for k, v in self._default_args.items():
+          if k not in request:
+            request[k] = v
+      else: # isinstance(request, list)
+        for r in request:
+          if isinstance(r, dict):
+            for k, v in self._default_args.items():
+              if k not in r:
+                r[k] = v
     return request
 
 
