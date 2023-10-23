@@ -16,10 +16,10 @@ from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
 
 def is_aqp_exp(node):
   return isinstance(node, exp.ErrorTarget) \
-      or isinstance(node, exp.RecallTarget) \
-      or isinstance(node, exp.PrecisionTarget) \
-      or isinstance(node, exp.Confidence) \
-      or isinstance(node, exp.Budget)
+    or isinstance(node, exp.RecallTarget) \
+    or isinstance(node, exp.PrecisionTarget) \
+    or isinstance(node, exp.Confidence) \
+    or isinstance(node, exp.Budget)
 
 
 def _remove_aqp(node):
@@ -37,21 +37,17 @@ class Query(object):
   sql_str: str
   config: Config
 
-
   @cached_property
   def _tokens(self):
     return Tokenizer().tokenize(self.sql_str)
-
 
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
 
-
   @cached_property
   def sql_query_text(self):
     return self.base_sql_no_aqp.sql()
-
 
   @cached_property
   def base_sql_no_aqp(self):
@@ -59,7 +55,6 @@ class Query(object):
     if _exp_no_aqp is None:
       raise Exception('SQL contains no non-AQP statements')
     return _exp_no_aqp
-
 
   @cached_property
   def _tables(self) -> Dict[str, Dict[str, str]]:
@@ -72,7 +67,6 @@ class Query(object):
       for column in table.columns:
         _tables[table_name][column.name] = column.type
     return _tables
-
 
   @cached_property
   def table_name_to_aliases(self):
@@ -99,12 +93,10 @@ class Query(object):
             table_alias[str.lower(tbl_name)] = str.lower(tbl_alias)
     return table_alias
 
-
   @cached_property
   def table_aliases_to_name(self):
     table_name_to_alias = self.table_name_to_aliases
     return {v: k for k, v in table_name_to_alias.items()}
-
 
   @cached_property
   def tables_in_query(self):
@@ -114,15 +106,12 @@ class Query(object):
         table_list.add(node.args["this"].args["this"])
     return table_list
 
-
   def get_expression(self):
     return self._expression
-
 
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
     return predicate_name
-
 
   def _get_sympify_form(self, node, predicate_count, predicate_mappings):
     if node is None:
@@ -148,12 +137,12 @@ class Query(object):
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
       return f"({e1} | {e2})", p2
     elif isinstance(node, exp.GT) or \
-            isinstance(node, exp.LT) or \
-            isinstance(node, exp.GTE) or \
-            isinstance(node, exp.LTE) or \
-            isinstance(node, exp.EQ) or \
-            isinstance(node, exp.Like) or \
-            isinstance(node, exp.NEQ):
+        isinstance(node, exp.LT) or \
+        isinstance(node, exp.GTE) or \
+        isinstance(node, exp.LTE) or \
+        isinstance(node, exp.EQ) or \
+        isinstance(node, exp.Like) or \
+        isinstance(node, exp.NEQ):
       # TODO: chained comparison operators not supported
       assert "this" in node.args and "expression" in node.args
       predicate_name = self._get_predicate_name(predicate_count)
@@ -162,13 +151,11 @@ class Query(object):
     else:
       raise NotImplementedError
 
-
   def _get_original_predicate(self, predicate_name, predicate_mappings) -> FilteringPredicate:
     if predicate_name[0] == "~":
       return FilteringPredicate(True, predicate_mappings[predicate_name[1:]])
     else:
       return FilteringPredicate(False, predicate_mappings[predicate_name])
-
 
   def _get_or_clause_representation(self, or_expression, predicate_mappings) -> List[FilteringPredicate]:
     connected_by_ors = list(or_expression.args)
@@ -179,7 +166,6 @@ class Query(object):
       for s in connected_by_ors:
         predicates_in_ors.append(self._get_original_predicate(str(s), predicate_mappings))
     return predicates_in_ors
-
 
   def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
     List[FilteringPredicate]]:
@@ -192,7 +178,6 @@ class Query(object):
       connected_by_ors = self._get_or_clause_representation(or_expression, predicate_mappings)
       or_expressions_connected_by_ands_repr.append(connected_by_ors)
     return or_expressions_connected_by_ands_repr
-
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
@@ -261,7 +246,6 @@ class Query(object):
     else:
       return []
 
-
   def _get_table_of_column(self, col_name):
     tables_of_column = []
     for table in self.tables_in_query:
@@ -273,7 +257,6 @@ class Query(object):
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
       return tables_of_column[0]
-
 
   def _get_normalized_col_name_from_col_exp(self, node):
     """
@@ -289,7 +272,6 @@ class Query(object):
     else:
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
-
 
   @cached_property
   def inference_engines_required_for_filtering_predicates(self):
@@ -315,7 +297,6 @@ class Query(object):
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
 
-
   @cached_property
   def tables_in_filtering_predicates(self):
     """
@@ -337,7 +318,6 @@ class Query(object):
           tables_required.add(originated_from.split('.')[0])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
-
 
   def _get_columns_in_expression_tree(self, exp_tree):
     '''
@@ -367,7 +347,6 @@ class Query(object):
           raise Exception('Unsupported column type')
     return column_set, exp_wise_columns
 
-
   @cached_property
   def columns_in_query(self):
     """
@@ -375,7 +354,6 @@ class Query(object):
     * is supported
     """
     return self._get_columns_in_expression_tree(self._expression)[0]
-
 
   # Get aggregation types with columns corresponding
   @cached_property
@@ -401,11 +379,9 @@ class Query(object):
         agg_type_with_cols.append((exp.Sum, columns_in_expression))
     return agg_type_with_cols
 
-
   @cached_property
   def is_approx_agg_query(self):
     return True if self.aggregated_columns_and_types and self.validate_aqp() else False
-
 
   @cached_property
   def inference_engines_required_for_query(self):
@@ -432,7 +408,6 @@ class Query(object):
 
     return list(inference_engines_required)
 
-
   def _get_keyword_arg(self, exp_type):
     value = None
     for node, _, key in self._expression.walk():
@@ -443,45 +418,40 @@ class Query(object):
           value = float(node.args['this'].args['this'])
     return value
 
-
   @cached_property
   def limit_cardinality(self):
     return self._get_keyword_arg(exp.Limit)
-
 
   def is_limit_query(self):
     if self.limit_cardinality is None:
       return False
     return True
 
-
   @cached_property
   def offset_number(self):
     return self._get_keyword_arg(exp.Offset)
 
-
   @cached_property
   def error_target(self):
-    return self._get_keyword_arg(exp.ErrorTarget) / 100.
-
+    err_target = self._get_keyword_arg(exp.ErrorTarget)
+    return err_target / 100. if err_target is not None else err_target
 
   @cached_property
   def confidence(self):
     return self._get_keyword_arg(exp.Confidence)
 
-
   # Validate AQP
 
   def validate_aqp(self):
     if not self.error_target:
-      raise Exception('AQP error target not found')
+      return False
 
     if not self.confidence:
-      raise Exception('AQP confidence not found')
+      return False
 
     # Only accept select statements
     if not isinstance(self.base_sql_no_aqp, exp.Select):
-      raise Exception('Not a select statement')
+      return False
 
     # Count the number of distinct aggregates
     expression_counts = defaultdict(int)
@@ -489,6 +459,6 @@ class Query(object):
       expression_counts[type(expression)] += 1
 
     if exp.Avg not in expression_counts and exp.Sum not in expression_counts and exp.Count not in expression_counts:
-      raise Exception('Supported aggregates are not found in approximate aggregation query')
+      return False
 
     return True

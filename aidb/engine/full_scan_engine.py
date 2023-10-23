@@ -38,5 +38,6 @@ class FullScanEngine(BaseEngine):
 
     # Execute the final query, now that all data is inserted
     async with self._sql_engine.begin() as conn:
+      print("Total Inference Service Calls = ", bound_service_list[0].count_inference)
       res = await conn.execute(text(query.sql_query_text))
       return res.fetchall()

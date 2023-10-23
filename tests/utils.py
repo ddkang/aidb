@@ -56,6 +56,6 @@ def command_line_utility(engine: Engine):
         results = engine.execute(query)
         end_time = time.time()
         print(f"Query Execution Time = {int((end_time - start_time)*100)/100} seconds")
-        print(pd.DataFrame(results))
+        print("Query Result", results[0][0])
       except Exception as e:
         print(e)

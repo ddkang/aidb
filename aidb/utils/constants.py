@@ -4,7 +4,7 @@ from typing import List
 
 CACHE_PREFIX = '__cache'
 CONFIG_PREFIX = '__config'
-NUM_PILOT_SAMPLES = 1000
+NUM_PILOT_SAMPLES = 500
 NUM_SAMPLES_SPLIT = 20
 FIND_NUM_SAMPLES_MODE = 'find_num_required_samples'
 ESTIMATE_AGG_RESULTS_MODE = 'estimate_aggregation_results'

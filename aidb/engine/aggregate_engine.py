@@ -279,4 +279,5 @@ class ApproximateAggregateEngine(BaseEngine):
       mode=ESTIMATE_AGG_RESULTS_MODE,
       num_samples=len(sampled_chunks) * chunk_size
     )
+    print("Total Inference Service Calls = ", list(inference_services_required)[0].count_inference)
     return [tuple(all_samples_estimates)]

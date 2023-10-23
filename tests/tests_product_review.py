@@ -4,10 +4,10 @@ import os
 from aidb.config.config_types import AIDBListType, InferenceBinding
 from aidb.engine import Engine
 from aidb.inference.examples.huggingface_inference_service import \
-    HuggingFaceNLP
+  HuggingFaceNLP
 from tests.utils import command_line_utility, setup_aidb_engine
 
-hf_key = "your hf key"
+hf_key = "<your hugging face key>"
 
 DB_URL = "sqlite+aiosqlite://"
 DB_NAME = 'aidb_test_amazon.sqlite'
@@ -41,4 +41,5 @@ if __name__ == '__main__':
   aidb_engine.bind_inference_service("sentiment_classification",
                                      InferenceBinding(("blobs00.review_id", "blobs00.review"),
                                                       ("sentiment.review_id", "sentiment.label", "sentiment.score")))
-  command_line_utility(aidb_engine)
+  # command_line_utility(aidb_engine)
+  aidb_engine.execute("SELECT * from sentiment where review_id < 10")

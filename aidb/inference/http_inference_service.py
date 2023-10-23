@@ -70,6 +70,7 @@ class HTTPInferenceService(CachedInferenceService):
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
     self._separator = '~'
+    self.mockapi_data = pd.read_csv("/home/akash/Documents/aidb-new/tests/data/amazon/ground_truth/mockapi.csv")
 
 
   def signature(self) -> Tuple[List, List]:
@@ -106,6 +107,7 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    return self.mockapi_data[self.mockapi_data["sentiment.review_id"]==input["blobs00.review_id"]]
     request = self.convert_input_to_request(input)
     response = self.request(request)
     output = self.convert_response_to_output(response)
