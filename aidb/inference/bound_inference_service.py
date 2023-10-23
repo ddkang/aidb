@@ -73,7 +73,6 @@ class CachedBoundInferenceService(BoundInferenceService):
 
       return table, columns
 
-
     async def tmp():
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
