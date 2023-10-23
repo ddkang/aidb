@@ -2,7 +2,7 @@ import glob
 import os
 import pandas as pd
 
-from aidb.config.config_types import InferenceBinding
+from aidb.config.config_types import InferenceBinding, AIDBListType
 from aidb.engine import Engine
 from aidb.inference.http_inference_service import HTTPInferenceService
 
@@ -24,7 +24,7 @@ def register_inference_services(engine: Engine, data_dir: str):
         columns_to_input_keys[col[4:]] = col[4:]
         input_cols.append(col[4:])
       elif col.startswith("out__"):
-        output_keys_to_columns[col[5:]] = col[5:]
+        output_keys_to_columns[(col[5:], AIDBListType())] = col[5:]
         output_cols.append(col[5:])
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")
