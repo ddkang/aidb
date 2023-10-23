@@ -1,7 +1,11 @@
 import time
 
-from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
+import pandas as pd
+
 from aidb.engine import Engine
+from tests.db_utils.db_setup import (clear_all_tables, create_db,
+                                     insert_data_in_tables,
+                                     setup_config_tables, setup_db)
 
 
 async def setup_aidb_engine(db_url, aidb_db_fname, data_dir):
@@ -47,10 +51,11 @@ def command_line_utility(engine: Engine):
         q = input("")
         query += f" {q.strip()}"
       try:
+        print("Running...")
         start_time = time.time()
         results = engine.execute(query)
         end_time = time.time()
-        print(f"Query Execution Time = {int((end_time - start_time)*100)}")
-        print(results)
+        print(f"Query Execution Time = {int((end_time - start_time)*100)/100} seconds")
+        print(pd.DataFrame(results))
       except Exception as e:
         print(e)

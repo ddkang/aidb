@@ -1,15 +1,13 @@
 import asyncio
-
-import pandas as pd
-
-from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
-from aidb.engine import Engine
-from aidb.config.config_types import InferenceBinding, AIDBListType
 import os
 
-from tests.utils import setup_aidb_engine, command_line_utility
+from aidb.config.config_types import AIDBListType, InferenceBinding
+from aidb.engine import Engine
+from aidb.inference.examples.huggingface_inference_service import \
+    HuggingFaceNLP
+from tests.utils import command_line_utility, setup_aidb_engine
 
-hf_key = "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"
+hf_key = "your hf key"
 
 DB_URL = "sqlite+aiosqlite://"
 DB_NAME = 'aidb_test_amazon.sqlite'
@@ -38,8 +36,6 @@ if __name__ == '__main__':
     model="LiYuan/amazon-review-sentiment-analysis",
     default_args={"options": {"wait_for_model": True}},
     copy_input=True)
-
-  # result = sentiment_classification.infer_one(pd.Series({"review": "this looks good", "review_id": 1}))
 
   aidb_engine.register_inference_service(sentiment_classification)
   aidb_engine.bind_inference_service("sentiment_classification",
