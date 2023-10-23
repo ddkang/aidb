@@ -78,16 +78,39 @@ class HTTPInferenceService(CachedInferenceService):
     raise NotImplementedError()
   
 
-  def convert_input_to_request(self, input: pd.Series) -> Dict:
+  def convert_input_to_request(self, input: Union[pd.Series, pd.DataFrame]) -> Dict:
     request = {}
-    for k, v in input.to_dict().items():
-      if k in self._columns_to_input_keys:
-        key = self._columns_to_input_keys[k]
-        if isinstance(key, tuple):
-          key = tuple(str(_k) for _k in key)
+    remove_ghost_key = False
+    if isinstance(input, pd.Series):
+      num_rows = 1
+      dict_input = {k: [v] for k, v in input.to_dict().items()}
+    else: # isinstance(input, pd.DataFrame)
+      num_rows = len(input)
+      dict_input = input.to_dict(orient='list')
+    # to support arbitrary batch size
+    # assume all numerical index form lists
+    for k, v in self._columns_to_input_keys.items():
+      if isinstance(v, tuple):
+        aidb_list_count = sum(1 for e in v if isinstance(e, AIDBListType))
+        if aidb_list_count == 0:
+          key = tuple(str(_k) for _k in v)
           key = self._separator.join(key)
-        request[key] = v
+          request[key] = dict_input[k][0]
+        elif aidb_list_count == 1:
+          for i in range(num_rows):
+            key = tuple(f'{i}' if isinstance(_k, AIDBListType) else f'{_k}' for _k in v)
+            if isinstance(v[0], AIDBListType):
+              key = ('_', ) + key # all converted keys should start with AIDBListType
+              remove_ghost_key = True
+            key = self._separator.join(key)
+            request[key] = dict_input[k][i]
+        else:
+          raise ValueError(f'Cannot have more than 1 AIDBListType in columns_to_input_keys')
+      elif k in dict_input: # isinstance(v, str)
+        request[v] = dict_input[k][0]
     request = unflatten_list(request, self._separator)
+    if remove_ghost_key:
+      request = request['_']
     if self._default_args is not None:
       if isinstance(request, dict):
         for k, v in self._default_args.items():

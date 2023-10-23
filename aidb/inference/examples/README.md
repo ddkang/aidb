@@ -25,15 +25,26 @@ and you want to use the [OpenAI Chat API](https://platform.openai.com/docs/api-r
 
 You will need to specify the mapping from the AIDB input columns to the JSON input format like this:
 ```python
+from aidb.config.config_types import AIDBListType
 map_input_to_request = {
   'model': ('model',),
-  'role': ('messages', '0', 'role'),
-  'content': ('messages', '0', 'content'),
+  'role': ('messages', AIDBListType(), 'role'),
+  'content': ('messages', AIDBListType(), 'content'),
   'n': 'n'
 }
 ```
 
-For input to request conversion, you need to provide explicit list index if your JSON request contains list. For output to response conversion, you can import `AIDBListType` and span list response into multiple rows. See [HuggingFace NLP](#nlp) for example. If an input column or an output JSON attribute is not inside the map keys, that column/attribute will be ignored. You can optionally write your own `HTTPInferenceService.convert_input_to_request` and `HTTPInferenceService.convert_response_to_output` methods if you want to do more complicated conversion.
+You can import `AIDBListType` to ease your conversion.
+
+For input to request conversion, you can either provide explicit list index if your JSON request contains list, or use `AIDBListType` to span your input column to a JSON list of arbitrary length (length of the list is your batch size) inside your JSON request. Each column_key: json_key map should contain at most 1 `AIDBListType` key.
+
+For response to output conversion, you can either provide explicit list index to retrieve the item from the JSON response, or use `AIDBListType` to span list response into multiple rows in your output dataframe.
+
+Please do not use `AIDBListType` for lists of known length such as coordinates. Use explicit numerical index instead.
+
+If an input column or an output JSON attribute is not inside the map keys, that column/attribute will be ignored.
+
+You can optionally write your own `HTTPInferenceService.convert_input_to_request` and `HTTPInferenceService.convert_response_to_output` methods if you want to do more complicated conversion.
 
 You can optionally move some arguments to `default_args` during initialization. For example, if you want to use the same `model` for all requests to OpenAI Chat API, you can do:
 ```python
@@ -67,8 +78,8 @@ openai_text = OpenAIText(
     "n": 2,
   },
   columns_to_input_keys={
-    'role': ('messages', '0', 'role'),
-    'content': ('messages', '0', 'content')
+    'role': ('messages', AIDBListType(), 'role'),
+    'content': ('messages', AIDBListType(), 'content')
   },
   response_keys_to_columns={
     'id': 'id',
