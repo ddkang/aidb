@@ -174,6 +174,8 @@ class CachedBoundInferenceService(BoundInferenceService):
             continue
 
           # FIXME: figure out where to put the column renaming
+          # assuming no ordering on inference engine output results
+          # columns with same name in different tables are assumed to be the same
           for idx, col in enumerate(self.binding.output_columns):
             if col not in row_results.columns:
               tbl, col_n = col.split('.')
@@ -183,6 +185,7 @@ class CachedBoundInferenceService(BoundInferenceService):
                   break
 
           try:
+            # returned results may have few redundant columns because of copying input
             row_results = row_results[list(self.binding.output_columns)]
           except:
             raise Exception("Column binding column not found in the inference results")
