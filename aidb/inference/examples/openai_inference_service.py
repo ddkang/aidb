@@ -9,6 +9,8 @@ class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_audio',
+      copy_input: bool=False,
+      is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -28,9 +30,9 @@ class OpenAIAudio(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=False,
+      copy_input=copy_input,
       batch_supported=False,
-      is_single=False,
+      is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
     )
@@ -40,6 +42,8 @@ class OpenAIImage(HTTPInferenceService):
   def __init__(
       self,
       name='openai_image', 
+      copy_input: bool=False,
+      is_single: bool=False,
       token: str=None, 
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -61,9 +65,9 @@ class OpenAIImage(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=False,
+      copy_input=copy_input,
       batch_supported=False,
-      is_single=False,
+      is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
     )
@@ -73,6 +77,8 @@ class OpenAIText(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_text',
+      copy_input: bool=False,
+      is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -88,9 +94,9 @@ class OpenAIText(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=False,
+      copy_input=copy_input,
       batch_supported=False,
-      is_single=False,
+      is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
     )
