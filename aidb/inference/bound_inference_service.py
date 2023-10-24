@@ -167,33 +167,33 @@ class CachedBoundInferenceService(BoundInferenceService):
           df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
           results.append(df)
         else:
-          row_results = self.service.infer_one(inp_row)
+          inference_results = self.service.infer_one(inp_row)
 
-          if len(row_results) == 0:
-            results.append(row_results)
+          if len(inference_results) == 0:
+            results.append(inference_results)
             continue
 
           # FIXME: figure out where to put the column renaming
           # assuming no ordering on inference engine output results
           # columns with same name in different tables are assumed to be the same
           for idx, col in enumerate(self.binding.output_columns):
-            if col not in row_results.columns:
+            if col not in inference_results.columns:
               tbl, col_n = col.split('.')
-              for c in row_results.columns:
+              for c in inference_results.columns:
                 if c.split('.')[1] == col_n:
-                  row_results.rename(columns={c: col}, inplace=True)
+                  inference_results.rename(columns={c: col}, inplace=True)
                   break
 
           try:
             # returned results may have few redundant columns because of copying input
-            row_results = row_results[list(self.binding.output_columns)]
+            inference_results = inference_results[list(self.binding.output_columns)]
           except:
             raise Exception("Column binding column not found in the inference results")
 
           tables = self.get_tables(self.binding.output_columns)
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
-            tmp_df = row_results[columns]
+            tmp_df = inference_results[columns]
             tmp_df = tmp_df.astype('object')
 
             if self._dialect == 'mysql' or self._dialect == 'postgresql':
@@ -237,7 +237,7 @@ class CachedBoundInferenceService(BoundInferenceService):
               await conn.execute(insert)
 
           await self._insert_in_cache_table(inp_row, conn)
-          results.append(row_results)
+          results.append(inference_results)
 
     return results
 
