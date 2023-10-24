@@ -36,19 +36,19 @@ class TastiTests():
     self.vd_type = vector_database_type
     self.seed = seed
 
-    self.data, blob_ids = self.generate_data(self.data_size, embedding_dim)
+    self.data, vector_ids = self.generate_data(self.data_size, embedding_dim)
     self.user_database = self.simulate_user_providing_database(index_path, weaviate_auth)
 
-    self.tasti = Tasti(index_name, blob_ids, self.user_database, nb_buckets, percent_fpf, seed)
+    self.tasti = Tasti(index_name, vector_ids, self.user_database, nb_buckets, percent_fpf, seed)
 
 
   def generate_data(self, data_size, emb_size):
     np.random.seed(self.seed)
     embeddings = np.random.rand(data_size, emb_size)
     data = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size), 'values': embeddings.tolist()})
-    blob_ids = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size)})
+    vector_ids = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size)})
     self.total_data += data_size
-    return data, blob_ids
+    return data, vector_ids
 
 
   def simulate_user_providing_database(self, index_path: Optional[str], weaviate_auth: Optional[WeaviateAuth]):
@@ -85,10 +85,10 @@ class TastiTests():
 
 
   def test(self):
-    representative_blob_ids = self.tasti.get_representative_blob_ids()
-    print('The shape of cluster representative ids', representative_blob_ids.shape)
+    representative_vector_ids = self.tasti.get_representative_vector_ids()
+    print('The shape of cluster representative ids', representative_vector_ids.shape)
     # get culster representatives ids
-    print(representative_blob_ids)
+    print(representative_vector_ids)
     topk_representatives = self.tasti.get_topk_representatives_for_all()
     # get topk representatives and dists for all data
     print(topk_representatives)
@@ -96,14 +96,14 @@ class TastiTests():
 
     # Chroma uses HNSW, which will not return exact search result
     if self.vd_type == VectorDatabaseType.FAISS.value:
-      for representative_id in list(representative_blob_ids['id']):
+      for representative_id in list(representative_vector_ids):
         assert representative_id in topk_representatives.loc[representative_id]['topk_reps']
 
-    new_data, new_blob_ids = self.simulate_user_inserting_new_data(self.data_size)
+    new_data, new_vector_ids = self.simulate_user_inserting_new_data(self.data_size)
     # get topk representatives and dists for new data based on stale representatives
-    print(self.tasti.get_topk_representatives_for_new_embeddings(new_blob_ids))
+    print(self.tasti.get_topk_representatives_for_new_embeddings(new_vector_ids))
     # reselect cluster representatives, recompute topk representatives and dists for all data
-    print(self.tasti.update_topk_representatives_for_all(new_blob_ids))
+    print(self.tasti.update_topk_representatives_for_all(new_vector_ids))
     # We can see the old cluster representative is kept
     print('The total number of cluster representatives is:', len(self.tasti.reps))
 
