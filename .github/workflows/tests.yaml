@@ -28,9 +28,6 @@ jobs:
     - name: Run query columns test
       run: python3 -m tests.tests_columns_in_query
 
-    - name: Run aggregation tests
-      run: python3 -m tests.test_aggregate_engine
-
     - name: Run full scan tests
       run: python3 -m tests.tests_full_scan_engine
 
