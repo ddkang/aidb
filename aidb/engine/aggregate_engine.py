@@ -234,7 +234,8 @@ class ApproximateAggregateEngine(BaseEngine):
     """
     inference_services_required = set([query.config.column_by_service[column] for column in query.columns_in_query])
     self.num_blob_ids = {}
-    for blob_table in self._config.blob_tables:
+    # FIXME: need to find a better way of extracting blob tables alone without mappings from config
+    for blob_table in self._config.blob_tables[:1]:
       async with self._sql_engine.begin() as conn:
         num_ids = await conn.execute(text(self.get_num_blob_ids_query(blob_table)))
       self.num_blob_ids[blob_table] = num_ids.fetchone()[0]
