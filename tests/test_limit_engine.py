@@ -33,9 +33,9 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
     tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database_type, index_path='./')
     tasti_index = tasti_test.tasti
-    mapping_blobs_table = 'mapping_blobs'
+    blob_mapping_table = 'mapping_blobs'
 
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir, tasti_index, mapping_blobs_table)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir, tasti_index, blob_mapping_table)
 
 
     register_inference_services(aidb_engine, data_dir)

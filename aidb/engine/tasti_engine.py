@@ -18,7 +18,7 @@ class TastiEngine(FullScanEngine):
       connection_uri: str,
       infer_config: bool = True,
       debug: bool = False,
-      mapping_blobs_table_name: Optional[str] = None,
+      blob_mapping_table_name: Optional[str] = None,
       tasti_index: Optional[Tasti] = None,
   ):
     super().__init__(connection_uri, infer_config, debug)
@@ -27,7 +27,7 @@ class TastiEngine(FullScanEngine):
     # TODO: modify to same rep table with different topk table
     self.topk_table_name = None
     # table for mapping blob keys to blob ids
-    self.mapping_blobs_table_name = mapping_blobs_table_name
+    self.blob_mapping_table_name = blob_mapping_table_name
     self.tasti_index = tasti_index
 
 
@@ -165,13 +165,13 @@ class TastiEngine(FullScanEngine):
     '''
     metadata = sqlalchemy.MetaData()
     metadata.reflect(conn)
-    mapping_blobs_table = sqlalchemy.schema.Table(self.mapping_blobs_table_name, metadata,
+    blob_mapping_table = sqlalchemy.schema.Table(self.blob_mapping_table_name, metadata,
                                                  autoload=True, autoload_with=conn)
 
     # FIXME: there is a sqlalchemy SAWarning, This warning may become an exception in a future release
     rep_table = sqlalchemy.schema.Table(self.rep_table_name, metadata,
-                                        *[column._copy() for column in mapping_blobs_table.columns],
-                                        *[constraint._copy() for constraint in mapping_blobs_table.constraints]
+                                        *[column._copy() for column in blob_mapping_table.columns],
+                                        *[constraint._copy() for constraint in blob_mapping_table.constraints]
                                         )
 
     columns = []
@@ -224,8 +224,8 @@ class TastiEngine(FullScanEngine):
 
     rep_blob_query_str = f'''
                     SELECT *
-                    FROM {self.mapping_blobs_table_name}
-                    WHERE {self.mapping_blobs_table_name}.vector_id IN {format(tuple(rep_ids.index))};
+                    FROM {self.blob_mapping_table_name}
+                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
                     '''
 
     async with self._sql_engine.begin() as conn:
