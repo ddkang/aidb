@@ -290,8 +290,8 @@ pip install -e .
 
 Example usage:
 ```python
-from aidb.inference.example.pytorch_local_inference import PyTorchLocalDetection
-groundingdino = PyTorchLocalDetection(
+from aidb.inference.example.pytorch_local_inference import PyTorchLocalObjectDetection
+groundingdino = PyTorchLocalObjectDetection(
   name='groundingdino',
   model_config_path='path/to/GroundingDINO_SwinT_OGC.py',
   model_checkpoint_path='path/to/groundingdino_swint_ogc.pth',

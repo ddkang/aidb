@@ -4,7 +4,7 @@ from groundingdino.util.inference import Model
 from aidb.inference.cached_inference_service import CachedInferenceService
 
 
-class PyTorchLocalDetection(CachedInferenceService):
+class PyTorchLocalObjectDetection(CachedInferenceService):
   def __init__(
       self,
       name: str,
