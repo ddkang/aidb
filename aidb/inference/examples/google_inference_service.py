@@ -21,6 +21,9 @@ def get_gcloud_access_token():
 class GoogleVisionAnnotate(HTTPInferenceService):
   def __init__(
       self,
+      name: str='google_vision_annotate',
+      copy_input: bool=False,
+      is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
@@ -35,7 +38,7 @@ class GoogleVisionAnnotate(HTTPInferenceService):
     if token is None:
       token = get_gcloud_access_token()
     super().__init__(
-        name='google_vision_image_annotate',
+        name=name,
         url=f'https://vision.googleapis.com/v1/{infer_type}:annotate',
         headers={
           'Content-Type': 'application/json; charset=utf-8',
@@ -43,9 +46,9 @@ class GoogleVisionAnnotate(HTTPInferenceService):
           'x-goog-user-project': project_id,
         },
         default_args=default_args,
-        copy_input=False,
+        copy_input=copy_input,
         batch_supported=False,
-        is_single=False,
+        is_single=is_single,
         columns_to_input_keys=columns_to_input_keys,
         response_keys_to_columns=response_keys_to_columns,
     )
