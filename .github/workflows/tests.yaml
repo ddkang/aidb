@@ -33,3 +33,6 @@ jobs:
 
     - name: Run limit engine tests
       run: python3 -m tests.test_limit_engine
+
+    - name: Run aggregation tests
+      run: python3 -m tests.test_aggregate_engine
