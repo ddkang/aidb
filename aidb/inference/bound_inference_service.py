@@ -72,7 +72,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         metadata.create_all(conn)
 
       return table, columns
-    
+
     async def tmp():
       async with self._engine.begin() as conn:
         return await conn.run_sync(get_table)
@@ -124,6 +124,14 @@ class CachedBoundInferenceService(BoundInferenceService):
     return list(tables)
 
 
+  async def _insert_in_cache_table(self, row, conn):
+    input_dic = {}
+    for col in self.binding.input_columns:
+      input_dic[self.convert_column_name(col)] = getattr(row, col)
+    insert = self.get_insert()(self._cache_table).values(**input_dic)
+    await conn.execute(insert)
+
+
   async def infer(self, inputs: pd.DataFrame):
     # FIXME: figure out where to put the column renaming
     for idx, col in enumerate(self.binding.input_columns):
@@ -148,28 +156,44 @@ class CachedBoundInferenceService(BoundInferenceService):
     # - Batch the inserts for new data
     # - Batch the selection for cached results... How to do this?
     async with self._engine.begin() as conn:
-      for idx, (_, row) in enumerate(inputs.iterrows()):
+      for idx, (_, inp_row) in enumerate(inputs.iterrows()):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(row, col) for col in self.binding.input_columns]
+              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(inp_row, col) for col in
+                self.binding.input_columns]
             )
           )
           df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
           results.append(df)
         else:
-          row_results = self.service.infer_one(row)
-          if len(row_results) == 0:
-            results.append(row_results)
+          inference_results = self.service.infer_one(inp_row)
+
+          if len(inference_results) == 0:
+            results.append(inference_results)
             continue
+
           # FIXME: figure out where to put the column renaming
+          # assuming no ordering on inference engine output results
+          # columns with same name in different tables are assumed to be the same
           for idx, col in enumerate(self.binding.output_columns):
-            row_results.rename(columns={row_results.columns[idx]: col}, inplace=True)
+            if col not in inference_results.columns:
+              tbl, col_n = col.split('.')
+              for c in inference_results.columns:
+                if c.split('.')[1] == col_n:
+                  inference_results.rename(columns={c: col}, inplace=True)
+                  break
+
+          try:
+            # returned results may have few redundant columns because of copying input
+            inference_results = inference_results[list(self.binding.output_columns)]
+          except:
+            raise Exception("Column binding column not found in the inference results")
 
           tables = self.get_tables(self.binding.output_columns)
           for table in tables:
             columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
-            tmp_df = row_results[columns]
+            tmp_df = inference_results[columns]
             tmp_df = tmp_df.astype('object')
 
             if self._dialect == 'mysql' or self._dialect == 'postgresql':
@@ -211,7 +235,9 @@ class CachedBoundInferenceService(BoundInferenceService):
 
             if self._dialect != "sqlite":
               await conn.execute(insert)
-          results.append(row_results)
+
+          await self._insert_in_cache_table(inp_row, conn)
+          results.append(inference_results)
 
     return results
 
