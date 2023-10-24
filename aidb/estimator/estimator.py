@@ -62,9 +62,8 @@ class Estimator(abc.ABC):
   def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
     pass
 
+
 # Single estimators
-
-
 class WeightedMeanSingleEstimator(Estimator):
   def __init__(self, population_size: int) -> None:
     self._population_size = sum(population_size.values())

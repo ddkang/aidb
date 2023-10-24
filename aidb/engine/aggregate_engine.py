@@ -1,8 +1,8 @@
 from collections import defaultdict
 from enum import Enum
+
 import pandas as pd
 import scipy
-import sqlglot.expressions as exp
 import statsmodels.stats.proportion
 from aidb.engine.base_engine import BaseEngine
 from aidb.estimator.estimator import (
@@ -11,6 +11,8 @@ from aidb.query.query import Query
 from aidb.samplers.sampler import SampledBlob
 from aidb.utils.constants import NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT
 from sqlalchemy.sql import text
+
+import sqlglot.expressions as exp
 from sqlglot.generator import Generator
 
 
@@ -19,7 +21,6 @@ def csv(*args, sep=", "):
 
 
 class ApproximateAggregateEngine(BaseEngine):
-
   class _estimation_mode(Enum):
     find_num_samples = 'find_num_required_samples_mode'
     estimate_aggregation_results = 'estimate_aggregation_results_mode'
@@ -130,7 +131,7 @@ class ApproximateAggregateEngine(BaseEngine):
     population_lb = statsmodels.stats.proportion.proportion_confint(
       num_column_samples, NUM_PILOT_SAMPLES, alpha,
       method
-      )[0]
+    )[0]
     pilot_estimate = estimator.estimate(
       agg_stats,
       conf,
@@ -203,10 +204,7 @@ class ApproximateAggregateEngine(BaseEngine):
           statistic_ans = chunk_statistics[agg_col_index]
           if statistic_ans is None: continue
           agg_stats.append(SampledBlob(wt, mass, statistic_ans, chunk_size))
-        results[agg_type].update(
-          {
-            columns[0]: agg_stats}
-          )
+        results[agg_type].update({columns[0]: agg_stats})
         agg_col_index += 1
     return results
 
@@ -282,7 +280,7 @@ class ApproximateAggregateEngine(BaseEngine):
 
     agg_results_on_chunks = self.get_agg_results_on_chunks(
       query, num_ids_sampled_per_service, sampled_chunks, chunk_size
-      )
+    )
     all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(
       query,
       agg_results_on_chunks,
