@@ -139,7 +139,7 @@ async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
       base_fname = os.path.basename(csv_fname)
       table_name = base_fname.split('.')[0]
 
-      if only_blob_data and not table_name.startswith('blobs') and not table_name.startswith('mapping'):
+      if only_blob_data and not table_name.startswith('blobs') and not table_name.startswith('mapping_'):
         continue
       df = pd.read_csv(csv_fname)
       for column in df.columns:
