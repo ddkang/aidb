@@ -18,7 +18,7 @@ class TastiEngine(FullScanEngine):
       connection_uri: str,
       infer_config: bool = True,
       debug: bool = False,
-      blob_mapping_table_name: Optional[str] = None,
+      mapping_blobs_table_name: Optional[str] = None,
       tasti_index: Optional[Tasti] = None,
   ):
     super().__init__(connection_uri, infer_config, debug)
@@ -27,7 +27,7 @@ class TastiEngine(FullScanEngine):
     # TODO: modify to same rep table with different topk table
     self.topk_table_name = None
     # table for mapping blob keys to blob ids
-    self.blob_mapping_table_name = blob_mapping_table_name
+    self.mapping_blobs_table_name = mapping_blobs_table_name
     self.tasti_index = tasti_index
 
 
@@ -165,7 +165,7 @@ class TastiEngine(FullScanEngine):
     '''
     metadata = sqlalchemy.MetaData()
     metadata.reflect(conn)
-    blob_mapping_table = sqlalchemy.schema.Table(self.blob_mapping_table_name, metadata,
+    blob_mapping_table = sqlalchemy.schema.Table(self.mapping_blobs_table_name, metadata,
                                                  autoload=True, autoload_with=conn)
 
     # FIXME: there is a sqlalchemy SAWarning, This warning may become an exception in a future release
@@ -224,8 +224,8 @@ class TastiEngine(FullScanEngine):
 
     rep_blob_query_str = f'''
                     SELECT *
-                    FROM {self.blob_mapping_table_name}
-                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
+                    FROM {self.mapping_blobs_table_name}
+                    WHERE {self.mapping_blobs_table_name}.vector_id IN {format(tuple(rep_ids.index))};
                     '''
 
     async with self._sql_engine.begin() as conn:

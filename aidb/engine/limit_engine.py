@@ -45,7 +45,7 @@ class LimitEngine(TastiEngine):
     for index, _ in sorted_list:
       for bound_service in bound_service_list:
         inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service,
-                                                                                  self.blob_mapping_table_name,
+                                                                                  self.mapping_blobs_table_name,
                                                                                   [index])
         async with self._sql_engine.begin() as conn:
           inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
