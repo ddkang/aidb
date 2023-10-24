@@ -139,7 +139,7 @@ async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
       base_fname = os.path.basename(csv_fname)
       table_name = base_fname.split('.')[0]
 
-      if only_blob_data and not table_name.startswith('blobs'):
+      if only_blob_data and not table_name.startswith('blobs') and not table_name.startswith('mapping'):
         continue
       df = pd.read_csv(csv_fname)
       for column in df.columns:
@@ -173,6 +173,7 @@ async def setup_config_tables(engine):
 
     Base.metadata.create_all(conn)
 
+
   def get_blob_table_names_and_columns(conn):
     metadata = MetaData()
     metadata.reflect(conn)
@@ -183,6 +184,7 @@ async def setup_config_tables(engine):
       table = metadata.tables[table_name]
       table_names_and_columns[table_name] = [column.name for column in table.columns if column.primary_key]
     return table_names, table_names_and_columns
+
 
   async with engine.begin() as conn:
     await conn.run_sync(create_blob_metadata_table)
