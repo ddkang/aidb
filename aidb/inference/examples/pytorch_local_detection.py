@@ -11,10 +11,10 @@ class PyTorchLocalDetection(CachedInferenceService):
       model_config_path: str,
       model_checkpoint_path: str,
       caption: str,
-      use_batch: bool,
+      use_batch: bool=True,
       batch_size: int=0,
       box_threshold: float=0.35,
-      col_name: str='image',
+      col_name: str='image_path_col',
   ):
     super().__init__(name=name, preferred_batch_size=batch_size)
     self._model = Model(model_config_path, model_checkpoint_path)
