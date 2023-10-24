@@ -253,7 +253,7 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_select_join_str(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
+  def _get_select_join_str(self, bound_service: BoundInferenceService, where_tables: Optional[List] = None, vector_id_table: Optional[str] = None):
     column_to_root_column = self._config.columns_to_root_column
     binding = bound_service.binding
     inp_cols = binding.input_columns
@@ -265,7 +265,10 @@ class BaseEngine():
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
-    join_str = self._get_inner_join_query(inp_tables)
+    if where_tables:
+      join_str = self._get_inner_join_query(inp_tables + where_tables)
+    else:
+      join_str = self._get_inner_join_query(inp_tables)
 
     select_join_str = f'''
                       SELECT {inp_cols_str}
@@ -279,8 +282,11 @@ class BaseEngine():
     and_connected = []
     for fp in filtering_predicates:
       and_connected.append(' OR '.join(
-        [predicate_to_str(p) for p in fp]))
-    return ' AND '.join(and_connected)
+        [p.sql() for p in fp]))
+    if and_connected:
+      return f"WHERE {' AND '.join(and_connected)}"
+    else:
+      return ''
 
 
   def get_input_query_for_inference_service_filter_service(
@@ -294,30 +300,56 @@ class BaseEngine():
     input query will also contain the predicates that can be currently satisfied using the inference services
     that are already executed
     """
-    filtering_predicates = user_query.filtering_predicates
-    inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
-    tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
-
-    column_to_root_column = self._config.columns_to_root_column
-    inp_tables, select_join_str = self._get_select_join_str(bound_service)
+    filtering_predicates = user_query.where_predicates
+    having_predicates = user_query.having_predicates
+    inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_where_predicates
+    inference_engines_required_for_having_predicates = user_query.inference_engines_required_for_having_predicates
 
     # filtering predicates that can be satisfied by the currently executed inference engines
     filtering_predicates_satisfied = []
-    for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
-                       tables_in_filtering_predicates):
-      if len(already_executed_inference_services.intersection(e)) == len(e) \
-        and len(set(inp_tables).intersection(t)) == len(t):
+    for p, e in zip(filtering_predicates, inference_engines_required_for_filtering_predicates):
+      if len(already_executed_inference_services.intersection(e)) == len(e):
         filtering_predicates_satisfied.append(p)
 
+    # having_predicates_satisfied = []
+    # for p, e in zip(having_predicates, inference_engines_required_for_having_predicates):
+    #   if len(already_executed_inference_services.intersection(e)) == len(e):
+    #     having_predicates_satisfied.append(p)
+
+    column_to_root_column = self._config.columns_to_root_column
+    filtering_cols = set()
+    for filtering_predicates in filtering_predicates_satisfied:
+      for fp in filtering_predicates:
+        filtering_cols = filtering_cols.union(user_query.columns_in_tree(fp))
+
+    # for having_predicates in having_predicates_satisfied:
+    #   for hp in having_predicates:
+    #     filtering_cols = filtering_cols.union(user_query.columns_in_tree(hp))
+
+    filtering_cols = filtering_cols.union(user_query.get_group_by_columns)
+
+    root_where_cols = [column_to_root_column.get(col, col) for col in filtering_cols]
+    where_tables = self._get_tables(list(set(root_where_cols)))
+
+    inp_tables, select_join_str = self._get_select_join_str(bound_service, where_tables)
+
     where_str = self._get_where_str(filtering_predicates_satisfied)
+    # have_str = self._get_where_str(having_predicates_satisfied)
+    # group_str = ', '.join(list(user_query.get_group_by_columns))
+
     for k, v in column_to_root_column.items():
       where_str = where_str.replace(k, v)
+      # have_str = have_str.replace(k, v)
+      # group_str = group_str.replace(k, v)
 
-    if len(filtering_predicates_satisfied) > 0:
-      inp_query_str = select_join_str + f'WHERE {where_str};'
-    else:
-      inp_query_str = select_join_str + ';'
+    inp_query_str = select_join_str + where_str
 
+
+    # if len(having_predicates_satisfied) > 0:
+    #   inp_query_str += f'GROUP BY {group_str} HAVING {have_str}'
+    #
+    # inp_query_str += ';'
+    print(inp_query_str)
     return inp_query_str
 
 
@@ -336,7 +368,7 @@ class BaseEngine():
     * param filtered_id_list: list of vector ids which will be selected in the query
     """
 
-    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
+    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table=vector_id_table)
 
     # FIXME: for different database, the IN grammar maybe different
     if filtered_id_list is None:

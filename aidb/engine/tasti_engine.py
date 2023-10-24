@@ -58,7 +58,9 @@ class TastiEngine(FullScanEngine):
       inp_df.set_index('vector_id', inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
-    score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
+    # score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
+    score_query_str, score_connected = self.get_having_score_query_str(query, self.rep_table_name)
+    print('sss', score_query_str)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql(text(score_query_str), conn))
     score_df.set_index('vector_id', inplace=True, drop=True)
@@ -79,10 +81,10 @@ class TastiEngine(FullScanEngine):
     filering_predicate_score_map = dict()
     and_connected = []
     score_count = 0
-    for fp in query.filtering_predicates:
+    for fp in query.where_predicates:
       or_connected = []
       for p in fp:
-        predicate_str = predicate_to_str(p)
+        predicate_str = p.sql()
         if predicate_str not in filering_predicate_score_map:
           filering_predicate_score_map[predicate_str] = f'score_{score_count}'
           score_count += 1
@@ -103,13 +105,73 @@ class TastiEngine(FullScanEngine):
       score_list.append(f'IIF({fp}, 1, 0) AS {filering_predicate_score_map[fp]}')
     score_list.append(f'{rep_table_name}.vector_id')
     select_str = ', '.join(score_list)
-    cols = list(filering_predicate_score_map.keys())
-    tables = self._get_tables(cols)
+
+    cols = set()
+    for fp in query.where_predicates:
+      for p in fp:
+        cols = cols.union(query.columns_in_tree(p))
+
+    tables = self._get_tables(list(cols))
     # some representative blobs may not have outputs from service, so left join is better
     join_str = self._get_left_join_str(rep_table_name, tables)
     score_query_str = f'''
                       SELECT {select_str}
-                      {join_str};
+                      {join_str}'''
+    return score_query_str, score_connected
+
+
+  def _get_having_predicate_score_map(self, query: Query) -> (Dict[str, str], List[List[str]]):
+    '''
+    Convert WHERE filtering predicate into 0/1 score, record the relation between different filtering predicate
+    '''
+    having_predicate_score_map = dict()
+    cols = set()
+    and_connected = []
+    score_count = 0
+    for fp in query.having_predicates:
+      or_connected = []
+      for p in fp:
+        aggregation = query.get_aggregation_expression(p)
+        cols = cols.union(query.columns_in_tree(p))
+        predicate_str = aggregation.sql()
+        if predicate_str not in having_predicate_score_map:
+          having_predicate_score_map[predicate_str] = f'having_score_{score_count}'
+          score_count += 1
+        or_connected.append(having_predicate_score_map[predicate_str])
+      and_connected.append(or_connected)
+
+    return having_predicate_score_map, and_connected, cols
+
+
+  def get_having_score_query_str(self, query: Query, rep_table_name: str) -> (str, List[List[str]]):
+    '''
+    Convert filtering condition into select clause, so we can use select result to compute proxy score for all blobs
+    '''
+
+    having_predicate_score_map, score_connected, cols = self._get_having_predicate_score_map(query)
+
+    score_list = []
+    # FIXME: for different database, the IN grammar maybe different
+    for fp in having_predicate_score_map:
+      score_list.append(f'{fp} AS {having_predicate_score_map[fp]}')
+    score_list.append(f'{rep_table_name}.vector_id')
+    select_str = ', '.join(score_list)
+
+    tables = self._get_tables(list(cols))
+    # some representative blobs may not have outputs from service, so left join is better
+    join_str = self._get_left_join_str(rep_table_name, tables)
+
+    where_predicate = query.where_predicates
+    where_str = self._get_where_str(where_predicate)
+
+    group_cols = query.group_by_columns
+    group_cols.add(f'{rep_table_name}.vector_id')
+    group_cols_str = ', '.join(list(group_cols))
+    score_query_str = f'''
+                      SELECT {select_str}
+                      {join_str}
+                      {where_str}
+                      GROUP BY {group_cols_str}
                       '''
     return score_query_str, score_connected
 
