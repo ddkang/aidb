@@ -1,5 +1,5 @@
 from collections import defaultdict
-
+from enum import Enum
 import pandas as pd
 import scipy
 import sqlglot.expressions as exp
@@ -9,9 +9,7 @@ from aidb.estimator.estimator import (
   Estimator, WeightedCountSetEstimator, WeightedMeanSetEstimator, WeightedSumSetEstimator)
 from aidb.query.query import Query
 from aidb.samplers.sampler import SampledBlob
-from aidb.utils.constants import (
-  ESTIMATE_AGG_RESULTS_MODE, FIND_NUM_SAMPLES_MODE, NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT,
-  ESTIMATE_NUM_SAMPLES_NORMAL_MODE, ESTIMATE_NUM_SAMPLES_WILSON_MODE)
+from aidb.utils.constants import NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT
 from sqlalchemy.sql import text
 from sqlglot.generator import Generator
 
@@ -21,6 +19,17 @@ def csv(*args, sep=", "):
 
 
 class ApproximateAggregateEngine(BaseEngine):
+
+  class _estimation_mode(Enum):
+    find_num_samples = 'find_num_required_samples_mode'
+    estimate_aggregation_results = 'estimate_aggregation_results_mode'
+
+
+  class _proportion_confint_mode(Enum):
+    normal = 'normal'
+    wilson = 'wilson'
+
+
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
     if agg_type == exp.Sum:
       return WeightedSumSetEstimator(self.num_blob_ids)
@@ -117,7 +126,7 @@ class ApproximateAggregateEngine(BaseEngine):
 
   def find_num_required_samples(self, estimator, agg_stats, conf, alpha, error_target, num_column_samples):
     z_score = scipy.stats.norm.ppf(alpha / 2.)
-    method = ESTIMATE_NUM_SAMPLES_NORMAL_MODE if num_column_samples / NUM_PILOT_SAMPLES > 0.5 else ESTIMATE_NUM_SAMPLES_WILSON_MODE
+    method = self._proportion_confint_mode.normal.value if num_column_samples / NUM_PILOT_SAMPLES > 0.5 else self._proportion_confint_mode.wilson.value
     population_lb = statsmodels.stats.proportion.proportion_confint(
       num_column_samples, NUM_PILOT_SAMPLES, alpha,
       method
@@ -218,12 +227,12 @@ class ApproximateAggregateEngine(BaseEngine):
       estimator = self._get_estimator(agg_type)
       for columns in columns_per_agg:
         agg_column_data = agg_results_on_chunks[agg_type][columns[0]]
-        if mode == FIND_NUM_SAMPLES_MODE:
+        if mode == self._estimation_mode.find_num_samples:
           num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
           results.append(
             self.find_num_required_samples(estimator, agg_column_data, conf, alpha, error_target, num_column_samples)
           )
-        elif mode == ESTIMATE_AGG_RESULTS_MODE:
+        elif mode == self._estimation_mode.estimate_aggregation_results:
           results.append(estimator.estimate(agg_column_data, conf, num_column_samples=num_samples).estimate)
     return results
 
@@ -235,7 +244,7 @@ class ApproximateAggregateEngine(BaseEngine):
     inference_services_required = set([query.config.column_by_service[column] for column in query.columns_in_query])
     self.num_blob_ids = {}
     # FIXME: need to find a better way of extracting blob tables alone without mappings from config
-    for blob_table in self._config.blob_tables[:1]:
+    for blob_table in self._config.blob_tables:
       async with self._sql_engine.begin() as conn:
         num_ids = await conn.execute(text(self.get_num_blob_ids_query(blob_table)))
       self.num_blob_ids[blob_table] = num_ids.fetchone()[0]
@@ -255,7 +264,7 @@ class ApproximateAggregateEngine(BaseEngine):
     num_samples_per_agg_column = self.get_estimates_on_data_chunks_agg_column_wise(
       query,
       agg_results_on_chunks,
-      mode=FIND_NUM_SAMPLES_MODE,
+      mode=self._estimation_mode.find_num_samples,
       num_ids_per_service=num_ids_per_service
     )
     num_samples = max(NUM_SAMPLES_SPLIT, max(num_samples_per_agg_column))
@@ -277,7 +286,7 @@ class ApproximateAggregateEngine(BaseEngine):
     all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(
       query,
       agg_results_on_chunks,
-      mode=ESTIMATE_AGG_RESULTS_MODE,
+      mode=self._estimation_mode.estimate_aggregation_results,
       num_samples=len(sampled_chunks) * chunk_size
     )
     return [tuple(all_samples_estimates)]

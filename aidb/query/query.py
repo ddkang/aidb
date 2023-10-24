@@ -48,6 +48,10 @@ class Query(object):
     return Parser().parse(self._tokens)[0]
 
 
+  def get_expression(self):
+    return self._expression
+
+
   @cached_property
   def sql_query_text(self):
     return self.base_sql_no_aqp.sql()
@@ -113,10 +117,6 @@ class Query(object):
       if isinstance(node, exp.Table):
         table_list.add(node.args["this"].args["this"])
     return table_list
-
-
-  def get_expression(self):
-    return self._expression
 
 
   def _get_predicate_name(self, predicate_count):
@@ -404,7 +404,7 @@ class Query(object):
 
   @cached_property
   def is_approx_agg_query(self):
-    return True if self.aggregated_columns_and_types and self.validate_aqp() else False
+    return True if self.aggregated_columns_and_types and self.validate_aqp_or_throw() else False
 
 
   @cached_property
@@ -472,7 +472,7 @@ class Query(object):
 
   # Validate AQP
 
-  def validate_aqp(self):
+  def validate_aqp_or_throw(self):
     if not self.error_target:
       raise Exception('AQP error target not found')
 

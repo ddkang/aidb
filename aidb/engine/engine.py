@@ -11,10 +11,9 @@ class Engine(LimitEngine, ApproximateAggregateEngine):
     '''
     # TODO: branch based on query type
     parsed_query = Query(query, self._config)
-
     if parsed_query.is_approx_agg_query:
       return asyncio_run(self.execute_aggregate_query(parsed_query, **kwargs))
-    if parsed_query.is_limit_query():
+    elif parsed_query.is_limit_query():
       return asyncio_run(self._execute_limit_query(parsed_query, **kwargs))
     else:
       return asyncio_run(self.execute_full_scan(parsed_query, **kwargs))
