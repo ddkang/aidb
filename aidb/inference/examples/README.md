@@ -297,8 +297,7 @@ groundingdino = PyTorchLocalDetection(
   model_checkpoint_path='path/to/groundingdino_swint_ogc.pth',
   caption='your caption',
   use_batch=True,
-  batch_size=16,
-  col_name='image',)
+  batch_size=2)
 outputs = groundingdino.infer_batch(inputs)
 ```
 

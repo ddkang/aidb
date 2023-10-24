@@ -11,12 +11,13 @@ class PyTorchLocalDetection(CachedInferenceService):
       model_config_path: str,
       model_checkpoint_path: str,
       caption: str,
+      is_single: bool=False,
       use_batch: bool=True,
       batch_size: int=0,
       box_threshold: float=0.35,
       image_path_col: str='image',
   ):
-    super().__init__(name=name, preferred_batch_size=batch_size)
+    super().__init__(name=name, preferred_batch_size=batch_size, is_single=is_single)
     self._model = Model(model_config_path, model_checkpoint_path)
     self._caption = caption
     self._use_batch = use_batch
@@ -24,8 +25,12 @@ class PyTorchLocalDetection(CachedInferenceService):
     self._image_path_col = image_path_col
 
 
-  def infer_one(self, input: pd.DataFrame) -> pd.DataFrame:
-    image = [input[self._image_path_col].iloc[0]]
+  def signature(self):
+    raise NotImplementedError()
+
+
+  def infer_one(self, input: pd.Series) -> pd.DataFrame:
+    image = [input.to_dict()[self._image_path_col]]
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
@@ -45,8 +50,8 @@ class PyTorchLocalDetection(CachedInferenceService):
 
     images = inputs[self._image_path_col].tolist()
     outputs_merge = []
-    for i in range(0, len(images), self._batch_size):
-      image_batch = images[i:i+self._batch_size] if i+self._batch_size < len(images) else images[i:]
+    for i in range(0, len(images), self.preferred_batch_size):
+      image_batch = images[i:i+self.preferred_batch_size] if i+self.preferred_batch_size < len(images) else images[i:]
       outputs = self._model.predict_with_caption(image_batch, self._caption, self._box_threshold)
       outputs = [
         {
@@ -58,4 +63,4 @@ class PyTorchLocalDetection(CachedInferenceService):
           "confidence": conf,
         } for image, output in zip(image_batch, outputs) for xyxy, conf in zip(output.xyxy, output.confidence)]
       outputs_merge.extend(outputs)
-    return pd.DataFrame(outputs)
+    return pd.DataFrame(outputs_merge)
