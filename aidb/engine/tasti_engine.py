@@ -165,13 +165,13 @@ class TastiEngine(FullScanEngine):
     '''
     metadata = sqlalchemy.MetaData()
     metadata.reflect(conn)
-    blob_mapping_table = sqlalchemy.schema.Table(self.mapping_blobs_table_name, metadata,
+    mapping_blobs_table = sqlalchemy.schema.Table(self.mapping_blobs_table_name, metadata,
                                                  autoload=True, autoload_with=conn)
 
     # FIXME: there is a sqlalchemy SAWarning, This warning may become an exception in a future release
     rep_table = sqlalchemy.schema.Table(self.rep_table_name, metadata,
-                                        *[column._copy() for column in blob_mapping_table.columns],
-                                        *[constraint._copy() for constraint in blob_mapping_table.constraints]
+                                        *[column._copy() for column in mapping_blobs_table.columns],
+                                        *[constraint._copy() for constraint in mapping_blobs_table.constraints]
                                         )
 
     columns = []
