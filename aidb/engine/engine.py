@@ -1,4 +1,4 @@
-from aidb.engine.aggregate_engine import ApproximateAggregateEngine
+from aidb.engine.approx_aggregate_engine import ApproximateAggregateEngine
 from aidb.engine.limit_engine import LimitEngine
 from aidb.utils.asyncio import asyncio_run
 from aidb.query.query import Query

@@ -50,27 +50,27 @@ class AQPKeywordTests(unittest.TestCase):
 class AQPValidationTests(unittest.TestCase):
   def test_valid_aqp(self):
     query = Query(valid_avg_sql, None)
-    self.assertEqual(query.validate_aqp_or_throw(), True)
+    self.assertEqual(query.is_valid_aqp_query(), True)
 
   def test_invalid_unsupported_agg_aqp(self):
     query = Query(unsupported_agg_aqp_sql, None)
     with self.assertRaises(Exception):
-      query.validate_aqp_or_throw()
+      query.is_valid_aqp_query()
 
   def test_invalid_agg_no_et(self):
     query = Query(agg_no_et_sql, None)
     with self.assertRaises(Exception):
-      query.validate_aqp_or_throw()
+      query.is_valid_aqp_query()
 
   def test_invalid_agg_no_conf(self):
     query = Query(agg_no_conf_sql, None)
     with self.assertRaises(Exception):
-      query.validate_aqp_or_throw()
+      query.is_valid_aqp_query()
 
   def test_invalid_not_select_sql(self):
     query = Query(not_select_sql, None)
     with self.assertRaises(Exception):
-      query.validate_aqp_or_throw()
+      query.is_valid_aqp_query()
 
 
 if __name__ == '__main__':

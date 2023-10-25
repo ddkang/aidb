@@ -404,7 +404,7 @@ class Query(object):
 
   @cached_property
   def is_approx_agg_query(self):
-    return True if self.aggregated_columns_and_types and self.validate_aqp_or_throw() else False
+    return True if self.aggregated_columns_and_types and self.is_valid_aqp_query() else False
 
 
   @cached_property
@@ -462,7 +462,8 @@ class Query(object):
 
   @cached_property
   def error_target(self):
-    return self._get_keyword_arg(exp.ErrorTarget) / 100.
+    error_target = self._get_keyword_arg(exp.ErrorTarget)
+    return error_target / 100. if error_target else None
 
 
   @cached_property
@@ -472,13 +473,7 @@ class Query(object):
 
   # Validate AQP
 
-  def validate_aqp_or_throw(self):
-    if not self.error_target:
-      raise Exception('AQP error target not found')
-
-    if not self.confidence:
-      raise Exception('AQP confidence not found')
-
+  def is_valid_aqp_query(self):
     # Only accept select statements
     if not isinstance(self.base_sql_no_aqp, exp.Select):
       raise Exception('Not a select statement')
@@ -489,6 +484,9 @@ class Query(object):
       expression_counts[type(expression)] += 1
 
     if exp.Avg not in expression_counts and exp.Sum not in expression_counts and exp.Count not in expression_counts:
-      raise Exception('Supported aggregates are not found in approximate aggregation query')
+      raise Exception('Supported aggregates are not found in aggregation query')
+
+    if not self.error_target or not self.confidence:
+      return False
 
     return True

@@ -24,9 +24,11 @@ class FullScanEngine(BaseEngine):
     bound_service_list = self._get_required_bound_services_order(query)
     inference_services_executed = set()
     for bound_service in bound_service_list:
-      inp_query_str, _, _, _ = self.get_input_query_for_inference_service_filter_service(bound_service,
-                                                                                         query,
-                                                                                         inference_services_executed)
+      inp_query_str, _, _, _ = self.get_input_query_for_inference_service_filter_service(
+        bound_service,
+        query,
+        inference_services_executed
+      )
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))

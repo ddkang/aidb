@@ -17,26 +17,31 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'aggregate',
+    '''SELECT AVG(x_min) FROM objects00;''',
+    '''SELECT AVG(x_min) FROM objects00;'''
+  ),
+  (
+    'approx_aggregate',
     '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00;'''
   ),
   (
-    'aggregate',
+    'approx_aggregate',
     '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
     '''SELECT SUM(x_min) FROM objects00;'''
   ),
   (
-    'aggregate',
+    'approx_aggregate',
     '''SELECT COUNT(*) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
     '''SELECT COUNT(*) FROM objects00;'''
   ),
   (
-    'aggregate',
+    'approx_aggregate',
     '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000 ERROR_TARGET 5% CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000;'''
   ),
   (
-    'aggregate',
+    'approx_aggregate',
     '''SELECT AVG(x_min), COUNT(frame) FROM objects00 WHERE object_id > 0 ERROR_TARGET 1% CONFIDENCE 99;''',
     '''SELECT AVG(x_min), COUNT(frame) FROM objects00  WHERE object_id > 0;'''
   )
@@ -71,6 +76,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       aidb_res = aidb_engine.execute(aidb_query)[0]
       print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
       error_target = Query(aidb_query, aidb_engine._config).error_target
+      if error_target is None: error_target = 0
       assert self._equality_check(aidb_res, gt_res, error_target)
 
     del gt_engine
