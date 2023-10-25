@@ -1,36 +1,33 @@
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, auto
 
 import pandas as pd
 import scipy
 import statsmodels.stats.proportion
 from aidb.engine.base_engine import BaseEngine
 from aidb.estimator.estimator import (
-  Estimator, WeightedCountSetEstimator, WeightedMeanSetEstimator, WeightedSumSetEstimator)
+  Estimator, SampledChunk, WeightedCountSetEstimator, WeightedMeanSetEstimator, WeightedSumSetEstimator)
 from aidb.query.query import Query
-from aidb.samplers.sampler import SampledBlob
-from aidb.utils.constants import NUM_PILOT_SAMPLES, NUM_SAMPLES_SPLIT
 from sqlalchemy.sql import text
 
 import sqlglot.expressions as exp
 from sqlglot.generator import Generator
 
 
-def csv(*args, sep=", "):
+_NUM_PILOT_SAMPLES = 1000
+_NUM_SAMPLES_SPLIT = 20
+
+
+def get_csv(*args, sep=", "):
   return sep.join(arg for arg in args if arg)
 
 
+class EstimationMode(Enum):
+    FIND_NUM_SAMPLES = auto()
+    ESTIMATE_AGGREGATION_RESULTS = auto()
+
+
 class ApproximateAggregateEngine(BaseEngine):
-  class _estimation_mode(Enum):
-    find_num_samples = 'find_num_required_samples_mode'
-    estimate_aggregation_results = 'estimate_aggregation_results_mode'
-
-
-  class _proportion_confint_mode(Enum):
-    normal = 'normal'
-    wilson = 'wilson'
-
-
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
     if agg_type == exp.Sum:
       return WeightedSumSetEstimator(self.num_blob_ids)
@@ -39,7 +36,7 @@ class ApproximateAggregateEngine(BaseEngine):
     elif agg_type == exp.Count:
       return WeightedCountSetEstimator(self.num_blob_ids)
     else:
-      raise NotImplementedError()
+      raise NotImplementedError("Avg, Count and Sum aggregations are only supported right now")
 
 
   def query_select_all_exp(self, query, chunk_size, offset):
@@ -55,7 +52,7 @@ class ApproximateAggregateEngine(BaseEngine):
         limit = query_limit - offset
     if query_offset:
       offset += query_offset
-    select_all_str = csv(
+    select_all_str = get_csv(
       f"SELECT *",
       gen.sql(query_exp, "from"),
       *[gen.sql(sql) for sql in query_exp.args.get("laterals", [])],
@@ -127,11 +124,7 @@ class ApproximateAggregateEngine(BaseEngine):
 
   def find_num_required_samples(self, estimator, agg_stats, conf, alpha, error_target, num_column_samples):
     z_score = scipy.stats.norm.ppf(alpha / 2.)
-    method = self._proportion_confint_mode.normal.value if num_column_samples / NUM_PILOT_SAMPLES > 0.5 else self._proportion_confint_mode.wilson.value
-    population_lb = statsmodels.stats.proportion.proportion_confint(
-      num_column_samples, NUM_PILOT_SAMPLES, alpha,
-      method
-    )[0]
+    population_lb = statsmodels.stats.proportion.proportion_confint(num_column_samples, _NUM_PILOT_SAMPLES, alpha)[0]
     pilot_estimate = estimator.estimate(
       agg_stats,
       conf,
@@ -172,10 +165,10 @@ class ApproximateAggregateEngine(BaseEngine):
     2D list with row - chunk id, col - agg type
     """
     aggregation_data = []
-    chunk_size = max(infer_ouput_length // NUM_SAMPLES_SPLIT, 1)
+    chunk_size = max(infer_ouput_length // _NUM_SAMPLES_SPLIT, 1)
     offset = 0
     num_chunks_processed = 0
-    while num_chunks_processed < NUM_SAMPLES_SPLIT:
+    while num_chunks_processed < _NUM_SAMPLES_SPLIT:
       select_exp_str = self.get_select_exp_str(query)
       new_query = self.get_aggregation_query_for_chunk(query, chunk_size, offset, select_exp_str)
       chunk_statistics = await est_conn.execute(text(new_query))
@@ -199,11 +192,11 @@ class ApproximateAggregateEngine(BaseEngine):
         agg_stats = []
         num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
         mass = 1.
-        wt = NUM_SAMPLES_SPLIT / (num_column_samples / chunk_size)
+        wt = _NUM_SAMPLES_SPLIT / (num_column_samples / chunk_size)
         for chunk_statistics in sampled_chunks:
           statistic_ans = chunk_statistics[agg_col_index]
           if statistic_ans is None: continue
-          agg_stats.append(SampledBlob(wt, mass, statistic_ans, chunk_size))
+          agg_stats.append(SampledChunk(wt, mass, statistic_ans, chunk_size))
         results[agg_type].update({columns[0]: agg_stats})
         agg_col_index += 1
     return results
@@ -225,13 +218,15 @@ class ApproximateAggregateEngine(BaseEngine):
       estimator = self._get_estimator(agg_type)
       for columns in columns_per_agg:
         agg_column_data = agg_results_on_chunks[agg_type][columns[0]]
-        if mode == self._estimation_mode.find_num_samples:
+        if mode == EstimationMode.FIND_NUM_SAMPLES:
           num_column_samples = num_ids_per_service[query.config.column_by_service[columns[0]].service.name]
           results.append(
             self.find_num_required_samples(estimator, agg_column_data, conf, alpha, error_target, num_column_samples)
           )
-        elif mode == self._estimation_mode.estimate_aggregation_results:
+        elif mode == EstimationMode.ESTIMATE_AGGREGATION_RESULTS:
           results.append(estimator.estimate(agg_column_data, conf, num_column_samples=num_samples).estimate)
+        else:
+          raise ValueError('Please provide valid estimation mode argument')
     return results
 
 
@@ -241,7 +236,6 @@ class ApproximateAggregateEngine(BaseEngine):
     """
     inference_services_required = set([query.config.column_by_service[column] for column in query.columns_in_query])
     self.num_blob_ids = {}
-    # FIXME: need to find a better way of extracting blob tables alone without mappings from config
     for blob_table in self._config.blob_tables:
       async with self._sql_engine.begin() as conn:
         num_ids = await conn.execute(text(self.get_num_blob_ids_query(blob_table)))
@@ -253,7 +247,7 @@ class ApproximateAggregateEngine(BaseEngine):
         inference_services_required,
         query,
         conn,
-        NUM_PILOT_SAMPLES
+        _NUM_PILOT_SAMPLES
       )
       total_num_ids = sum(num_ids_per_service.values())
       sampled_chunks, chunk_size = await self.execute_query_on_data_chunks(total_num_ids, conn, query)
@@ -262,10 +256,10 @@ class ApproximateAggregateEngine(BaseEngine):
     num_samples_per_agg_column = self.get_estimates_on_data_chunks_agg_column_wise(
       query,
       agg_results_on_chunks,
-      mode=self._estimation_mode.find_num_samples,
+      mode=EstimationMode.FIND_NUM_SAMPLES,
       num_ids_per_service=num_ids_per_service
     )
-    num_samples = max(NUM_SAMPLES_SPLIT, max(num_samples_per_agg_column))
+    num_samples = max(_NUM_SAMPLES_SPLIT, max(num_samples_per_agg_column))
 
     # Final query execution on required number of samples
     async with self._sql_engine.begin() as conn:
@@ -284,7 +278,7 @@ class ApproximateAggregateEngine(BaseEngine):
     all_samples_estimates = self.get_estimates_on_data_chunks_agg_column_wise(
       query,
       agg_results_on_chunks,
-      mode=self._estimation_mode.estimate_aggregation_results,
+      mode=EstimationMode.ESTIMATE_AGGREGATION_RESULTS,
       num_samples=len(sampled_chunks) * chunk_size
     )
     return [tuple(all_samples_estimates)]

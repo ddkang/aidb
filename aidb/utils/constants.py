@@ -2,9 +2,6 @@ import hashlib
 from typing import List
 
 
-NUM_PILOT_SAMPLES = 1000
-NUM_SAMPLES_SPLIT = 20
-
 CACHE_PREFIX = '__cache'
 CONFIG_PREFIX = '__config'
 REP_PREFIX = '__rep'

@@ -8,8 +8,15 @@ import scipy
 import scipy.stats
 from statsmodels.stats.weightstats import DescrStatsW
 
-from aidb.samplers.sampler import SampledBlob
 from aidb.utils.logger import logger
+
+
+@dataclass
+class SampledChunk():
+  weight: float
+  mass: float
+  statistic: float
+  num_items: int
 
 
 @dataclass
@@ -59,7 +66,7 @@ class Estimator(abc.ABC):
 
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledChunk], conf: float, **kwargs) -> Estimate:
     pass
 
 
@@ -69,7 +76,7 @@ class WeightedMeanSingleEstimator(Estimator):
     self._population_size = sum(population_size.values())
 
 
-  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledChunk], conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
@@ -84,7 +91,7 @@ class WeightedMeanSingleEstimator(Estimator):
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledChunk], conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     counts = np.array([sample.num_items for sample in samples]).astype(int)
@@ -101,7 +108,7 @@ class WeightedMeanSetEstimator(Estimator):
 
 
 class WeightedCountSetEstimator(WeightedMeanSingleEstimator):
-  def estimate(self, samples: List[SampledBlob], conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledChunk], conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     # Statistics are already counts
     statistics = np.array([sample.statistic for sample in samples])
