@@ -2,8 +2,8 @@ from typing import List
 
 import boto3
 
-from aidb.blob_store.blob_store import Blob, BlobStore, DocumentBlob, ImageBlob
-from aidb.blob_store.utils import get_document_type, is_document, is_image_file
+from aidb_utilities.blob_store.blob_store import Blob, BlobStore, DocumentBlob, ImageBlob
+from aidb_utilities.blob_store.utils import get_document_type, is_document, is_image_file
 
 
 class AwsS3BlobStore(BlobStore):

@@ -1,7 +1,7 @@
 import os
 import time
 
-from aidb.blob_store.blob_store import DocumentType
+from aidb_utilities.blob_store.blob_store import DocumentType
 
 
 def get_file_extension(file: str):

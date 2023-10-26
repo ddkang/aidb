@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import List
 
-from blob_store.blob_store import Blob
+from aidb_utilities.blob_store.blob_store import Blob
 
-from aidb.blob_store.blob_store import BlobStore, DocumentBlob, ImageBlob
-from aidb.blob_store.utils import (get_document_type,
-                                   get_local_file_creation_time, is_document,
-                                   is_image_file)
+from aidb_utilities.blob_store.blob_store import BlobStore, DocumentBlob, ImageBlob
+from aidb_utilities.blob_store.utils import (get_document_type,
+                                             get_local_file_creation_time, is_document,
+                                             is_image_file)
 
 
 class LocalBlobStore(BlobStore):

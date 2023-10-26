@@ -1,4 +1,3 @@
-from dataclasses import asdict
 from typing import List, Union
 
 import pandas as pd
@@ -7,7 +6,7 @@ import sqlalchemy.ext.asyncio
 from sqlalchemy import MetaData
 from sqlalchemy.sql import text
 
-from aidb.blob_store.blob_store import Blob
+from aidb_utilities.blob_store.blob_store import Blob
 from aidb.config.config_types import python_type_to_sqlalchemy_type
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE

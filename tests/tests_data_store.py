@@ -2,9 +2,9 @@ import unittest
 import os
 import sqlalchemy
 import sqlalchemy.ext.asyncio
-from aidb.blob_store.local_storage import LocalImageBlobStore, LocalDocumentBlobStore
-from aidb.blob_store.aws_s3_storage import AwsS3ImageBlobStore
-from aidb.db_setup.blob_table import BaseTablesSetup
+from aidb_utilities.blob_store.local_storage import LocalImageBlobStore, LocalDocumentBlobStore
+from aidb_utilities.blob_store.aws_s3_storage import AwsS3ImageBlobStore
+from aidb_utilities.db_setup.blob_table import BaseTablesSetup
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
 
 from unittest import IsolatedAsyncioTestCase
@@ -50,11 +50,11 @@ class AidbDataStoreTests(IsolatedAsyncioTestCase):
     document_blobs = local_document_store.get_blobs()
     await setup_blob_tables(document_blobs)
 
-  async def test_aws_image_storage_positive(self):
-    clean_resources()
-    aws_image_store = AwsS3ImageBlobStore("bucket-name", "<your-aws-access-key>", "your-secret-key")
-    image_blobs = aws_image_store.get_blobs()
-    await setup_blob_tables(image_blobs)
+  # async def test_aws_image_storage_positive(self):
+  #   clean_resources()
+  #   aws_image_store = AwsS3ImageBlobStore("bucket-name", "<your-aws-access-key>", "your-secret-key")
+  #   image_blobs = aws_image_store.get_blobs()
+  #   await setup_blob_tables(image_blobs)
 
 
 if __name__ == '__main__':
