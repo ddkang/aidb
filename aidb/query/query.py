@@ -1,3 +1,4 @@
+import collections
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Dict, List
@@ -330,3 +331,52 @@ class Query(object):
         else:
           raise Exception('Unsupported column type')
     return column_set
+
+
+  @cached_property
+  def inference_engines_required_for_query(self):
+    """
+    Inference services required for sql query, will return a list of inference service
+    """
+    visited = self.columns_in_query.copy()
+    stack = list(visited)
+    inference_engines_required = set()
+
+    while stack:
+      col = stack.pop()
+
+      if col in self.config.column_by_service:
+        inference = self.config.column_by_service[col]
+
+        if inference not in inference_engines_required:
+          inference_engines_required.add(inference)
+
+          for inference_col in inference.binding.input_columns:
+            if inference_col not in visited:
+              stack.append(inference_col)
+              visited.add(inference_col)
+
+    return list(inference_engines_required)
+
+
+  def _get_keyword_arg(self, exp_type):
+    value = None
+    for node, _, key in self._expression.walk():
+      if isinstance(node, exp_type):
+        # FIXME: this is only for LIMIT query, modify later
+        if value is not None:
+          raise Exception('Multiple LIMIT keywords found')
+        else:
+          value = float(node.args['this'].args['this'])
+    return value
+
+
+  def get_limit_cardinality(self):
+    return self._get_keyword_arg(exp.Limit)
+
+
+  def is_limit_query(self):
+    cardinality = self.get_limit_cardinality()
+    if cardinality is None:
+      return False
+    return True

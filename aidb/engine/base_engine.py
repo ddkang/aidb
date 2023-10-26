@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
@@ -207,41 +207,60 @@ class BaseEngine():
     return join_path_str
 
 
+  def _get_select_join_str(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
+    column_to_root_column = self._config.columns_to_root_column
+    binding = bound_service.binding
+    inp_cols = binding.input_columns
+    root_inp_cols = [column_to_root_column.get(col, col) for col in inp_cols]
+
+    # used to select inp rows based on blob ids
+    if vector_id_table:
+      root_inp_cols.append(f'{vector_id_table}.vector_id')
+
+    inp_cols_str = ', '.join(root_inp_cols)
+    inp_tables = self._get_tables(root_inp_cols)
+    join_str = self._get_inner_join_query(inp_tables)
+
+    select_join_str = f'''
+                      SELECT {inp_cols_str}
+                      {join_str}
+                      '''
+
+    return inp_tables, select_join_str
+
+
   def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
     and_connected = []
     for fp in filtering_predicates:
-      and_connected.append(" OR ".join(
+      and_connected.append(' OR '.join(
         [predicate_to_str(p) for p in fp]))
-    return " AND ".join(and_connected)
+    return ' AND '.join(and_connected)
 
 
-  def get_input_query_for_inference_service(self, bound_service: BoundInferenceService, user_query: Query,
-                                            already_executed_inference_services: set):
+  def get_input_query_for_inference_service_filter_service(
+      self,
+      bound_service: BoundInferenceService,
+      user_query: Query,
+      already_executed_inference_services: Set[str]
+  ):
     """
     this function returns the input query to fetch the input records for an inference service
     input query will also contain the predicates that can be currently satisfied using the inference services
     that are already executed
     """
     filtering_predicates = user_query.filtering_predicates
-    column_to_root_column = self._config.columns_to_root_column
     inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
     tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
-    binding = bound_service.binding
-    inp_cols = binding.input_columns
-    root_inp_cols = [column_to_root_column.get(
-      col, col) for col in inp_cols]
 
-    inp_cols_str = ', '.join(root_inp_cols)
-    inp_tables = self._get_tables(root_inp_cols)
-    join_str = self._get_inner_join_query(inp_tables)
+    column_to_root_column = self._config.columns_to_root_column
+    inp_tables, select_join_str = self._get_select_join_str(bound_service)
 
     # filtering predicates that can be satisfied by the currently executed inference engines
     filtering_predicates_satisfied = []
     for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
                        tables_in_filtering_predicates):
-      if len(already_executed_inference_services.intersection(e)) == len(e) and len(
-          set(inp_tables).intersection(t)) == len(
-        t):
+      if len(already_executed_inference_services.intersection(e)) == len(e) \
+        and len(set(inp_tables).intersection(t)) == len(t):
         filtering_predicates_satisfied.append(p)
 
     where_str = self._get_where_str(filtering_predicates_satisfied)
@@ -249,14 +268,55 @@ class BaseEngine():
       where_str = where_str.replace(k, v)
 
     if len(filtering_predicates_satisfied) > 0:
-      inp_query_str = f'''
-              SELECT {inp_cols_str}
-              {join_str}
-              WHERE {where_str};
-            '''
+      inp_query_str = select_join_str + f'WHERE {where_str};'
     else:
-      inp_query_str = f'''
-              SELECT {inp_cols_str}
-              {join_str};
-            '''
+      inp_query_str = select_join_str + ';'
+
     return inp_query_str
+
+
+  def get_input_query_for_inference_service_filtered_index(
+      self,
+      bound_service: BoundInferenceService,
+      vector_id_table: str,
+      filtered_id_list: Optional[List[int]] = None
+  ):
+    """
+    This function returns the input query to fetch the input records for an inference service.
+    If filtered_id_list is provided, input query will only select those blobs in the list.
+    And this query doesn't filter vector id on original predicate.
+    * param bound_service: bounded inference service, used to know input columns
+    * param vector_id_table: a table which contains a column named 'vector_id' and maps blob keys to vector id
+    * param filtered_id_list: list of vector ids which will be selected in the query
+    """
+
+    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
+
+    # FIXME: for different database, the IN grammar maybe different
+    if filtered_id_list is None:
+      inp_query_str = select_join_str
+    elif len(filtered_id_list) == 1:
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]};'
+    else:
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))};'
+
+    return inp_query_str
+
+
+  def _get_left_join_str(self, rep_table_name: str, tables: List[str]) -> str:
+    """
+    Constructs a LEFT JOIN SQL string based on the given representative table name and a list of table names.
+    :param rep_table_name: Name of the representative table.
+    :param tables: List of table names to join.
+    """
+    join_strs = []
+    rep_cols = [rep_col.name.split('.')[0] for rep_col in self._config.tables[rep_table_name].columns]
+    for table_name in tables:
+      table_cols = [table_col.name.split('.')[0] for table_col in self._config.tables[table_name].columns]
+      join_conditions = [f'{rep_table_name}.{col} = {table_name}.{col}' for col in table_cols if col in rep_cols]
+      if join_conditions:
+        join_str = f"LEFT JOIN {table_name} ON {' AND '.join(join_conditions)}"
+        join_strs.append(join_str)
+      else:
+        raise Exception(f'Can\'t join table {rep_table_name} and {table_name}')
+    return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
