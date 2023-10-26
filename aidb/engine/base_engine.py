@@ -25,7 +25,7 @@ class BaseEngine():
       debug: bool = False,
   ):
     self._connection_uri = connection_uri
-    self._debug = debug
+    self._debug = True
 
     self._dialect = self._infer_dialect(connection_uri)
     self._sql_engine = self._create_sql_engine()

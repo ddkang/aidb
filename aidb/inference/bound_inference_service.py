@@ -127,7 +127,7 @@ class CachedBoundInferenceService(BoundInferenceService):
   async def _insert_in_cache_table(self, row, conn):
     input_dic = {}
     for col in self.binding.input_columns:
-      input_dic[self.convert_column_name(col)] = getattr(row, col)
+      input_dic[self.convert_column_name(col)] = getattr(row, col).item()
     insert = self.get_insert()(self._cache_table).values(**input_dic)
     await conn.execute(insert)
 
@@ -140,10 +140,10 @@ class CachedBoundInferenceService(BoundInferenceService):
     # Note: the input columns are assumed to be in order
     query_futures = []
     async with self._engine.begin() as conn:
-      for row in inputs.itertuples():
+      for ind, row in inputs.iterrows():
         cache_query = self._cache_query_stub.where(
           sqlalchemy.sql.and_(
-            *[col == row[idx] for idx, col in enumerate(self._cache_columns)]
+            *[col == row[col.name.replace("__", ".")].item() for idx, col in enumerate(self._cache_columns)]
           )
         )
         query_futures.append(conn.execute(cache_query))
@@ -160,7 +160,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(inp_row, col) for col in
+              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(inp_row, col).item() for col in
                 self.binding.input_columns]
             )
           )
@@ -169,72 +169,69 @@ class CachedBoundInferenceService(BoundInferenceService):
         else:
           inference_results = self.service.infer_one(inp_row)
 
-          if len(inference_results) == 0:
-            results.append(inference_results)
-            continue
+          if len(inference_results) > 0:
+            # FIXME: figure out where to put the column renaming
+            # assuming no ordering on inference engine output results
+            # columns with same name in different tables are assumed to be the same
+            for idx, col in enumerate(self.binding.output_columns):
+              if col not in inference_results.columns:
+                tbl, col_n = col.split('.')
+                for c in inference_results.columns:
+                  if c.split('.')[1] == col_n:
+                    inference_results.rename(columns={c: col}, inplace=True)
+                    break
 
-          # FIXME: figure out where to put the column renaming
-          # assuming no ordering on inference engine output results
-          # columns with same name in different tables are assumed to be the same
-          for idx, col in enumerate(self.binding.output_columns):
-            if col not in inference_results.columns:
-              tbl, col_n = col.split('.')
-              for c in inference_results.columns:
-                if c.split('.')[1] == col_n:
-                  inference_results.rename(columns={c: col}, inplace=True)
-                  break
+            try:
+              # returned results may have few redundant columns because of copying input
+              inference_results = inference_results[list(self.binding.output_columns)]
+            except:
+              raise Exception("Column binding column not found in the inference results")
 
-          try:
-            # returned results may have few redundant columns because of copying input
-            inference_results = inference_results[list(self.binding.output_columns)]
-          except:
-            raise Exception("Column binding column not found in the inference results")
+            tables = self.get_tables(self.binding.output_columns)
+            for table in tables:
+              columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
+              tmp_df = inference_results[columns]
+              tmp_df = tmp_df.astype('object')
 
-          tables = self.get_tables(self.binding.output_columns)
-          for table in tables:
-            columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
-            tmp_df = inference_results[columns]
-            tmp_df = tmp_df.astype('object')
-
-            if self._dialect == 'mysql' or self._dialect == 'postgresql':
-              tmp_values = tmp_df.to_dict(orient='list')
-              values = {}
-              for k, v in tmp_values.items():
-                k = k.split('.')[1]
-                values[k] = v
-              insert = self.get_insert()(self._tables[table]._table).values(**values)
-            elif self._dialect == 'sqlite':
-              for idx, row in tmp_df.iterrows():
-                sqlalchemy_row = {}
-                for col in tmp_df.columns:
-                  col_name = col.split('.')[1]
-                  sqlalchemy_row[col_name] = row[col]
-                # on_conflict_do_update takes only 1 row at a time
-                insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
-                  index_elements=self._tables[table].primary_key,
-                  set_=sqlalchemy_row,
-                )
-                await conn.execute(insert)
-
-            # FIXME: does this need to be used anywhere else?
-            # FIXME: needs to be tested for sqlite and postgresql
-            if len(self._tables[table].primary_key) > 0:
-              if self._dialect == 'mysql':
-                insert = insert.on_duplicate_key_update(
-                  values
-                )
-              elif self._dialect == 'postgresql':
-                insert = insert.on_conflict_do_update(
-                  index_elements=self._tables[table].primary_key,
-                  set_=values,
-                )
+              if self._dialect == 'mysql' or self._dialect == 'postgresql':
+                tmp_values = tmp_df.to_dict(orient='list')
+                values = {}
+                for k, v in tmp_values.items():
+                  k = k.split('.')[1]
+                  values[k] = v
+                insert = self.get_insert()(self._tables[table]._table).values(**values)
               elif self._dialect == 'sqlite':
-                pass
-              else:
-                raise NotImplementedError(f'Unknown dialect {self._dialect}')
+                for idx, row in tmp_df.iterrows():
+                  sqlalchemy_row = {}
+                  for col in tmp_df.columns:
+                    col_name = col.split('.')[1]
+                    sqlalchemy_row[col_name] = row[col]
+                  # on_conflict_do_update takes only 1 row at a time
+                  insert = self.get_insert()(self._tables[table]._table).values(sqlalchemy_row).on_conflict_do_update(
+                    index_elements=self._tables[table].primary_key,
+                    set_=sqlalchemy_row,
+                  )
+                  await conn.execute(insert)
 
-            if self._dialect != "sqlite":
-              await conn.execute(insert)
+              # FIXME: does this need to be used anywhere else?
+              # FIXME: needs to be tested for sqlite and postgresql
+              if len(self._tables[table].primary_key) > 0:
+                if self._dialect == 'mysql':
+                  insert = insert.on_duplicate_key_update(
+                    values
+                  )
+                elif self._dialect == 'postgresql':
+                  insert = insert.on_conflict_do_update(
+                    index_elements=self._tables[table].primary_key,
+                    set_=values,
+                  )
+                elif self._dialect == 'sqlite':
+                  pass
+                else:
+                  raise NotImplementedError(f'Unknown dialect {self._dialect}')
+
+              if self._dialect != "sqlite":
+                await conn.execute(insert)
 
           await self._insert_in_cache_table(inp_row, conn)
           results.append(inference_results)
