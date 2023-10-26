@@ -19,8 +19,9 @@ class AIDB:
 
     aidb_engine = Engine(f'{config.DB_URL}/{config.DB_NAME}', debug=False)
 
-    inference_engine = config.inference_engine
-    aidb_engine.register_inference_service(inference_engine)
-    aidb_engine.bind_inference_service(inference_engine.name,
-                                       InferenceBinding(config.input_col, config.output_col))
+    for inference_engine in config.inference_engines:
+      aidb_engine.register_inference_service(inference_engine)
+      aidb_engine.bind_inference_service(
+        inference_engine.name,
+        InferenceBinding(config.input_col, config.output_col))
     return aidb_engine
