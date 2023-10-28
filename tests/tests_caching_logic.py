@@ -28,20 +28,21 @@ class CachingLogic(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;''',
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;'''
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;''',
+        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;'''
       ),
     ]
 
     # no service calls before executing query
     assert aidb_engine._config.inference_services["objects00"].infer_one.calls == 0
 
-    for query_type, aidb_query, exact_query in queries:
+    calls = [20, 27]
+    for index, (query_type, aidb_query, exact_query) in enumerate(queries):
       print(f'Running query {exact_query} in ground truth database')
       # Run the query on the ground truth database
       async with gt_engine.begin() as conn:
@@ -52,7 +53,8 @@ class CachingLogic(IsolatedAsyncioTestCase):
       aidb_res = aidb_engine.execute(aidb_query)
       assert len(gt_res) == len(aidb_res)
       # running the same query, so number of inference calls should remain same
-      assert aidb_engine._config.inference_services["objects00"].infer_one.calls == 7
+
+      assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index]
       aidb_engine
     del gt_engine
     p.terminate()

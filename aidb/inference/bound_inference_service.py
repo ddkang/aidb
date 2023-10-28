@@ -92,16 +92,24 @@ class CachedBoundInferenceService(BoundInferenceService):
 
     self._cache_query_stub = sqlalchemy.sql.select(self._cache_columns)
 
-    output_cols = [
-       self._columns[col_name]
-      for col_name in self.binding.output_columns
-    ]
-    output_tables = list(set([str(col.table) for col in output_cols]))
-    output_tables = [self._tables[table_name] for table_name in output_tables]
-    joined = output_tables[0]
-    for table in output_tables[1:]:
-      joined = joined.join(table)
-    self._result_query_stub = sqlalchemy.sql.select(output_cols)
+    output_tables = set()
+    output_cols_with_label = []
+    for col_name in self.binding.output_columns:
+      col = self._columns[col_name]
+      output_tables.add(str(col.table))
+      output_cols_with_label.append(col.label(col_name))
+
+    joined = self._cache_table
+    for table_name in output_tables:
+      condition = []
+      for col in self._tables[table_name].columns:
+        for cache_col in self._cache_columns:
+          normal_name = cache_col.name.split('__')[1]
+          if col.name == normal_name:
+            condition.append(getattr(self._cache_table.c, cache_col.name)
+                             == getattr(self._tables[table_name]._table.c, col.name))
+      joined = sqlalchemy.join(joined, self._tables[table_name]._table, *condition)
+    self._result_query_stub = sqlalchemy.sql.select(output_cols_with_label).select_from(joined)
 
 
   def get_insert(self):
