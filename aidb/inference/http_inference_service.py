@@ -6,7 +6,7 @@ import requests
 
 from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
-
+from aidb.utils.perf_utils import call_counter
 
 def convert_response_to_output(
     response: Union[Dict, List],
@@ -138,6 +138,7 @@ class HTTPInferenceService(CachedInferenceService):
     return pd.DataFrame(output)
 
 
+  @call_counter
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     request = self.convert_input_to_request(input)
     response = self.request(request)
