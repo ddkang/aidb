@@ -92,7 +92,7 @@ class HTTPInferenceService(CachedInferenceService):
     # assume all numerical index form lists
     for k, v in self._columns_to_input_keys.items():
       if k > len(dict_input_keys):
-        break
+        continue
       k = dict_input_keys[k]
       if isinstance(v, tuple):
         aidb_list_count = sum(1 for e in v if isinstance(e, AIDBListType))
