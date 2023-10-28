@@ -34,8 +34,12 @@ class CachedBoundInferenceService(BoundInferenceService):
   _dialect: str
 
 
-  def convert_column_name(self, column_name: str):
+  def convert_normalized_col_name_to_cache_col_name(self, column_name: str):
     return column_name.replace('.', '__')
+
+
+  def convert_cache_column_name_to_normalized_column_name(self, column_name: str):
+    return column_name.replace('__', '.')
 
 
   def __post_init__(self):
@@ -51,7 +55,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       fk_constraints = {}
       for column_name in self.binding.input_columns:
         column = self._columns[column_name]
-        new_table_col_name = self.convert_column_name(column_name)
+        new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
         logger.debug('New table col name', new_table_col_name)
         logger.debug('Ref column', str(column))
         fk_ref_table_name = str(column).split('.')[0]
@@ -135,7 +139,7 @@ class CachedBoundInferenceService(BoundInferenceService):
   async def _insert_in_cache_table(self, row, conn):
     input_dic = {}
     for col in self.binding.input_columns:
-      input_dic[self.convert_column_name(col)] = getattr(row, col).item()
+      input_dic[self.convert_normalized_col_name_to_cache_col_name(col)] = getattr(row, col).item()
     insert = self.get_insert()(self._cache_table).values(**input_dic)
     await conn.execute(insert)
 
@@ -151,7 +155,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       for ind, row in inputs.iterrows():
         cache_query = self._cache_query_stub.where(
           sqlalchemy.sql.and_(
-            *[col == row[col.name.replace("__", ".")].item() for idx, col in enumerate(self._cache_columns)]
+            *[col == row[self.convert_cache_column_name_to_normalized_column_name(col.name)].item() for idx, col in enumerate(self._cache_columns)]
           )
         )
         query_futures.append(conn.execute(cache_query))
@@ -168,7 +172,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_column_name(col)) == getattr(inp_row, col).item() for col in
+              *[getattr(self._cache_table.c, self.convert_normalized_col_name_to_cache_col_name(col)) == getattr(inp_row, col).item() for col in
                 self.binding.input_columns]
             )
           )
