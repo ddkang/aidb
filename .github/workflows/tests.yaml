@@ -20,9 +20,9 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Download test data
-      run: | 
-         gdown https://drive.google.com/uc?id=1suiAyBKzPKrfRLHg3IR2jOnhcZUeBvvY
-         unzip data.zip -d tests/
+      run: |
+        gdown https://drive.google.com/uc?id=1suiAyBKzPKrfRLHg3IR2jOnhcZUeBvvY
+        unzip data.zip -d tests/
 
     - name: Run db setup tests
       run: python3 -m tests.tests_db_setup
