@@ -35,6 +35,9 @@ class BaseEngine():
     asyncio_run(self._sql_engine.dispose())
 
 
+  # ---------------------
+  # Setup
+  # ---------------------
   async def _infer_config(self) -> Config:
     '''
     Infer the database configuration from the sql engine.
