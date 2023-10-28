@@ -173,16 +173,9 @@ class CachedBoundInferenceService(BoundInferenceService):
             results.append(inference_results)
             continue
 
-          # FIXME: figure out where to put the column renaming
-          # assuming no ordering on inference engine output results
-          # columns with same name in different tables are assumed to be the same
+          # FIXME: figure out where to put the column renamingme
           for idx, col in enumerate(self.binding.output_columns):
-            if col not in inference_results.columns:
-              tbl, col_n = col.split('.')
-              for c in inference_results.columns:
-                if c.split('.')[1] == col_n:
-                  inference_results.rename(columns={c: col}, inplace=True)
-                  break
+            inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
 
           try:
             # returned results may have few redundant columns because of copying input
