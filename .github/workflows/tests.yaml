@@ -41,3 +41,6 @@ jobs:
 
     - name: Run caching logic tests
       run: python3 -m tests.tests_caching_logic
+
+    - name: Run data store tests
+      run: python3 -m tests.tests_data_store
