@@ -58,4 +58,4 @@ class BlobStore(ABC):
 
   @abstractmethod
   def get_blobs(self) -> List[Blob]:
-    pass
+    raise Exception("get_blobs function not implemented")

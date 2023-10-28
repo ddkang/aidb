@@ -50,11 +50,12 @@ class AidbDataStoreTests(IsolatedAsyncioTestCase):
     document_blobs = local_document_store.get_blobs()
     await setup_blob_tables(document_blobs)
 
-  # async def test_aws_image_storage_positive(self):
-  #   clean_resources()
-  #   aws_image_store = AwsS3ImageBlobStore('bucket-name', '<your-aws-access-key>', 'your-secret-key')
-  #   image_blobs = aws_image_store.get_blobs()
-  #   await setup_blob_tables(image_blobs)
+  @unittest.skip("Skip in case of absence of AWS credentials")
+  async def test_aws_image_storage_positive(self):
+    clean_resources()
+    aws_image_store = AwsS3ImageBlobStore('bucket-name', '<your-aws-access-key>', 'your-secret-key')
+    image_blobs = aws_image_store.get_blobs()
+    await setup_blob_tables(image_blobs)
 
 
 if __name__ == '__main__':
