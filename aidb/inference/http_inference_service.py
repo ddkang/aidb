@@ -10,7 +10,7 @@ from aidb.inference.cached_inference_service import CachedInferenceService
 
 def convert_response_to_output(
     response: Union[Dict, List],
-    _response_keys_to_columns: Dict[Union[str, tuple], str]) -> Dict:
+    _response_keys_to_columns: Dict[Union[str, tuple], int]) -> Dict:
   output = {v: [] for v in _response_keys_to_columns.values()}
   for k, v in _response_keys_to_columns.items():
     if not isinstance(k, tuple):
@@ -53,8 +53,8 @@ class HTTPInferenceService(CachedInferenceService):
       default_args: Union[Dict, None]=None,
       copy_input: bool=True,
       batch_supported: bool=False,
-      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
-      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      columns_to_input_keys: Dict[int, Union[str, tuple]]=None,
+      response_keys_to_columns: Dict[Union[str, tuple], int]=None,
       **kwargs
   ):
     '''
@@ -87,9 +87,13 @@ class HTTPInferenceService(CachedInferenceService):
     else: # isinstance(input, pd.DataFrame)
       num_rows = len(input)
       dict_input = input.to_dict(orient='list')
+    dict_input_keys = list(dict_input.keys())
     # to support arbitrary batch size
     # assume all numerical index form lists
     for k, v in self._columns_to_input_keys.items():
+      if k > len(dict_input_keys):
+        break
+      k = dict_input_keys[k]
       if isinstance(v, tuple):
         aidb_list_count = sum(1 for e in v if isinstance(e, AIDBListType))
         if aidb_list_count == 0:
@@ -106,7 +110,7 @@ class HTTPInferenceService(CachedInferenceService):
             request[key] = dict_input[k][i]
         else:
           raise ValueError(f'Cannot have more than 1 AIDBListType in columns_to_input_keys')
-      elif k in dict_input: # isinstance(v, str)
+      else: # isinstance(v, str)
         request[v] = dict_input[k][0]
     request = unflatten_list(request, self._separator)
     if remove_ghost_key:

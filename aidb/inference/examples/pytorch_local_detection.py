@@ -15,14 +15,12 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
       use_batch: bool=True,
       batch_size: int=0,
       box_threshold: float=0.35,
-      image_path_col: str='image',
   ):
     super().__init__(name=name, preferred_batch_size=batch_size, is_single=is_single)
     self._model = Model(model_config_path, model_checkpoint_path)
     self._caption = caption
     self._use_batch = use_batch
     self._box_threshold = box_threshold
-    self._image_path_col = image_path_col
 
 
   def signature(self):
@@ -30,7 +28,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    image = [input.to_dict()[self._image_path_col]]
+    image = [input.to_dict().values()[0]]
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
@@ -48,14 +46,14 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
     if not self._use_batch:
       return super().infer_batch(inputs)
 
-    images = inputs[self._image_path_col].tolist()
+    images = inputs.to_dict(orient="list").values()[0]
     outputs_merge = []
     for i in range(0, len(images), self.preferred_batch_size):
       image_batch = images[i:i+self.preferred_batch_size] if i+self.preferred_batch_size < len(images) else images[i:]
       outputs = self._model.predict_with_caption(image_batch, self._caption, self._box_threshold)
       outputs = [
         {
-          self._image_path_col: image,
+          "image": image,
           "min_x": xyxy[0],
           "min_y": xyxy[1],
           "max_x": xyxy[2],
