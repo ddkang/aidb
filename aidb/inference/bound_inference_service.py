@@ -208,6 +208,20 @@ class CachedBoundInferenceService(BoundInferenceService):
                   k = k.split('.')[1]
                   values[k] = v
                 insert = self.get_insert()(self._tables[table]._table).values(**values)
+
+                # FIXME: does this need to be used anywhere else?
+                # FIXME: needs to be tested for sqlite and postgresql
+                if len(self._tables[table].primary_key) > 0:
+                  if self._dialect == 'mysql':
+                    insert = insert.on_duplicate_key_update(
+                      values
+                    )
+                  elif self._dialect == 'postgresql':
+                    insert = insert.on_conflict_do_update(
+                      index_elements=self._tables[table].primary_key,
+                      set_=values,
+                    )
+                await conn.execute(insert)
               elif self._dialect == 'sqlite':
                 for idx, row in tmp_df.iterrows():
                   sqlalchemy_row = {}
@@ -220,26 +234,6 @@ class CachedBoundInferenceService(BoundInferenceService):
                     set_=sqlalchemy_row,
                   )
                   await conn.execute(insert)
-
-              # FIXME: does this need to be used anywhere else?
-              # FIXME: needs to be tested for sqlite and postgresql
-              if len(self._tables[table].primary_key) > 0:
-                if self._dialect == 'mysql':
-                  insert = insert.on_duplicate_key_update(
-                    values
-                  )
-                elif self._dialect == 'postgresql':
-                  insert = insert.on_conflict_do_update(
-                    index_elements=self._tables[table].primary_key,
-                    set_=values,
-                  )
-                elif self._dialect == 'sqlite':
-                  pass
-                else:
-                  raise NotImplementedError(f'Unknown dialect {self._dialect}')
-
-              if self._dialect != "sqlite":
-                await conn.execute(insert)
 
           await self._insert_in_cache_table(inp_row, conn)
           results.append(inference_results)
