@@ -19,10 +19,11 @@ class BaseTablesSetup(object):
     self._dialect = infer_dialect(connection_uri)
     self._sql_engine = create_sql_engine(connection_uri)
 
+
   async def _create_table(self, table_name, table_columns):
-    """
+    '''
     creates the table in the database
-    """
+    '''
     async with self._sql_engine.begin() as conn:
       metadata = MetaData(bind=conn)
       _ = sqlalchemy.Table(table_name, metadata, *[
@@ -30,12 +31,13 @@ class BaseTablesSetup(object):
       ])
       await conn.run_sync(lambda conn: metadata.create_all(conn))
 
+
   async def _setup_blob_config_table(self, table_name, table_columns):
-    """
+    '''
     setup the blob_key configuration table
-    """
+    '''
     await self._create_table(BLOB_TABLE_NAMES_TABLE,
-                             [("table_name", sqlalchemy.String(20), True), ("blob_key", sqlalchemy.String(20), True)])
+                             [('table_name', sqlalchemy.String(20), True), ('blob_key', sqlalchemy.String(20), True)])
     async with self._sql_engine.begin() as conn:
       for c_name, _, is_pk in table_columns:
         if is_pk:
@@ -45,22 +47,24 @@ class BaseTablesSetup(object):
             .bindparams(table_name=table_name, blob_key=c_name)
           )
 
+
   async def _insert_data_in_table(self, table_name: str, data: pd.DataFrame):
-    """
+    '''
     inserts rows in the table
-    """
+    '''
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: data.to_sql(table_name, conn, if_exists='append', index=False))
 
-  def insert_data(self, table_name, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
-    """
+
+  def insert_blob_meta_data(self, table_name, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
+    '''
     creates the blob table and the blob key configuration table
     inserts the blob data in the blob table
-    """
-    assert len(primary_key_cols) > 0, "Primary key should be specified"
+    '''
+    assert len(primary_key_cols) > 0, 'Primary key should be specified'
     if not isinstance(blob_data, pd.DataFrame):
       blob_data = pd.DataFrame([b.to_dict() for b in blob_data])
-    assert blob_data.shape[0] > 0, "No blobs to insert in the blob table"
+    assert blob_data.shape[0] > 0, 'No blobs to insert in the blob table'
     table_columns = []
     for column in blob_data.columns:
       dtype = python_type_to_sqlalchemy_type(blob_data[column].dtype)

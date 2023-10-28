@@ -5,9 +5,9 @@ from typing import List, Union
 
 
 class DocumentType(Enum):
-  PDF = "pdf"
-  DOCX = "docx"
-  DOC = "doc"
+  PDF = 'pdf'
+  DOCX = 'docx'
+  DOC = 'doc'
 
 
 @dataclass
@@ -16,7 +16,7 @@ class Blob:
 
   def to_dict(self):
     return {
-      "blob_id": self.blob_id,
+      'blob_id': self.blob_id,
     }
 
 
@@ -27,9 +27,9 @@ class ImageBlob(Blob):
 
   def to_dict(self):
     return {
-      "blob_id": self.blob_id,
-      "image_path": self.image_path,
-      "created_at": self.created_at
+      'blob_id': self.blob_id,
+      'image_path': self.image_path,
+      'created_at': self.created_at
     }
 
 
@@ -41,19 +41,19 @@ class DocumentBlob(Blob):
 
   def to_dict(self):
     return {
-      "blob_id": self.blob_id,
-      "doc_path": self.doc_path,
-      "created_at": self.created_at,
-      "doc_type": self.doc_type.value
+      'blob_id': self.blob_id,
+      'doc_path': self.doc_path,
+      'created_at': self.created_at,
+      'doc_type': self.doc_type.value
     }
 
 
 class BlobStore(ABC):
 
   def __int__(self):
-    """
+    '''
     configuration, data store access keys, etc.
-    """
+    '''
     pass
 
   @abstractmethod

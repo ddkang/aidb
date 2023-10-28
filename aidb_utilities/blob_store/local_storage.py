@@ -4,15 +4,13 @@ from typing import List
 from aidb_utilities.blob_store.blob_store import Blob
 
 from aidb_utilities.blob_store.blob_store import BlobStore, DocumentBlob, ImageBlob
-from aidb_utilities.blob_store.utils import (get_document_type,
-                                             get_local_file_creation_time, is_document,
-                                             is_image_file)
+from aidb_utilities.blob_store.utils import get_document_type, get_local_file_creation_time, is_document, is_image_file
 
 
 class LocalBlobStore(BlobStore):
 
   def __init__(self, local_dir):
-    self.files = Path(local_dir).rglob("*")
+    self.files = Path(local_dir).rglob('*')
 
   def get_blobs(self) -> List[Blob]:
     pass
