@@ -69,8 +69,7 @@ class BaseTablesSetup(object):
     for column in blob_data.columns:
       dtype = python_type_to_sqlalchemy_type(blob_data[column].dtype)
       if dtype == sqlalchemy.String:
-        # TODO: VAR CHAR length should be based on the number of characters
-        c_type = sqlalchemy.String(50)  # 50 characters long
+        c_type = sqlalchemy.Text()
       else:
         c_type = dtype
       table_columns.append((column, c_type, column in primary_key_cols))
