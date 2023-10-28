@@ -14,7 +14,7 @@ class AwsS3BlobStore(BlobStore):
     self.bucket = s3.Bucket(bucket_name)
 
   def get_blobs(self) -> List[Blob]:
-    pass
+    raise Exception("get_blobs function not implemented")
 
 
 class AwsS3ImageBlobStore(AwsS3BlobStore):

@@ -13,7 +13,7 @@ class LocalBlobStore(BlobStore):
     self.files = Path(local_dir).rglob('*')
 
   def get_blobs(self) -> List[Blob]:
-    pass
+    raise Exception("get_blobs function not implemented")
 
 
 class LocalImageBlobStore(LocalBlobStore):
