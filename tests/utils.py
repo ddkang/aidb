@@ -3,13 +3,13 @@ from aidb.engine import Engine
 
 async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, blob_mapping_table_name = None):
   # Set up the ground truth database
-  gt_db_fname = 'aidb_gt'
+  gt_db_fname = 'aidb_gt.sqlite'
   await create_db(db_url, gt_db_fname)
   gt_engine = await setup_db(db_url, gt_db_fname, data_dir)
   await insert_data_in_tables(gt_engine, data_dir, False)
 
   # Set up the aidb database
-  aidb_db_fname = 'aidb_test'
+  aidb_db_fname = 'aidb_test.sqlite'
   await create_db(db_url, aidb_db_fname)
   tmp_engine = await setup_db(db_url, aidb_db_fname, data_dir)
   await clear_all_tables(tmp_engine)
