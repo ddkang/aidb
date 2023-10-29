@@ -37,7 +37,7 @@ sympy==1.11.1
 tomli==2.0.1
 typing_extensions==4.7.1
 tzdata==2023.3
-urllib3==2.0.4
+urllib3==1.26.17
 uvicorn==0.23.2
 weaviate-client==3.24.1
 flatten-json==0.1.13
