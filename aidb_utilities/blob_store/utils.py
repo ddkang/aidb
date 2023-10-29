@@ -1,6 +1,7 @@
 import os
 import time
 
+from PIL import Image
 from aidb_utilities.blob_store.blob_store import DocumentType
 
 
@@ -13,9 +14,12 @@ def get_local_file_creation_time(file: str):
 
 
 def is_image_file(file: str):
-  image_extension_filter = ['jpg', 'jpeg', 'png']
-  file_ext = get_file_extension(file)
-  return file_ext in image_extension_filter
+  img = Image.open(file)
+  try:
+    img.verify()
+    return True
+  except Exception:
+    return False
 
 
 def is_document(file: str):

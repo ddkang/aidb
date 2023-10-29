@@ -43,3 +43,4 @@ weaviate-client==3.24.1
 flatten-json==0.1.13
 gdown==4.7.1
 boto3==1.28.63
+Pillow==10.1.0
