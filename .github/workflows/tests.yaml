@@ -46,4 +46,4 @@ jobs:
       run: python3 -m tests.tests_data_store
 
     - name: Run vector database setup tests
-        run: python3 -m tests.tests_vector_database_setup
+      run: python3 -m tests.tests_vector_database_setup
