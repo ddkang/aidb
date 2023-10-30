@@ -81,12 +81,14 @@ class FaissVectorDatabase(VectorDatabase):
       self.index_list[index_name] = faiss.index_cpu_to_gpu(
         self.gpu_resources, 0, self.index_list[index_name])
 
+    self.save_index(index_name)
+
 
   def load_index(self, index_name: str):
     '''
     Read index from disk
     '''
-    load_path = self.path + index_name + '.index'
+    load_path = f'{self.path}/{index_name}.index'
     self.index_list[index_name] = faiss.read_index(load_path)
     if self.gpu_resources is not None:
       self.index_list[index_name] = faiss.index_cpu_to_gpu(
@@ -94,7 +96,7 @@ class FaissVectorDatabase(VectorDatabase):
 
 
   def save_index(self, index_name:str):
-    save_path = self.path + index_name + '.index'
+    save_path = f'{self.path}/{index_name}.index'
     faiss.write_index(self.index_list[index_name], save_path)
 
 
@@ -128,6 +130,7 @@ class FaissVectorDatabase(VectorDatabase):
     id_list = np.array(list(data['id'])).astype('int64')
 
     self.index_list[index_name].add_with_ids(embedding_list, id_list)
+    self.save_index(index_name)
 
 
   def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
@@ -174,5 +177,4 @@ class FaissVectorDatabase(VectorDatabase):
     data = pd.DataFrame({'id': reps.tolist(), 'values': embeddings[reps].tolist()})
     self.insert_data(index_name, data)
     topk_reps, topk_dists = self.query_by_embedding(index_name, embeddings, top_k=top_k)
-    self.save_index(index_name)
     return topk_reps, topk_dists
