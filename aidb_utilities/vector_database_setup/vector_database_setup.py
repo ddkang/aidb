@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from typing import Union, NewType
 
@@ -47,7 +48,15 @@ class VectorDatabaseSetup:
     This function is used to generate embedding based on blob file, the input has foramt
     pd.DataFrame({'vector_id':[], 'path':[]}, the output should have format pd.DataFrame({'id':[], 'values':[]}
     '''
-    raise NotImplementedError
+
+    # FIXME: this should be replaced real generate_embedding function
+    def generate_data(data_size, emb_size):
+      np.random.seed(1234)
+      embeddings = np.random.rand(data_size, emb_size)
+      data = pd.DataFrame({'id': range(data_size), 'values': embeddings.tolist()})
+      return data
+
+    return generate_data(1000, 128)
 
 
   def _create_vector_database_index(self, data: pd.DataFrame):
