@@ -28,7 +28,7 @@ class ImageBlob(Blob):
   def to_dict(self):
     return {
       'blob_id': self.blob_id,
-      'image_path': self.image_path,
+      'path': self.image_path,
       'created_at': self.created_at
     }
 
@@ -42,7 +42,7 @@ class DocumentBlob(Blob):
   def to_dict(self):
     return {
       'blob_id': self.blob_id,
-      'doc_path': self.doc_path,
+      'path': self.doc_path,
       'created_at': self.created_at,
       'doc_type': self.doc_type.value
     }
