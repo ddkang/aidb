@@ -78,7 +78,6 @@ class VectorDatabaseSetup:
       user_vector_database.create_index(self.index_name, recreate_index=True)
 
     user_vector_database.insert_data(self.index_name, data)
-    return user_vector_database
 
 
   async def setup(self, path_column: Optional[str] = None):
