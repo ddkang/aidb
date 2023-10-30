@@ -53,8 +53,8 @@ class HTTPInferenceService(CachedInferenceService):
       default_args: Union[Dict, None]=None,
       copy_input: bool=True,
       batch_supported: bool=False,
-      columns_to_input_keys: Dict[int, Union[str, tuple]]=None,
-      response_keys_to_columns: Dict[Union[str, tuple], int]=None,
+      columns_to_input_keys: List[Union[str, tuple]]=None,
+      response_keys_to_columns: List[Union[str, tuple]]=None,
       **kwargs
   ):
     '''
@@ -90,7 +90,7 @@ class HTTPInferenceService(CachedInferenceService):
     dict_input_keys = list(dict_input.keys())
     # to support arbitrary batch size
     # assume all numerical index form lists
-    for k, v in self._columns_to_input_keys.items():
+    for k, v in enumerate(self._columns_to_input_keys):
       if k > len(dict_input_keys):
         continue
       k = dict_input_keys[k]
@@ -136,6 +136,7 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def convert_response_to_output(self, response: Dict) -> pd.DataFrame:
+    self._response_keys_to_columns = {k: i for i, k in enumerate(self._response_keys_to_columns)}
     output = convert_response_to_output(response, self._response_keys_to_columns)
     if not any(isinstance(value, list) for value in output.values()):
       output = {k: [v] for k, v in output.items()}
