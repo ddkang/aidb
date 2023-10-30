@@ -22,7 +22,7 @@ def clean_vector_database():
 
 def test_equality(value):
   np.random.seed(1234)
-  embeddings = np.random.rand(1000, 128)
+  embeddings = np.random.rand(3, 128)
   embeddings = (embeddings * 100).astype(int)
   value = (value * 100).astype(int)
   assert np.array_equal(embeddings, value)
@@ -43,7 +43,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     await vector_database.setup()
 
     existing_vector_database = FaissVectorDatabase(auth)
-    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(1000)), reload=True)
+    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(3)), reload=True)
     test_equality(value)
 
 
@@ -56,7 +56,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     await vector_database.setup()
 
     existing_vector_database = ChromaVectorDatabase(auth)
-    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(1000)), reload=True)
+    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(3)), reload=True)
     test_equality(value)
 
 
@@ -72,7 +72,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     await vector_database.setup()
 
     existing_vector_database = WeaviateVectorDatabase(auth)
-    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(1000)), reload=True)
+    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(3)), reload=True)
     test_equality(value)
 
 

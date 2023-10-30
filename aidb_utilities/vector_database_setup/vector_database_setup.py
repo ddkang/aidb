@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Union, NewType
+from typing import Union, NewType, Optional
 
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
 from aidb.utils.db import create_sql_engine, infer_dialect
@@ -50,13 +50,13 @@ class VectorDatabaseSetup:
     '''
 
     # FIXME: this should be replaced real generate_embedding function
-    def generate_data(data_size, emb_size):
+    def generate_data(vector_database_df):
       np.random.seed(1234)
-      embeddings = np.random.rand(data_size, emb_size)
-      data = pd.DataFrame({'id': range(data_size), 'values': embeddings.tolist()})
+      embeddings = np.random.rand(len(vector_database_df), 128)
+      data = pd.DataFrame({'id': vector_database_df['vector_id'], 'values': embeddings.tolist()})
       return data
 
-    return generate_data(1000, 128)
+    return generate_data(vector_database_df)
 
 
   def _create_vector_database_index(self, data: pd.DataFrame):
@@ -67,24 +67,27 @@ class VectorDatabaseSetup:
     }
 
     try:
-      user_database = vector_database[self.vd_type](self.auth)
+      user_vector_database = vector_database[self.vd_type](self.auth)
     except KeyError:
       raise ValueError(f'{self.vd_type} is not a supported database type. We support FAISS, Chroma and Weaviate.')
 
     if self.vd_type == 'FAISS':
       embedding_length = len(data['values'].iloc[0])
-      user_database.create_index(self.index_name, embedding_length, recreate_index=True)
+      user_vector_database.create_index(self.index_name, embedding_length, recreate_index=True)
     else:
-      user_database.create_index(self.index_name, recreate_index=True)
+      user_vector_database.create_index(self.index_name, recreate_index=True)
 
-    user_database.insert_data(self.index_name, data)
-    return user_database
+    user_vector_database.insert_data(self.index_name, data)
+    return user_vector_database
 
 
-  async def setup(self):
+  async def setup(self, path_column: Optional[str] = None):
+    if path_column is None:
+      path_column = 'path'
+
     async with self._sql_engine.begin() as conn:
       select_columns = await self._retrieve_blob_keys(conn)
-      select_columns.append('path')
+      select_columns.append(path_column)
       select_str = ', '.join(select_columns)
       query_str = f'''
                       SELECT {select_str}
@@ -94,12 +97,12 @@ class VectorDatabaseSetup:
       df = await conn.run_sync(lambda conn: pd.read_sql(query_str, conn))
 
       df['vector_id'] = list(range(len(df)))
-      blob_mapping_table_df = df.drop(columns='path')
+      blob_mapping_table_df = df.drop(columns=path_column)
       # create blob mapping table
       await conn.run_sync(lambda conn: blob_mapping_table_df.to_sql(self.blob_mapping_table_name, conn,
                                                                     index=False, if_exists='append'))
 
-    vector_database_df = df[['vector_id', 'path']]
+    vector_database_df = df[['vector_id', path_column]]
     embeddings_df = self._get_embedding(vector_database_df)
 
     self._create_vector_database_index(embeddings_df)
