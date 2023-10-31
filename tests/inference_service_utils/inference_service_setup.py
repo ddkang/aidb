@@ -19,8 +19,6 @@ def register_inference_services(engine: Engine, data_dir: str):
     output_cols = []
     columns_to_input_keys = []
     output_keys_to_columns = []
-    in_col_idx = 0
-    out_col_idx = 0
     for col in columns:
       if col.startswith("in__"):
         columns_to_input_keys.append(col[4:])
