@@ -15,12 +15,11 @@ sentiment_inference_service = HuggingFaceNLP(
       response_keys_to_columns=[(AIDBListType(), AIDBListType(), 'label'),  # 0 means the first column of the output dataframe, but the actual first column has name "sentiment.label" 
                                 (AIDBListType(), AIDBListType(), 'score')], # 1 means the second column of the output dataframe, but the actual second column has name "sentiment.score"
       model="LiYuan/amazon-review-sentiment-analysis",
-      default_args={"options": {"wait_for_model": True}},
-      copy_input=True)
+      default_args={"options": {"wait_for_model": True}})
 inference_engines = [
   {
     "service": sentiment_inference_service,
     "input_col": ("blobs00.review", "blobs00.review_id"), # I leave the bindings as they are for now, but they may change following the change above
-    "output_col": ("sentiment.label", "sentiment.score", "sentiment.review", "sentiment.review_id")
+    "output_col": ("sentiment.label", "sentiment.score", "sentiment.review_id")
   }
 ]

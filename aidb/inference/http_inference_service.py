@@ -8,6 +8,7 @@ from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
 from aidb.utils.perf_utils import call_counter
 
+
 def convert_response_to_output(
     response: Union[Dict, List],
     _response_keys_to_columns: Dict[Union[str, tuple], int]) -> Dict:
@@ -51,7 +52,6 @@ class HTTPInferenceService(CachedInferenceService):
       url: str=None,
       headers: Union[Dict, None]=None,
       default_args: Union[Dict, None]=None,
-      copy_input: bool=True,
       batch_supported: bool=False,
       columns_to_input_keys: List[Union[str, tuple]]=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
@@ -60,14 +60,12 @@ class HTTPInferenceService(CachedInferenceService):
     '''
     :param str url: The URL to send the request to. The request will be a POST request.
     :param dict headers: The headers to send with the request.
-    :param bool copy_input: Whether to copy the input _after_ receiving the request from the server.
     :param bool batch_supported: Whether the server supports batch requests.
     '''
     super().__init__(*args, **kwargs)
     self._url = url
     self._headers = headers
     self._default_args = default_args
-    self._copy_input = copy_input
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
@@ -149,9 +147,6 @@ class HTTPInferenceService(CachedInferenceService):
     response = self.request(request)
     output = self.convert_response_to_output(response)
 
-    # TODO: is this correct for zero or 2+ outputs?
-    if self._copy_input:
-      output = output.assign(**input)
     return output
 
 
@@ -166,7 +161,5 @@ class HTTPInferenceService(CachedInferenceService):
     # We assume the server returns a list of responses
     response = response.json()
     outputs = [pd.read_json(r, orient='records') for r in response]
-    if self._copy_input:
-      outputs = [o.assign(**i) for o, (_, i) in zip(outputs, inputs.iterrows())]
 
     return outputs

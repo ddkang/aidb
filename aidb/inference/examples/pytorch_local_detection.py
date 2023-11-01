@@ -32,7 +32,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
-        self._image_path_col: image[0],
+        "image": image[0],
         "min_x": xyxy[0],
         "min_y": xyxy[1],
         "max_x": xyxy[2],

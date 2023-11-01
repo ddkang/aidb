@@ -9,7 +9,6 @@ class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_audio',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
@@ -30,7 +29,6 @@ class OpenAIAudio(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
@@ -42,7 +40,6 @@ class OpenAIImage(HTTPInferenceService):
   def __init__(
       self,
       name='openai_image', 
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None, 
       default_args: Dict[str, Union[str, int]]=None,
@@ -65,7 +62,6 @@ class OpenAIImage(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
@@ -77,7 +73,6 @@ class OpenAIText(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_text',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
@@ -94,7 +89,6 @@ class OpenAIText(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,

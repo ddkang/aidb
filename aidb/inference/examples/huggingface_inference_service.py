@@ -10,7 +10,6 @@ class HuggingFaceNLP(HTTPInferenceService):
   def __init__(
       self,
       name: str='huggingface_nlp',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
@@ -27,7 +26,6 @@ class HuggingFaceNLP(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
@@ -39,7 +37,6 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
   def __init__(
       self,
       name: str='huggingface_vision_audio',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
@@ -55,7 +52,6 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       response_keys_to_columns=response_keys_to_columns,

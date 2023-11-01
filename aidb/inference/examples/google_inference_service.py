@@ -22,7 +22,6 @@ class GoogleVisionAnnotate(HTTPInferenceService):
   def __init__(
       self,
       name: str='google_vision_annotate',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
@@ -46,7 +45,6 @@ class GoogleVisionAnnotate(HTTPInferenceService):
           'x-goog-user-project': project_id,
         },
         default_args=default_args,
-        copy_input=copy_input,
         batch_supported=False,
         is_single=is_single,
         columns_to_input_keys=columns_to_input_keys,
