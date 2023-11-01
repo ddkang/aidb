@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 import os
 
@@ -14,6 +14,8 @@ class OpenAIAudio(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: List=None,
+      output_columns_types: List=None,
       infer_type: str='transcriptions'):
     assert infer_type in [
         "transcriptions",
@@ -33,6 +35,8 @@ class OpenAIAudio(HTTPInferenceService):
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )
 
 
@@ -45,6 +49,8 @@ class OpenAIImage(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: List=None,
+      output_columns_types: List=None,
       infer_type: str='generations'
     ):
     assert infer_type in [
@@ -66,6 +72,8 @@ class OpenAIImage(HTTPInferenceService):
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )
 
 
@@ -78,6 +86,8 @@ class OpenAIText(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: List=None,
+      output_columns_types: List=None,
     ):
     if token is None:
       token = os.environ['OPENAI_API_KEY']
@@ -93,4 +103,6 @@ class OpenAIText(HTTPInferenceService):
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )

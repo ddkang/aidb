@@ -54,7 +54,9 @@ class HTTPInferenceService(CachedInferenceService):
       default_args: Union[Dict, None]=None,
       batch_supported: bool=False,
       columns_to_input_keys: List[Union[str, tuple]]=None,
+      input_columns_types: List=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
+      output_columns_types: List=None,
       **kwargs
   ):
     '''
@@ -69,6 +71,14 @@ class HTTPInferenceService(CachedInferenceService):
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
+
+    assert not input_columns_types or len(input_columns_types) == len(columns_to_input_keys), \
+      f'input_columns_types must be None or have same length as columns_to_input_keys'
+    self._input_columns_types = input_columns_types
+    assert not output_columns_types or len(output_columns_types) == len(response_keys_to_columns), \
+      f'output_columns_types must be None or have same length as response_keys_to_columns'
+    self._output_columns_types = output_columns_types
+
     self._separator = '~'
 
 
@@ -85,7 +95,14 @@ class HTTPInferenceService(CachedInferenceService):
     else: # isinstance(input, pd.DataFrame)
       num_rows = len(input)
       dict_input = input.to_dict(orient='list')
+
     dict_input_keys = list(dict_input.keys())
+
+    if self._input_columns_types is not None:
+      for k, _type in zip(dict_input_keys, self._input_columns_types):
+        if len(dict_input[k]) > 0:
+          assert isinstance(dict_input[k][0], _type), f'Input column {k} must be of type {_type}'
+
     # to support arbitrary batch size
     # assume all numerical index form lists
     for k, v in enumerate(self._columns_to_input_keys):
@@ -138,6 +155,12 @@ class HTTPInferenceService(CachedInferenceService):
     output = convert_response_to_output(response, self._response_keys_to_columns)
     if not any(isinstance(value, list) for value in output.values()):
       output = {k: [v] for k, v in output.items()}
+
+    if self._output_columns_types is not None:
+      for k, _type in zip(output.keys(), self._output_columns_types):
+        if len(output[k]) > 0:
+          assert isinstance(output[k][0], _type), f'Output column {k} must be of type {_type}'
+
     return pd.DataFrame(output)
 
 

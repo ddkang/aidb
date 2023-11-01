@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 import subprocess
 
@@ -27,6 +27,8 @@ class GoogleVisionAnnotate(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: List=None,
+      output_columns_types: List=None,
       project_id: str=None,
       infer_type: str='images',
   ):
@@ -49,4 +51,6 @@ class GoogleVisionAnnotate(HTTPInferenceService):
         is_single=is_single,
         columns_to_input_keys=columns_to_input_keys,
         response_keys_to_columns=response_keys_to_columns,
+        input_columns_types=input_columns_types,
+        output_columns_types=output_columns_types,
     )

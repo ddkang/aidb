@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, List
 import os
 import requests
 import pandas as pd
@@ -15,6 +15,8 @@ class HuggingFaceNLP(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: List=None,
+      output_columns_types: List=None,
       model: str=None):
     if token is None:
       token = os.environ['HF_API_KEY']
@@ -30,6 +32,8 @@ class HuggingFaceNLP(HTTPInferenceService):
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )
 
 
@@ -41,6 +45,7 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      output_columns_types: List=None,
       model: str=None):
     if token is None:
       token = os.environ['HF_API_KEY']
@@ -55,6 +60,7 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
       batch_supported=False,
       is_single=is_single,
       response_keys_to_columns=response_keys_to_columns,
+      output_columns_types=output_columns_types,
     )
 
 
