@@ -1,7 +1,7 @@
 import argparse
 
-from tests.utils import command_line_utility
-from aidb_factory import AIDB
+from aidb_utilities.command_line_setup.command_line_setup import command_line_utility
+from aidb_utilities.aidb_setup.aidb_factory import AIDB
 
 
 if __name__ == '__main__':
