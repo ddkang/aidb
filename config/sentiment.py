@@ -11,9 +11,11 @@ HF_KEY = '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'
 sentiment_inference_service = HuggingFaceNLP(
       name="sentiment_classification",
       token=HF_KEY,
-      columns_to_input_keys=['inputs'],                                     # 0 means the first column of the input dataframe, but the actual first column has name "blobs00.review"
-      response_keys_to_columns=[(AIDBListType(), AIDBListType(), 'label'),  # 0 means the first column of the output dataframe, but the actual first column has name "sentiment.label" 
-                                (AIDBListType(), AIDBListType(), 'score')], # 1 means the second column of the output dataframe, but the actual second column has name "sentiment.score"
+      columns_to_input_keys=['inputs'],                                     # list index 0 means the first column of the input dataframe, but the actual first column has name "blobs00.review"
+      response_keys_to_columns=[(AIDBListType(), AIDBListType(), 'label'),  # list index 0 means the first column of the output dataframe, but the actual first column has name "sentiment.label" 
+                                (AIDBListType(), AIDBListType(), 'score')], # list index 1 means the second column of the output dataframe, but the actual second column has name "sentiment.score"
+      input_columns_types=[str],
+      output_columns_types=[str, float],
       model="LiYuan/amazon-review-sentiment-analysis",
       default_args={"options": {"wait_for_model": True}})
 inference_engines = [
