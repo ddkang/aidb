@@ -451,10 +451,9 @@ class Query(object):
   def confidence(self):
     return self._get_keyword_arg(exp.Confidence)
 
-
+  @cached_property
   def is_approx_agg_query(self):
-    return self.error_target is not None or \
-      self.confidence is not None
+    return self.error_target is not None and self.confidence is not None
 
 
   # Validate AQP
