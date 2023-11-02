@@ -6,7 +6,7 @@ import copy
 
 import sqlglot.expressions as exp
 from sqlglot.rewriter import Rewriter
-from sqlglot import Parser, Tokenizer, transpile, parse_one
+from sqlglot import Parser, Tokenizer, parse_one
 from sympy import sympify
 from sympy.logic.boolalg import to_cnf
 
@@ -56,15 +56,7 @@ class Query(object):
 
   @cached_property
   def sql_query_text(self):
-    return self.base_sql_no_aqp.sql()
-
-
-  @cached_property
-  def base_sql_no_aqp(self):
-    _exp_no_aqp = self._expression.transform(_remove_aqp)
-    if _exp_no_aqp is None:
-      raise Exception('SQL contains no non-AQP statements')
-    return _exp_no_aqp
+    return self._expression.sql()
 
 
   @cached_property
@@ -379,53 +371,6 @@ class Query(object):
     return self._get_columns_in_expression_tree(self._expression)[0]
 
 
-  #Get aggregation types with columns corresponding
-  @cached_property
-  def aggregated_columns_and_types(self):
-    '''
-    Return aggregation types and corresponding columns,
-    even with multi aggregations
-    eg: SELECT avg(column1) from table1;
-    agg_type_with_cols = [(exp.Avg, [[column1]])]
-    SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
-    agg_type_with_cols = [(exp.Avg, [[col1], [col2]])
-            (exp.Count, [[col1, col2, col3, col4]])]
-    '''
-    select_exp = self.base_sql_no_aqp.args['expressions']
-    agg_type_with_cols = []
-    for expression in select_exp:
-      columns_in_expression = self._get_columns_in_expression_tree(expression)[1]
-      if isinstance(expression, exp.Avg):
-        agg_type_with_cols.append((exp.Avg, columns_in_expression))
-      elif isinstance(expression, exp.Count):
-        agg_type_with_cols.append((exp.Count, columns_in_expression))
-      elif isinstance(expression, exp.Sum):
-        agg_type_with_cols.append((exp.Sum, columns_in_expression))
-    return agg_type_with_cols
-
-
-  # Get aggregation type
-  @cached_property
-  def get_agg_type(self):
-    # Only support one aggregation for the time being
-    if len(self.base_sql_no_aqp.args['expressions']) != 1:
-      raise Exception('Multiple expressions found')
-    select_exp = self.base_sql_no_aqp.args['expressions'][0]
-    if isinstance(select_exp, exp.Avg):
-      return exp.Avg
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
-    else:
-      raise Exception('Unsupported aggregation')
-
-
-  @cached_property
-  def is_approx_agg_query(self):
-    return True if self.aggregated_columns_and_types and self.is_valid_aqp_query() else False
-
-
   @cached_property
   def inference_engines_required_for_query(self):
     """
@@ -456,6 +401,7 @@ class Query(object):
     ]
 
     return inference_engines_ordered
+
 
   @cached_property
   def blob_tables_required_for_query(self):
@@ -498,8 +444,7 @@ class Query(object):
 
   @cached_property
   def error_target(self):
-    error_target = self._get_keyword_arg(exp.ErrorTarget)
-    return error_target / 100. if error_target else None
+    return self._get_keyword_arg(exp.ErrorTarget)
 
 
   @cached_property
@@ -507,8 +452,12 @@ class Query(object):
     return self._get_keyword_arg(exp.Confidence)
 
 
-  # Validate AQP
+  def is_approx_agg_query(self):
+    return self.error_target is not None or \
+      self.confidence is not None
 
+
+  # Validate AQP
   def is_valid_aqp_query(self):
     # Only accept select statements
     if not isinstance(self.base_sql_no_aqp, exp.Select):
@@ -529,14 +478,28 @@ class Query(object):
 
 
   @cached_property
-  def columns_in_select(self):
-    return self._get_columns_in_expression_tree(self._expression.find(exp.Select))
+  def base_sql_no_aqp(self):
+    _exp_no_aqp = self._expression.transform(_remove_aqp)
+    if _exp_no_aqp is None:
+      raise Exception('SQL contains no non-AQP statements')
+    return _exp_no_aqp
 
 
-  def get_in_expression(self, columns, values):
-    column_str = f'{", ".join(columns)}'
-    in_exp = exp.In(this='x_min', expression = [1,3,4])
-    print(in_exp)
+  # Get aggregation type
+  @cached_property
+  def get_agg_type(self):
+    # Only support one aggregation for the time being
+    if len(self.base_sql_no_aqp.args['expressions']) != 1:
+      raise Exception('Multiple expressions found')
+    select_exp = self.base_sql_no_aqp.args['expressions'][0]
+    if isinstance(select_exp, exp.Avg):
+      return exp.Avg
+    elif isinstance(select_exp, exp.Count):
+      return exp.Count
+    elif isinstance(select_exp, exp.Sum):
+      return exp.Sum
+    else:
+      raise Exception('Unsupported aggregation')
 
 
   # FIXME: move it to sqlglot.rewriter

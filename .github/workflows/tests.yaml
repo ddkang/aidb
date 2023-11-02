@@ -47,3 +47,6 @@ jobs:
 
     - name: Run vector database setup tests
       run: python3 -m tests.tests_vector_database_setup
+
+    - name: Run aggregation query SUM tests
+      run: python3 -m tests.test_aggregation

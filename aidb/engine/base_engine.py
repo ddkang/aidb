@@ -277,6 +277,34 @@ class BaseEngine():
 
     return inp_query_str
 
+  def add_filter_key_into_query(
+    self,
+    table_columns: List[str],
+    sample_df: pd.DataFrame,
+    query: Query,
+    query_expression,
+    add_select: Optional[bool] = False
+  ):
+    selected_column = []
+    col_name_set = set()
+
+    if len(sample_df) == 0:
+      return query_expression, selected_column
+
+
+    for col in table_columns:
+      col_name = col.split('.')[1]
+      if col_name in sample_df.columns and col_name not in col_name_set:
+        # FIXME: for different database, the IN grammar maybe different
+        filtered_key_str = f'{col_name} IN ({", ".join(str(value) for value in sample_df[col_name].tolist())})'
+        if add_select:
+          query_expression = query.add_select(query_expression, col_name)
+        query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
+        selected_column.append(col)
+        col_name_set.add(col.split('.')[1])
+
+    return query_expression, selected_column
+
 
   def get_input_query_for_inference_service_filtered_index(
       self,
@@ -295,15 +323,17 @@ class BaseEngine():
 
     _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
 
-    # FIXME: for different database, the IN grammar maybe different
     if filtered_id_list is None:
-      inp_query_str = select_join_str
-    elif len(filtered_id_list) == 1:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]};'
-    else:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))};'
+      return select_join_str
 
-    return inp_query_str
+    new_query = Query(select_join_str, self._config)
+    sample_df = pd.DataFrame({'vector_id': filtered_id_list})
+    query_expression, _ = self.add_filter_key_into_query([f'{vector_id_table}.vector_id'],
+                                                                       sample_df,
+                                                                       new_query,
+                                                                       new_query._expression)
+
+    return query_expression.sql()
 
 
   def _get_left_join_str(self, rep_table_name: str, tables: List[str]) -> str:

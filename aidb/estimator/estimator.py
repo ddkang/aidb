@@ -1,26 +1,16 @@
 import abc
 import math
 from dataclasses import dataclass
-from typing import Any, List, Dict
+from typing import List
 
 import numpy as np
 import scipy
 import scipy.stats
 from statsmodels.stats.weightstats import DescrStatsW
 
+from aidb.samplers.sampler import SampledBlob
 from aidb.utils.logger import logger
 
-
-@dataclass
-class SampledBlobKey:
-  blob_key: str
-  weight: float
-  mass: float
-
-@dataclass
-class SampledBlob(SampledBlobKey):
-  statistic: float
-  num_items: int
 
 
 @dataclass

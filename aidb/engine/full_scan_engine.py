@@ -1,9 +1,7 @@
 import pandas as pd
 from sqlalchemy.sql import text
-from typing import List
 
 from aidb.engine.base_engine import BaseEngine
-from aidb.inference.bound_inference_service import BoundInferenceService
 from aidb.query.query import Query
 
 class FullScanEngine(BaseEngine):
