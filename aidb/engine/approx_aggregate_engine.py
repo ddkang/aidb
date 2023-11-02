@@ -37,20 +37,20 @@ class ApproximateAggregateEngine(BaseEngine):
 
       # run inference on pilot blobs
       sample_results = await self.execute_inference_and_get_results_on_sampled_data(sampler,
-                                                                              all_blobs_df,
-                                                                              _NUM_PILOT_SAMPLES,
-                                                                              query,
-                                                                              conn)
+                                                                                    all_blobs_df,
+                                                                                    _NUM_PILOT_SAMPLES,
+                                                                                    query,
+                                                                                    conn)
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
       if num_samples == 0:
         return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
       new_sample_results = await self.execute_inference_and_get_results_on_sampled_data(sampler,
-                                                                              all_blobs_df,
-                                                                              num_samples,
-                                                                              query,
-                                                                              conn)
+                                                                                        all_blobs_df,
+                                                                                        num_samples,
+                                                                                        query,
+                                                                                        conn)
 
     sample_results.extend(new_sample_results)
     return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
