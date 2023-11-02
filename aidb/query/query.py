@@ -2,9 +2,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List
+import copy
 
 import sqlglot.expressions as exp
-from sqlglot import Parser, Tokenizer
+from sqlglot.rewriter import Rewriter
+from sqlglot import Parser, Tokenizer, transpile, parse_one
 from sympy import sympify
 from sympy.logic.boolalg import to_cnf
 
@@ -377,7 +379,7 @@ class Query(object):
     return self._get_columns_in_expression_tree(self._expression)[0]
 
 
-  # Get aggregation types with columns corresponding
+  #Get aggregation types with columns corresponding
   @cached_property
   def aggregated_columns_and_types(self):
     '''
@@ -400,6 +402,23 @@ class Query(object):
       elif isinstance(expression, exp.Sum):
         agg_type_with_cols.append((exp.Sum, columns_in_expression))
     return agg_type_with_cols
+
+
+  # Get aggregation type
+  @cached_property
+  def get_agg_type(self):
+    # Only support one aggregation for the time being
+    if len(self.base_sql_no_aqp.args['expressions']) != 1:
+      raise Exception('Multiple expressions found')
+    select_exp = self.base_sql_no_aqp.args['expressions'][0]
+    if isinstance(select_exp, exp.Avg):
+      return exp.Avg
+    elif isinstance(select_exp, exp.Count):
+      return exp.Count
+    elif isinstance(select_exp, exp.Sum):
+      return exp.Sum
+    else:
+      raise Exception('Unsupported aggregation')
 
 
   @cached_property
@@ -430,7 +449,24 @@ class Query(object):
               stack.append(inference_col)
               visited.add(inference_col)
 
-    return list(inference_engines_required)
+    inference_engines_ordered = [
+      inference_engine
+      for inference_engine in self.config.inference_topological_order
+      if inference_engine in inference_engines_required
+    ]
+
+    return inference_engines_ordered
+
+  @cached_property
+  def blob_tables_required_for_query(self):
+    blob_tables = set()
+    for inference_engine in self.inference_engines_required_for_query:
+      for input_col in inference_engine.binding.input_columns:
+        input_table = input_col.split('.')[0]
+        if input_table in self.config.blob_tables:
+          blob_tables.add(input_table)
+
+    return list(blob_tables)
 
 
   def _get_keyword_arg(self, exp_type):
@@ -487,6 +523,40 @@ class Query(object):
       raise Exception('Supported aggregates are not found in aggregation query')
 
     if not self.error_target or not self.confidence:
-      return False
+      raise Exception('Aggregation query should contain error target and confidence')
 
     return True
+
+
+  @cached_property
+  def columns_in_select(self):
+    return self._get_columns_in_expression_tree(self._expression.find(exp.Select))
+
+
+  def get_in_expression(self, columns, values):
+    column_str = f'{", ".join(columns)}'
+    in_exp = exp.In(this='x_min', expression = [1,3,4])
+    print(in_exp)
+
+
+  # FIXME: move it to sqlglot.rewriter
+  def add_where_condition(self, expression, operator:str , where_condition):
+    expression = copy.deepcopy(expression)
+    where = expression.find(exp.Where)
+    new_condition = parse_one(where_condition)
+    if where:
+      if operator.upper() == 'AND':
+        where.args['this'] = exp.And(this=new_condition, expression=where.args['this'])
+      elif operator.upper() == 'OR':
+        where.args['this'] = exp.Or(this=new_condition, expression=where.args['this'])
+      return expression
+    else:
+      where_expr = exp.Where(this=new_condition)
+      expression.args['where'] = where_expr
+      return expression
+
+
+  def add_select(self, expression, selects):
+    re = Rewriter(expression)
+    e = re.add_selects(selects)
+    return e.expression

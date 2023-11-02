@@ -210,7 +210,7 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_query_component_strs(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
+  def _get_select_join_str(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
     column_to_root_column = self._config.columns_to_root_column
     binding = bound_service.binding
     inp_cols = binding.input_columns
@@ -224,15 +224,12 @@ class BaseEngine():
     inp_tables = self._get_tables(root_inp_cols)
     join_str = self._get_inner_join_query(inp_tables)
 
-    return inp_tables, inp_cols_str, join_str
-
-
-  def _get_select_join_str(self, inp_cols_str, join_str):
     select_join_str = f'''
                       SELECT {inp_cols_str}
                       {join_str}
                       '''
-    return select_join_str
+
+    return inp_tables, select_join_str
 
 
   def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
@@ -259,8 +256,7 @@ class BaseEngine():
     tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
 
     column_to_root_column = self._config.columns_to_root_column
-    inp_tables, inp_cols_str, join_str =  self._get_query_component_strs(bound_service)
-    select_join_str = self._get_select_join_str(inp_cols_str, join_str)
+    inp_tables, select_join_str = self._get_select_join_str(bound_service)
 
     # filtering predicates that can be satisfied by the currently executed inference engines
     filtering_predicates_satisfied = []
@@ -279,7 +275,7 @@ class BaseEngine():
     else:
       inp_query_str = select_join_str + ';'
 
-    return inp_query_str, inp_cols_str, join_str, where_str
+    return inp_query_str
 
 
   def get_input_query_for_inference_service_filtered_index(
@@ -297,8 +293,7 @@ class BaseEngine():
     * param filtered_id_list: list of vector ids which will be selected in the query
     """
 
-    _, inp_cols_str, join_str =  self._get_query_component_strs(bound_service, vector_id_table)
-    select_join_str = self._get_select_join_str(inp_cols_str, join_str)
+    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
 
     # FIXME: for different database, the IN grammar maybe different
     if filtered_id_list is None:

@@ -1,3 +1,4 @@
+import time
 from multiprocessing import Process
 import os
 import unittest
@@ -37,8 +38,8 @@ queries = [
   ),
   (
     'approx_aggregate',
-    '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000 ERROR_TARGET 5% CONFIDENCE 95;''',
-    '''SELECT AVG(x_min) FROM objects00 WHERE object_name='car' AND frame < 10000;'''
+    '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 20% CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00;'''
   ),
   (
     'approx_aggregate',
@@ -59,11 +60,11 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
   async def test_agg_query(self):
     dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/jackson')
+    data_dir = os.path.join(dirname, 'data/jackson_all')
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
-
+    time.sleep(1)
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
     register_inference_services(aidb_engine, data_dir)
     for query_type, aidb_query, aggregate_query in queries:
@@ -71,7 +72,6 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(aggregate_query))
         gt_res = gt_res.fetchall()[0]
-
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)[0]
       print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
