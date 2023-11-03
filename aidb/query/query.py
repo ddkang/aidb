@@ -375,7 +375,14 @@ class Query(object):
             if inference_col not in visited:
               stack.append(inference_col)
               visited.add(inference_col)
-    return list(inference_engines_required)
+
+    inference_engines_ordered = [
+      inference_engine
+      for inference_engine in self.config.inference_topological_order
+      if inference_engine in inference_engines_required
+    ]
+
+    return inference_engines_ordered
 
 
   @cached_property
