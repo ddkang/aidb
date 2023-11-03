@@ -6,7 +6,6 @@ from typing import Any, Dict
 
 @dataclass
 class SampledBlobId:
-  blob_id: int
   weight: float
   mass: float
 

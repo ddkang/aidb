@@ -7,11 +7,8 @@ from typing import List
 
 from aidb.engine.base_engine import BaseEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
-from aidb.samplers.sampler import SampledBlob, SampledBlobId
-from aidb.samplers.uniform_sampler import UniformBlobSampler
+from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
-
-
 
 _NUM_PILOT_SAMPLES = 1000
 
@@ -24,22 +21,30 @@ class ApproximateAggregateEngine(BaseEngine):
     query.is_valid_aqp_query()
 
     blob_tables = query.blob_tables_required_for_query
+    filtering_predicates = query.filtering_predicates
+    blob_key_filtering_predicates = []
+    inference_engines_required = query.inference_engines_required_for_filtering_predicates
+    for filtering_predicate, engine_required in zip(filtering_predicates, inference_engines_required):
+      if len(engine_required) == 0:
+        blob_key_filtering_predicates.append(filtering_predicate)
+    blob_key_filtering_predicates_str = self._get_where_str(blob_key_filtering_predicates)
+    column_to_root_column = self._config.columns_to_root_column
+    for k, v in column_to_root_column.items():
+      blob_key_filtering_predicates_str = blob_key_filtering_predicates_str.replace(k, v)
+    blob_key_filtering_predicates_str = f'WHERE {blob_key_filtering_predicates_str}' \
+                                         if blob_key_filtering_predicates_str else ''
+
     async with self._sql_engine.begin() as conn:
-      blob_count_res = await conn.execute(text(self.get_blob_count_query(blob_tables)))
-
-      all_blobs_query_str = self.get_all_blobs_query(blob_tables)
-      all_blobs_df = await conn.run_sync(lambda conn: pd.read_sql(text(all_blobs_query_str), conn))
-
+      blob_count_query_str = self.get_blob_count_query(blob_tables, blob_key_filtering_predicates_str)
+      blob_count_res = await conn.execute(text(blob_count_query_str))
       self.blob_count = blob_count_res.fetchone()[0]
 
-      sampler = UniformBlobSampler(self.blob_count)
-
       # run inference on pilot blobs
-      sample_results = await self.execute_inference_and_get_results_on_sampled_data(sampler,
-                                                                                    all_blobs_df,
-                                                                                    _NUM_PILOT_SAMPLES,
-                                                                                    query,
-                                                                                    conn)
+      sample_results = await self.get_results_on_sampled_data(_NUM_PILOT_SAMPLES,
+                                                              query,
+                                                              blob_tables,
+                                                              blob_key_filtering_predicates_str,
+                                                              conn)
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
@@ -47,23 +52,28 @@ class ApproximateAggregateEngine(BaseEngine):
       # FIXME: what to return when num_sample is 0
       if num_samples == 0:
         return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
-      new_sample_results = await self.execute_inference_and_get_results_on_sampled_data(sampler,
-                                                                                        all_blobs_df,
-                                                                                        num_samples,
-                                                                                        query,
-                                                                                        conn)
+      elif num_samples + _NUM_PILOT_SAMPLES > self.blob_count:
+        raise Exception('Not enough blob ids to sample')
+
+      new_sample_results = await self.get_results_on_sampled_data(num_samples,
+                                                                  query,
+                                                                  blob_tables,
+                                                                  blob_key_filtering_predicates_str,
+                                                                  conn)
 
     sample_results.extend(new_sample_results)
     return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
 
 
-  def get_blob_count_query(self, table_names: List[str]):
+  def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
     '''Function that returns a query, to get total number of blob ids'''
     join_str = self._get_inner_join_query(table_names)
+    where_str = f'WHERE {blob_key_filtering_predicates_str}' if blob_key_filtering_predicates_str else ''
     return f'''
             SELECT COUNT(*)
-            {join_str};
-          '''
+            {join_str}
+            {where_str};
+            '''
 
 
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
@@ -73,7 +83,7 @@ class ApproximateAggregateEngine(BaseEngine):
       raise NotImplementedError("Avg aggregations are only supported right now")
 
 
-  def get_all_blobs_query(self, blob_tables: List[str]):
+  def get_sample_blobs_query(self, blob_tables: List[str], num_samples: int, blob_key_filtering_predicates_str: str):
     '''Function to return a query to get all blob keys'''
     join_str = self._get_inner_join_query(blob_tables)
 
@@ -87,11 +97,15 @@ class ApproximateAggregateEngine(BaseEngine):
           col_name_set.add(col_name)
 
     select_column_str = ', '.join(select_column)
-    all_blobs_query_str = f'''
+    # FIXME: add condition that samples are not in previous sampled data
+    sample_blobs_query_str = f'''
                 SELECT {select_column_str}
                 {join_str}
+                {blob_key_filtering_predicates_str}
+                ORDER BY RANDOM()
+                LIMIT {num_samples};
                  '''
-    return all_blobs_query_str
+    return sample_blobs_query_str
 
 
   async def execute_inference_services(self, query: Query, sample_df: pd.DataFrame, conn):
@@ -114,9 +128,9 @@ class ApproximateAggregateEngine(BaseEngine):
       inference_services_executed.add(bound_service.service.name)
 
 
-  async def get_agg_results(self, query: Query, sample_df: pd.DataFrame, conn):
+  async def get_agg_results(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
     '''
-    Run aggregation query group by blob keys, return aggregation value for each blob
+    Return aggregation results of each sample blob, contains weight, mass, statistic, num_items
     '''
     tables_in_query = query.tables_in_query
     query_no_aqp_sql = query.base_sql_no_aqp
@@ -127,8 +141,7 @@ class ApproximateAggregateEngine(BaseEngine):
     query_expression, selected_column = self.add_filter_key_into_query(table_columns,
                                                                        sample_df,
                                                                        query_no_aqp_sql,
-                                                                       query_expression,
-                                                                       add_select=True)
+                                                                       query_expression)
 
     query_expression = query_no_aqp_sql.add_select(query_expression, 'COUNT(*) AS num_items')
     query_str = f'''
@@ -137,53 +150,33 @@ class ApproximateAggregateEngine(BaseEngine):
                  '''
 
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
-    return res_df
+
+    aggregation_results = []
+    for index, row in res_df.iterrows():
+      aggregation_results.append(SampledBlob(weight=1. / self.blob_count,
+                                             mass=1,
+                                             statistic=row[0],
+                                             num_items=int(row[1])))
+
+    return aggregation_results
 
 
-  def get_sample_results(
+  async def get_results_on_sampled_data(
       self,
-      sample_blob_key_df: pd.DataFrame,
-      samples: List[SampledBlobId],
-      agg_results: pd.DataFrame
-  ) -> List[SampledBlob]:
-    '''
-    Return aggregation results of each blob, contains blob_id, weight, mass, statistic, num_items
-    '''
-    blob_key_sample_mapping = dict()
-    for (index, row), sample in zip(sample_blob_key_df.iterrows(), samples):
-      blob_key = ', '.join([str(x) for x in row.values])
-      blob_key_sample_mapping[blob_key] = sample
-
-    sample_results = []
-    for index, row in agg_results[sample_blob_key_df.columns].iterrows():
-      blob_key = ', '.join([str(x) for x in row.values])
-      sample_results.append(SampledBlob(blob_key_sample_mapping[blob_key].blob_id,
-                                        blob_key_sample_mapping[blob_key].weight,
-                                        blob_key_sample_mapping[blob_key].mass,
-                                        statistic=agg_results.iloc[index, 0],
-                                        num_items=agg_results['num_items'].iloc[index]))
-    return sample_results
-
-
-  async def execute_inference_and_get_results_on_sampled_data(
-      self,
-      sampler: UniformBlobSampler,
-      all_blobs_df: pd.DataFrame,
       num_samples: int,
       query: Query,
+      blob_tables: List[str],
+      blob_key_filtering_predicates_str: str,
       conn
   ):
-    sample_blobs = sampler.sample_next_n(num_samples=num_samples)
+    sample_blobs_query_str = self.get_sample_blobs_query(blob_tables, num_samples, blob_key_filtering_predicates_str)
+    sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_blobs_query_str), conn))
 
-    sample_index = [int(sample.blob_id.iloc[0]) for sample in sample_blobs]
-    sample_blob_key_df = all_blobs_df.iloc[sample_index]
+    await self.execute_inference_services(query, sample_blobs_df, conn)
 
-    await self.execute_inference_services(query, sample_blob_key_df, conn)
+    aggregation_results = await self.get_agg_results(query, sample_blobs_df, conn)
 
-    agg_results = await self.get_agg_results(query, sample_blob_key_df, conn)
-
-    sample_results = self.get_sample_results(sample_blob_key_df, sample_blobs, agg_results)
-    return sample_results
+    return aggregation_results
 
 
   def get_additional_required_num_samples(

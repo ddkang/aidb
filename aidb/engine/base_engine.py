@@ -282,8 +282,7 @@ class BaseEngine():
     table_columns: List[str],
     sample_df: pd.DataFrame,
     query: Query,
-    query_expression,
-    add_select: Optional[bool] = False
+    query_expression
   ):
     selected_column = []
     col_name_set = set()
@@ -296,9 +295,8 @@ class BaseEngine():
       col_name = col.split('.')[1]
       if col_name in sample_df.columns and col_name not in col_name_set:
         # FIXME: for different database, the IN grammar maybe different
+        # FIXME: this logic is wrong for multiple blob keys input
         filtered_key_str = f'{col_name} IN ({", ".join(str(value) for value in sample_df[col_name].tolist())})'
-        if add_select:
-          query_expression = query.add_select(query_expression, col_name)
         query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
         selected_column.append(col)
         col_name_set.add(col.split('.')[1])

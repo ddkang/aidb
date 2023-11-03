@@ -513,9 +513,3 @@ class Query(object):
       where_expr = exp.Where(this=new_condition)
       expression.args['where'] = where_expr
       return expression
-
-
-  def add_select(self, expression, selects):
-    re = Rewriter(expression)
-    e = re.add_selects(selects)
-    return e.expression
