@@ -3,7 +3,7 @@ from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
 
 DB_URL = 'sqlite+aiosqlite://'
 DB_NAME = 'aidb_test_amazon.sqlite'
-HF_KEY = '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'
+HF_KEY = '<hf-key>'
 
 sentiment_inference_service = HuggingFaceNLP(
   name="sentiment_classification",
