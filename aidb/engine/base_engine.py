@@ -324,10 +324,13 @@ class BaseEngine():
     """
 
     _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
-
+    if filtered_id_list == None:
+      return select_join_str
+    
     new_query = Query(select_join_str, self._config)
     sample_df = pd.DataFrame({'vector_id': filtered_id_list})
-    query_expression, _ = self.add_filter_key_into_query([f'{vector_id_table}.vector_id'],
+    filter_column = [f'{vector_id_table}.vector_id']
+    query_expression, _ = self.add_filter_key_into_query(filter_column,
                                                          sample_df,
                                                          new_query,
                                                          new_query._expression)
