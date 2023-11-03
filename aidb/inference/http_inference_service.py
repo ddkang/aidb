@@ -8,9 +8,10 @@ from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
 from aidb.utils.perf_utils import call_counter
 
+
 def convert_response_to_output(
     response: Union[Dict, List],
-    _response_keys_to_columns: Dict[Union[str, tuple], str]) -> Dict:
+    _response_keys_to_columns: Dict[Union[str, tuple], int]) -> Dict:
   output = {v: [] for v in _response_keys_to_columns.values()}
   for k, v in _response_keys_to_columns.items():
     if not isinstance(k, tuple):
@@ -51,26 +52,33 @@ class HTTPInferenceService(CachedInferenceService):
       url: str=None,
       headers: Union[Dict, None]=None,
       default_args: Union[Dict, None]=None,
-      copy_input: bool=True,
       batch_supported: bool=False,
-      columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
-      response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      columns_to_input_keys: List[Union[str, tuple]]=None,
+      input_columns_types: Union[List, None]=None,
+      response_keys_to_columns: List[Union[str, tuple]]=None,
+      output_columns_types: Union[List, None]=None,
       **kwargs
   ):
     '''
     :param str url: The URL to send the request to. The request will be a POST request.
     :param dict headers: The headers to send with the request.
-    :param bool copy_input: Whether to copy the input _after_ receiving the request from the server.
     :param bool batch_supported: Whether the server supports batch requests.
     '''
     super().__init__(*args, **kwargs)
     self._url = url
     self._headers = headers
     self._default_args = default_args
-    self._copy_input = copy_input
     self._batch_supported = batch_supported
     self._columns_to_input_keys = columns_to_input_keys
     self._response_keys_to_columns = response_keys_to_columns
+
+    assert not input_columns_types or len(input_columns_types) == len(columns_to_input_keys), \
+      f'input_columns_types must be None or have same length as columns_to_input_keys'
+    self._input_columns_types = input_columns_types
+    assert not output_columns_types or len(output_columns_types) == len(response_keys_to_columns), \
+      f'output_columns_types must be None or have same length as response_keys_to_columns'
+    self._output_columns_types = output_columns_types
+
     self._separator = '~'
 
 
@@ -87,9 +95,20 @@ class HTTPInferenceService(CachedInferenceService):
     else: # isinstance(input, pd.DataFrame)
       num_rows = len(input)
       dict_input = input.to_dict(orient='list')
+
+    dict_input_keys = list(dict_input.keys())
+
+    if self._input_columns_types is not None:
+      for k, _type in zip(dict_input_keys, self._input_columns_types):
+        if len(dict_input[k]) > 0:
+          assert isinstance(dict_input[k][0], _type), f'Input column {k} must be of type {_type}'
+
     # to support arbitrary batch size
     # assume all numerical index form lists
-    for k, v in self._columns_to_input_keys.items():
+    for k, v in enumerate(self._columns_to_input_keys):
+      if k > len(dict_input_keys):
+        continue
+      k = dict_input_keys[k]
       if isinstance(v, tuple):
         aidb_list_count = sum(1 for e in v if isinstance(e, AIDBListType))
         if aidb_list_count == 0:
@@ -106,7 +125,7 @@ class HTTPInferenceService(CachedInferenceService):
             request[key] = dict_input[k][i]
         else:
           raise ValueError(f'Cannot have more than 1 AIDBListType in columns_to_input_keys')
-      elif k in dict_input: # isinstance(v, str)
+      else: # isinstance(v, str)
         request[v] = dict_input[k][0]
     request = unflatten_list(request, self._separator)
     if remove_ghost_key:
@@ -132,9 +151,16 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def convert_response_to_output(self, response: Dict) -> pd.DataFrame:
+    self._response_keys_to_columns = {k: i for i, k in enumerate(self._response_keys_to_columns)}
     output = convert_response_to_output(response, self._response_keys_to_columns)
     if not any(isinstance(value, list) for value in output.values()):
       output = {k: [v] for k, v in output.items()}
+
+    if self._output_columns_types is not None:
+      for k, _type in zip(output.keys(), self._output_columns_types):
+        if len(output[k]) > 0:
+          assert isinstance(output[k][0], _type), f'Output column {k} must be of type {_type}'
+
     return pd.DataFrame(output)
 
 
@@ -144,9 +170,6 @@ class HTTPInferenceService(CachedInferenceService):
     response = self.request(request)
     output = self.convert_response_to_output(response)
 
-    # TODO: is this correct for zero or 2+ outputs?
-    if self._copy_input:
-      output = output.assign(**input)
     return output
 
 
@@ -161,7 +184,5 @@ class HTTPInferenceService(CachedInferenceService):
     # We assume the server returns a list of responses
     response = response.json()
     outputs = [pd.read_json(r, orient='records') for r in response]
-    if self._copy_input:
-      outputs = [o.assign(**i) for o, (_, i) in zip(outputs, inputs.iterrows())]
 
     return outputs

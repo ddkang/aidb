@@ -17,14 +17,14 @@ def register_inference_services(engine: Engine, data_dir: str):
     columns = df.columns
     input_cols = []
     output_cols = []
-    columns_to_input_keys = {}
-    output_keys_to_columns = {}
+    columns_to_input_keys = []
+    output_keys_to_columns = []
     for col in columns:
       if col.startswith("in__"):
-        columns_to_input_keys[col[4:]] = col[4:]
+        columns_to_input_keys.append(col[4:])
         input_cols.append(col[4:])
       elif col.startswith("out__"):
-        output_keys_to_columns[(col[5:], AIDBListType())] = col[5:]
+        output_keys_to_columns.append((col[5:], AIDBListType()))
         output_cols.append(col[5:])
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")

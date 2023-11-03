@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 import os
 
@@ -9,12 +9,13 @@ class OpenAIAudio(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_audio',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
       infer_type: str='transcriptions'):
     assert infer_type in [
         "transcriptions",
@@ -30,11 +31,12 @@ class OpenAIAudio(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )
 
 
@@ -42,12 +44,13 @@ class OpenAIImage(HTTPInferenceService):
   def __init__(
       self,
       name='openai_image', 
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None, 
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
       infer_type: str='generations'
     ):
     assert infer_type in [
@@ -65,11 +68,12 @@ class OpenAIImage(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )
 
 
@@ -77,12 +81,13 @@ class OpenAIText(HTTPInferenceService):
   def __init__(
       self,
       name: str='openai_text',
-      copy_input: bool=False,
       is_single: bool=False,
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
     ):
     if token is None:
       token = os.environ['OPENAI_API_KEY']
@@ -94,9 +99,10 @@ class OpenAIText(HTTPInferenceService):
         'Authorization': f'Bearer {token}',
       },
       default_args=default_args,
-      copy_input=copy_input,
       batch_supported=False,
       is_single=is_single,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
+      input_columns_types=input_columns_types,
+      output_columns_types=output_columns_types,
     )

@@ -11,6 +11,7 @@ from aidb.inference.inference_service import InferenceService
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import cache_table_name_from_inputs
 from aidb.utils.logger import logger
+from aidb.utils.type_conversion import pandas_dtype_to_native_type
 
 
 @dataclass
@@ -139,7 +140,7 @@ class CachedBoundInferenceService(BoundInferenceService):
   async def _insert_in_cache_table(self, row, conn):
     input_dic = {}
     for col in self.binding.input_columns:
-      input_dic[self.convert_normalized_col_name_to_cache_col_name(col)] = getattr(row, col).item()
+      input_dic[self.convert_normalized_col_name_to_cache_col_name(col)] = pandas_dtype_to_native_type(getattr(row, col))
     insert = self.get_insert()(self._cache_table).values(**input_dic)
     await conn.execute(insert)
 
@@ -155,7 +156,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       for ind, row in inputs.iterrows():
         cache_query = self._cache_query_stub.where(
           sqlalchemy.sql.and_(
-            *[col == row[self.convert_cache_column_name_to_normalized_column_name(col.name)].item() for idx, col in enumerate(self._cache_columns)]
+            *[col == pandas_dtype_to_native_type(row[self.convert_cache_column_name_to_normalized_column_name(col.name)]) for idx, col in enumerate(self._cache_columns)]
           )
         )
         query_futures.append(conn.execute(cache_query))
@@ -172,7 +173,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_normalized_col_name_to_cache_col_name(col)) == getattr(inp_row, col).item() for col in
+              *[getattr(self._cache_table.c, self.convert_normalized_col_name_to_cache_col_name(col)) == pandas_dtype_to_native_type(getattr(inp_row, col)) for col in
                 self.binding.input_columns]
             )
           )
@@ -183,21 +184,16 @@ class CachedBoundInferenceService(BoundInferenceService):
 
           if len(inference_results) > 0:
             # FIXME: figure out where to put the column renaming
-            # assuming no ordering on inference engine output results
-            # columns with same name in different tables are assumed to be the same
             for idx, col in enumerate(self.binding.output_columns):
-              if col not in inference_results.columns:
-                tbl, col_n = col.split('.')
-                for c in inference_results.columns:
+              if idx < len(inference_results.columns):
+                inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
+              else: # assume later columns are copied from input
+                # assume columns with same name in input / output tables are the same
+                _, col_n = col.split('.')
+                for c in self.binding.input_columns:
                   if c.split('.')[1] == col_n:
-                    inference_results.rename(columns={c: col}, inplace=True)
+                    inference_results[col] = inp_row[c]
                     break
-
-            try:
-              # returned results may have few redundant columns because of copying input
-              inference_results = inference_results[list(self.binding.output_columns)]
-            except:
-              raise Exception("Column binding column not found in the inference results")
 
             tables = self.get_tables(self.binding.output_columns)
             for table in tables:
