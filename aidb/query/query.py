@@ -1,10 +1,10 @@
-import collections
-from dataclasses import dataclass, field
+import copy
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List
 
 import sqlglot.expressions as exp
-from sqlglot import Parser, Tokenizer
+from sqlglot import Parser, Tokenizer, parse_one
 from sympy import sympify
 from sympy.logic.boolalg import to_cnf
 
@@ -402,3 +402,20 @@ class Query(object):
     if cardinality is None:
       return False
     return True
+
+
+  # FIXME: move it to sqlglot.rewriter
+  def add_where_condition(self, expression, operator:str , where_condition):
+    expression = copy.deepcopy(expression)
+    where = expression.find(exp.Where)
+    new_condition = parse_one(where_condition)
+    if where:
+      if operator.upper() == 'AND':
+        where.args['this'] = exp.And(this=new_condition, expression=where.args['this'])
+      elif operator.upper() == 'OR':
+        where.args['this'] = exp.Or(this=new_condition, expression=where.args['this'])
+      return expression
+    else:
+      where_expr = exp.Where(this=new_condition)
+      expression.args['where'] = where_expr
+      return expression
