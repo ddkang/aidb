@@ -356,7 +356,28 @@ class Query(object):
               stack.append(inference_col)
               visited.add(inference_col)
 
-    return list(inference_engines_required)
+    inference_engines_ordered = [
+      inference_engine
+      for inference_engine in self.config.inference_topological_order
+      if inference_engine in inference_engines_required
+    ]
+
+    return inference_engines_ordered
+
+
+  @cached_property
+  def blob_tables_required_for_query(self):
+    '''
+    get required blob tables for a query
+    '''
+    blob_tables = set()
+    for inference_engine in self.inference_engines_required_for_query:
+      for input_col in inference_engine.binding.input_columns:
+        input_table = input_col.split('.')[0]
+        if input_table in self.config.blob_tables:
+          blob_tables.add(input_table)
+
+    return list(blob_tables)
 
 
   def _get_keyword_arg(self, exp_type):
@@ -371,12 +392,13 @@ class Query(object):
     return value
 
 
-  def get_limit_cardinality(self):
+  @cached_property
+  def limit_cardinality(self):
     return self._get_keyword_arg(exp.Limit)
 
 
   def is_limit_query(self):
-    cardinality = self.get_limit_cardinality()
+    cardinality = self.limit_cardinality
     if cardinality is None:
       return False
     return True
