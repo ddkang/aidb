@@ -30,3 +30,12 @@ inference_engines = [
 blobs_csv_file = "tests/data/amazon_reviews.csv"
 blob_table_name = "blobs00"
 blobs_keys_columns = ["review_id"]
+
+"""
+dictionary of table names to list of columns
+"""
+
+tables = {"sentiment": [
+  {"name": "review_id", "is_primary_key": True, "refers_to": ("blobs00", "review_id"), "dtype": int},
+  {"name": "label", "dtype": str},
+  {"name": "score", "dtype": float}]}

@@ -1,5 +1,7 @@
 import time
 
+import pandas as pd
+
 from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
 
 
@@ -37,4 +39,5 @@ def command_line_utility(engine):
       results = engine.execute(query)
       end_time = time.time()
       print(f"Query Execution Time = {int((end_time - start_time)*100)/100} seconds")
-      print("Query Result", results)
+      print("Query Result")
+      print(pd.DataFrame(results))
