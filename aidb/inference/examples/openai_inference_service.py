@@ -14,8 +14,8 @@ class OpenAIAudio(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      input_columns_types: List=None,
-      output_columns_types: List=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
       infer_type: str='transcriptions'):
     assert infer_type in [
         "transcriptions",
@@ -49,8 +49,8 @@ class OpenAIImage(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      input_columns_types: List=None,
-      output_columns_types: List=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
       infer_type: str='generations'
     ):
     assert infer_type in [
@@ -86,8 +86,8 @@ class OpenAIText(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      input_columns_types: List=None,
-      output_columns_types: List=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
     ):
     if token is None:
       token = os.environ['OPENAI_API_KEY']

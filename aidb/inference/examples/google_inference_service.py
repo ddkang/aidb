@@ -27,8 +27,8 @@ class GoogleVisionAnnotate(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      input_columns_types: List=None,
-      output_columns_types: List=None,
+      input_columns_types: Union[List, None]=None,
+      output_columns_types: Union[List, None]=None,
       project_id: str=None,
       infer_type: str='images',
   ):

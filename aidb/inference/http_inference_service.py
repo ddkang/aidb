@@ -54,9 +54,9 @@ class HTTPInferenceService(CachedInferenceService):
       default_args: Union[Dict, None]=None,
       batch_supported: bool=False,
       columns_to_input_keys: List[Union[str, tuple]]=None,
-      input_columns_types: List=None,
+      input_columns_types: Union[List, None]=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
-      output_columns_types: List=None,
+      output_columns_types: Union[List, None]=None,
       **kwargs
   ):
     '''
