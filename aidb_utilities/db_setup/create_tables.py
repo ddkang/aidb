@@ -16,7 +16,11 @@ async def create_output_tables(db_url: str, db_name: str, tables_info):
     metadata = MetaData(bind=conn)
     await conn.run_sync(metadata.reflect)
     # Create tables
+    existing_tables = metadata.tables
     for table_name, columns in tables_info.items():
+      if table_name in existing_tables:
+        print(f"Skipping: Table {table_name} already exists")
+        continue
       columns_info = []
       fk_constraints = {}
       for column in columns:
