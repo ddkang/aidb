@@ -188,15 +188,8 @@ class CachedBoundInferenceService(BoundInferenceService):
               if idx < len(inference_results.columns):
                 inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
               else: # assume later columns are copied from input
-                # # decision 1: assume output binding has the same order as input binding when copying columns
-                # input_col_idx = idx - len(self.binding.input_columns)
-                # if input_col_idx < len(self.binding.input_columns):
-                #   inference_results[col] = inp_row[self.binding.input_columns[input_col_idx]]
-                # else:
-                #   raise ValueError(f'Column {col} not found in input columns')
-
-                # decision 2: assume columns with same name in input / output tables are the same
-                tbl, col_n = col.split('.')
+                # assume columns with same name in input / output tables are the same
+                _, col_n = col.split('.')
                 for c in self.binding.input_columns:
                   if c.split('.')[1] == col_n:
                     inference_results[col] = inp_row[c]
