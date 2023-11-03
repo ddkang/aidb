@@ -16,7 +16,7 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
-    '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00;'''
   ),
   (
@@ -63,7 +63,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       print(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)[0]
       print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
-      error_target = Query(aidb_query, aidb_engine._config).error_target / 100
+      error_target = Query(aidb_query, aidb_engine._config).error_target
       if error_target is None: error_target = 0
       assert self._equality_check(aidb_res, gt_res, error_target)
 

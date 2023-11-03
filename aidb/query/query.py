@@ -444,7 +444,8 @@ class Query(object):
 
   @cached_property
   def error_target(self):
-    return self._get_keyword_arg(exp.ErrorTarget)
+    error_target = self._get_keyword_arg(exp.ErrorTarget)
+    return error_target / 100. if error_target else None
 
 
   @cached_property
@@ -467,7 +468,7 @@ class Query(object):
     for expression in self.base_sql_no_aqp.args['expressions']:
       expression_counts[type(expression)] += 1
 
-    if exp.Avg not in expression_counts and exp.Sum not in expression_counts and exp.Count not in expression_counts:
+    if exp.Avg not in expression_counts:
       raise Exception('Supported aggregates are not found in aggregation query')
 
     if not self.error_target or not self.confidence:
@@ -493,10 +494,6 @@ class Query(object):
     select_exp = self.base_sql_no_aqp.args['expressions'][0]
     if isinstance(select_exp, exp.Avg):
       return exp.Avg
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
     else:
       raise Exception('Unsupported aggregation')
 

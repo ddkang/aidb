@@ -6,8 +6,7 @@ import statsmodels.stats.proportion
 from typing import List
 
 from aidb.engine.base_engine import BaseEngine
-from aidb.estimator.estimator import (
-    Estimator, WeightedCountSetEstimator, WeightedMeanSetEstimator, WeightedSumSetEstimator)
+from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
 from aidb.samplers.sampler import SampledBlob, SampledBlobId
 from aidb.samplers.uniform_sampler import UniformBlobSampler
 from aidb.query.query import Query
@@ -44,8 +43,10 @@ class ApproximateAggregateEngine(BaseEngine):
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
+      print('num_samples', num_samples)
+      # FIXME: what to return when num_sample is 0
       if num_samples == 0:
-        return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
+        return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
       new_sample_results = await self.execute_inference_and_get_results_on_sampled_data(sampler,
                                                                                         all_blobs_df,
                                                                                         num_samples,
@@ -66,14 +67,10 @@ class ApproximateAggregateEngine(BaseEngine):
 
 
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
-    if agg_type == exp.Sum:
-      return WeightedSumSetEstimator(self.blob_count)
-    elif agg_type == exp.Avg:
+    if agg_type == exp.Avg:
       return WeightedMeanSetEstimator(self.blob_count)
-    elif agg_type == exp.Count:
-      return WeightedCountSetEstimator(self.blob_count)
     else:
-      raise NotImplementedError("Avg, Count and Sum aggregations are only supported right now")
+      raise NotImplementedError("Avg aggregations are only supported right now")
 
 
   def get_all_blobs_query(self, blob_tables: List[str]):
@@ -195,7 +192,7 @@ class ApproximateAggregateEngine(BaseEngine):
       sample_results: List[SampledBlob],
       estimator:Estimator
   ) -> int:
-    error_target = query.error_target
+    error_target = query.error_target * 100
     conf = query.confidence / 100.
     alpha = 1. - conf
     pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf / 2)

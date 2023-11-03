@@ -34,6 +34,19 @@ INSERT INTO employees (id, name)
 VALUES (101, 'John');
 '''
 
+invalid_count_sql = '''
+SELECT COUNT(bar)
+FROM foo
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
+
+invalid_sum_sql = '''
+SELECT COUNT(bar)
+FROM foo
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
 
 class AQPKeywordTests(unittest.TestCase):
   def test_confidence(self):
@@ -69,6 +82,16 @@ class AQPValidationTests(unittest.TestCase):
 
   def test_invalid_not_select_sql(self):
     query = Query(not_select_sql, None)
+    with self.assertRaises(Exception):
+      query.is_valid_aqp_query()
+
+  def test_invalid_count_sql(self):
+    query = Query(invalid_count_sql, None)
+    with self.assertRaises(Exception):
+      query.is_valid_aqp_query()
+
+  def test_invalid_sum_sql(self):
+    query = Query(invalid_sum_sql, None)
     with self.assertRaises(Exception):
       query.is_valid_aqp_query()
 

@@ -48,5 +48,11 @@ jobs:
     - name: Run vector database setup tests
       run: python3 -m tests.tests_vector_database_setup
 
+    - name: Run query parser tests
+      run: python3 -m tests.test_queries
+
+    - name: Run exact aggregation query tests
+      run: python3 -m tests.test_exact_aggregation
+
     - name: Run aggregation query Avg tests
       run: python3 -m tests.test_aggregation
