@@ -37,8 +37,15 @@ class TastiEngine(FullScanEngine):
     2. infer all bound services for all cluster representatives blobs
     3. generate proxy score per predicate for all blobs based on topk rep ids and dists
     '''
-    bound_service_list = query.inference_engines_required_for_query
-    blob_tables = query.blob_tables_required_for_query
+    bound_service_list = self._get_required_bound_services_order(query)
+
+    blob_tables = set()
+    for bound_service in bound_service_list:
+      for input_col in bound_service.binding.input_columns:
+        input_table = input_col.split('.')[0]
+        if input_table in self._config.blob_tables:
+          blob_tables.add(input_table)
+    blob_tables = list(blob_tables)
 
     self.rep_table_name, self.topk_table_name = table_name_for_rep_and_topk(blob_tables)
     if self.rep_table_name not in self._config.tables or self.topk_table_name not in self._config.tables:
@@ -61,7 +68,7 @@ class TastiEngine(FullScanEngine):
     score_df = score_df.groupby(level=0).mean()
     score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
-     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
+    # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
     return score_for_all_df, score_connected
 
 

@@ -5,7 +5,7 @@ import sqlglot.expressions as exp
 import statsmodels.stats.proportion
 from typing import List
 
-from aidb.engine.base_engine import BaseEngine
+from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
@@ -13,7 +13,7 @@ from aidb.query.query import Query
 _NUM_PILOT_SAMPLES = 1000
 
 
-class ApproximateAggregateEngine(BaseEngine):
+class ApproximateAggregateEngine(FullScanEngine):
   async def execute_aggregate_query(self, query: Query):
     '''
     Execute aggregation query using approximate processing
@@ -112,13 +112,13 @@ class ApproximateAggregateEngine(BaseEngine):
     '''
     Executed inference services on sampled data
     '''
-    inference_engines_required = query.inference_engines_required_for_query
+    bound_service_list = self._get_required_bound_services_order(query)
     inference_services_executed = set()
-    for bound_service in inference_engines_required:
+    for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service, query,
                                                                                 inference_services_executed)
       new_query = Query(inp_query_str, self._config)
-      query_str, _ = self.add_filter_key_into_query(bound_service.binding.input_columns,
+      query_str, _ = self.add_filter_key_into_query(list(bound_service.binding.input_columns),
                                                     sample_df,
                                                     new_query,
                                                     new_query._expression)

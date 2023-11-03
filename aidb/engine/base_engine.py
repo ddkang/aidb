@@ -322,14 +322,13 @@ class BaseEngine():
     _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
 
     if filtered_id_list is None:
-      return select_join_str
+      inp_query_str = select_join_str
+    elif len(filtered_id_list) == 1:
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]};'
+    else:
+      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))};'
 
-    new_query = Query(select_join_str, self._config)
-    sample_df = pd.DataFrame({'vector_id': filtered_id_list})
-    vector_id_column = [f'{vector_id_table}.vector_id']
-    query_expression, _ = self.add_filter_key_into_query(vector_id_column, sample_df, new_query, new_query._expression)
-
-    return query_expression.sql()
+    return inp_query_str
 
 
   def _get_left_join_str(self, rep_table_name: str, tables: List[str]) -> str:

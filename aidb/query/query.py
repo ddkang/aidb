@@ -393,14 +393,7 @@ class Query(object):
             if inference_col not in visited:
               stack.append(inference_col)
               visited.add(inference_col)
-
-    inference_engines_ordered = [
-      inference_engine
-      for inference_engine in self.config.inference_topological_order
-      if inference_engine in inference_engines_required
-    ]
-
-    return inference_engines_ordered
+    return list(inference_engines_required)
 
 
   @cached_property
@@ -426,13 +419,13 @@ class Query(object):
     return value
 
 
-  @cached_property
-  def limit_cardinality(self):
+  def get_limit_cardinality(self):
     return self._get_keyword_arg(exp.Limit)
 
 
   def is_limit_query(self):
-    if self.limit_cardinality is None:
+    cardinality = self.get_limit_cardinality()
+    if cardinality is None:
       return False
     return True
 
@@ -513,3 +506,9 @@ class Query(object):
       where_expr = exp.Where(this=new_condition)
       expression.args['where'] = where_expr
       return expression
+
+
+  def add_select(self, expression, selects):
+    re = Rewriter(expression)
+    e = re.add_selects(selects)
+    return e.expression
