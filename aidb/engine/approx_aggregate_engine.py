@@ -5,7 +5,7 @@ import sqlglot.expressions as exp
 import statsmodels.stats.proportion
 from typing import List
 
-from aidb.engine.full_scan_engine import FullScanEngine
+from aidb.engine.base_engine import BaseEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
@@ -13,7 +13,7 @@ from aidb.query.query import Query
 _NUM_PILOT_SAMPLES = 1000
 
 
-class ApproximateAggregateEngine(FullScanEngine):
+class ApproximateAggregateEngine(BaseEngine):
   async def execute_aggregate_query(self, query: Query):
     '''
     Execute aggregation query using approximate processing
@@ -112,30 +112,34 @@ class ApproximateAggregateEngine(FullScanEngine):
     '''
     Executed inference services on sampled data
     '''
-    bound_service_list = self._get_required_bound_services_order(query)
+    bound_service_list = query.inference_engines_required_for_filtering_predicates
     inference_services_executed = set()
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service, query,
                                                                                 inference_services_executed)
       new_query = Query(inp_query_str, self._config)
+      expression = new_query.get_expression()
       query_str, _ = self.add_filter_key_into_query(list(bound_service.binding.input_columns),
                                                     sample_df,
                                                     new_query,
-                                                    new_query._expression)
+                                                    expression)
 
       input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str.sql()), conn))
       await bound_service.infer(input_df)
       inference_services_executed.add(bound_service.service.name)
 
 
-  async def get_agg_results(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
+  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
     '''
     Return aggregation results of each sample blob, contains weight, mass, statistic, num_items
+    For example, if there is 1000 blobs, blob A has two detected objects with x_min = 500 and x_min = 1000,
+    the query is Avg(x_min), the result of blob A is SampledBlob(1/1000, 1, 750, 2)
+    mass is default value 1, weight is same for each blob in uniform sampling
     '''
     tables_in_query = query.tables_in_query
     query_no_aqp_sql = query.base_sql_no_aqp
     query_no_aqp_sql = Query(query_no_aqp_sql.sql(), self._config)
-    query_expression = query_no_aqp_sql._expression
+    query_expression = query_no_aqp_sql.get_expression()
 
     table_columns = [f'{table}.{col.name}' for table in tables_in_query for col in self._config.tables[table].columns]
     query_expression, selected_column = self.add_filter_key_into_query(table_columns,
@@ -151,14 +155,14 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
 
-    aggregation_results = []
+    results_for_each_blob = []
     for index, row in res_df.iterrows():
-      aggregation_results.append(SampledBlob(weight=1. / self.blob_count,
+      results_for_each_blob.append(SampledBlob(weight=1. / self.blob_count,
                                              mass=1,
                                              statistic=row[0],
                                              num_items=int(row[1])))
 
-    return aggregation_results
+    return results_for_each_blob
 
 
   async def get_results_on_sampled_data(
@@ -174,9 +178,9 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     await self.execute_inference_services(query, sample_blobs_df, conn)
 
-    aggregation_results = await self.get_agg_results(query, sample_blobs_df, conn)
+    results_for_each_blob = await self.get_results_for_each_blob(query, sample_blobs_df, conn)
 
-    return aggregation_results
+    return results_for_each_blob
 
 
   def get_additional_required_num_samples(
