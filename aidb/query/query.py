@@ -453,7 +453,7 @@ class Query(object):
     if len(expression_counts) > 1:
       raise Exception('Multiple expression types found')
 
-    if exp.Count or exp.Sum in expression_counts:
+    if exp.Count in expression_counts or exp.Sum in expression_counts:
       raise Exception("We haven't supported approximation for SUM/COUNT query yet")
 
     if exp.Avg not in expression_counts:

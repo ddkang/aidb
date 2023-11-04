@@ -63,6 +63,7 @@ class ApproximateAggregateEngine(FullScanEngine):
                                                                   conn)
 
     sample_results.extend(new_sample_results)
+    # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
     return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
 
 
