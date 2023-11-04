@@ -277,6 +277,7 @@ class BaseEngine():
 
     return inp_query_str
 
+
   def add_filter_key_into_query(
     self,
     table_columns: List[str],
@@ -284,6 +285,13 @@ class BaseEngine():
     query: Query,
     query_expression
   ):
+    '''
+    Add filter condition, like where keyA in (1,2,3)
+    param table_columns: list of filtering columns, like keyA in the example.
+    param sample_df: dataframe store filter values, {'keyA': [1,2,3]}
+    param query: query class
+    param query_expression: sqlglot parsed query expression
+    '''
     selected_column = []
     col_name_set = set()
 
@@ -320,15 +328,19 @@ class BaseEngine():
     """
 
     _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
+    if filtered_id_list == None:
+      return select_join_str
 
-    if filtered_id_list is None:
-      inp_query_str = select_join_str
-    elif len(filtered_id_list) == 1:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id = {filtered_id_list[0]};'
-    else:
-      inp_query_str = select_join_str + f'WHERE {vector_id_table}.vector_id IN {format(tuple(filtered_id_list))};'
+    new_query = Query(select_join_str, self._config)
+    # FIXME: avoid hard strings
+    sample_df = pd.DataFrame({'vector_id': filtered_id_list})
+    filter_column = [f'{vector_id_table}.vector_id']
+    query_expression, _ = self.add_filter_key_into_query(filter_column,
+                                                         sample_df,
+                                                         new_query,
+                                                         new_query._expression)
 
-    return inp_query_str
+    return query_expression.sql()
 
 
   def _get_left_join_str(self, rep_table_name: str, tables: List[str]) -> str:

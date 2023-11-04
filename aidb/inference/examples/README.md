@@ -26,23 +26,23 @@ and you want to use the [OpenAI Chat API](https://platform.openai.com/docs/api-r
 You will need to specify the mapping from the AIDB input columns to the JSON input format like this:
 ```python
 from aidb.config.config_types import AIDBListType
-map_input_to_request = {
-  'model': ('model',),
-  'role': ('messages', AIDBListType(), 'role'),
-  'content': ('messages', AIDBListType(), 'content'),
-  'n': 'n'
-}
+map_input_to_request = [
+  ('model',),                              # column 0: model
+  ('messages', AIDBListType(), 'role'),    # column 1: role
+  ('messages', AIDBListType(), 'content'), # column 2: content
+  'n'                                      # column 3: n
+]
 ```
 
-You can import `AIDBListType` to ease your conversion.
+The order of columns match the order of your bindings. You can import `AIDBListType` to ease your conversion.
 
-For input to request conversion, you can either provide explicit list index if your JSON request contains list, or use `AIDBListType` to span your input column to a JSON list of arbitrary length (length of the list is your batch size) inside your JSON request. Each column_key: json_key map should contain at most 1 `AIDBListType` key.
+For input to request conversion, you can either provide explicit list index if your JSON request contains list, or use `AIDBListType` to span your input column to a JSON list of arbitrary length (length of the list is your batch size) inside your JSON request. Each item in the key map list should contain at most 1 `AIDBListType` key.
 
 For response to output conversion, you can either provide explicit list index to retrieve the item from the JSON response, or use `AIDBListType` to span list response into multiple rows in your output dataframe.
 
 Please do not use `AIDBListType` for lists of known length such as coordinates. Use explicit numerical index instead.
 
-If an input column or an output JSON attribute is not inside the map keys, that column/attribute will be ignored.
+If an input column has index which is greater than or equal to the length of key map, or an output JSON attribute is not inside the key map list, that column/attribute will be ignored.
 
 You can optionally write your own `HTTPInferenceService.convert_input_to_request` and `HTTPInferenceService.convert_response_to_output` methods if you want to do more complicated conversion.
 
@@ -77,16 +77,16 @@ openai_text = OpenAIText(
     "model": "gpt-3.5-turbo",
     "n": 2,
   },
-  columns_to_input_keys={
-    'role': ('messages', AIDBListType(), 'role'),
-    'content': ('messages', AIDBListType(), 'content')
-  },
-  response_keys_to_columns={
-    'id': 'id',
-    'created': 'created',
-    'model': 'model',
-    ('choices', AIDBListType(), 'message', 'content'): 'response',
-  })
+  columns_to_input_keys=[
+    ('messages', AIDBListType(), 'role'),
+    ('messages', AIDBListType(), 'content')
+  ],
+  response_keys_to_columns=[
+    'id',
+    'created',
+    'model',
+    ('choices', AIDBListType(), 'message', 'content'):,
+  ])
 openai_text_response_pd = openai_text.infer_one(pd.Series({
   "role": "user",
   "content": "Do you know Google Cloud Vision API?"
@@ -95,7 +95,7 @@ openai_text_response_pd
 ```
 
 Response:
-|	|id|	created|	model|	response|
+|	|0 (id)|	1 (created)|	2 (model)|	3 (response)|
 |---|---|---|---|---|
 |0|	chatcmpl-8Ci3StQkwrZVzeksQ7NdLcwzx7Hza	|1698039974|	gpt-3.5-turbo-0613|	Yes, I am familiar with Google Cloud Vision API. It is a set of computer vision capabilities offered by Google Cloud that allows developers to integrate vision detection features into their applications. The API enables tasks like image labeling, face detection, object recognition, text extraction, and more. It uses machine learning models to analyze images and provide accurate results.|
 |1|	chatcmpl-8Ci3StQkwrZVzeksQ7NdLcwzx7Hza	|1698039974|	gpt-3.5-turbo-0613|	Yes, I am familiar with Google Cloud Vision API. It is a machine learning-based image analysis tool provided by Google Cloud Platform. It allows developers to integrate image recognition, labeling, face detection, OCR (optical character recognition), and various other image-related functionalities into their applications.|
@@ -115,17 +115,17 @@ openai_image = OpenAIImage(
     "n": 3,
     "size": "512x512"
   },
-  columns_to_input_keys={'prompt': 'prompt'},
-  response_keys_to_columns={
-    'created': 'created',
-    ('data', AIDBListType(), 'url'): 'url',
-  })
+  columns_to_input_keys=['prompt'],
+  response_keys_to_columns=[
+    'created',
+    ('data', AIDBListType(), 'url'),
+  ])
 openai_image_response_pd = openai_image.infer_one(pd.Series({"prompt": "Miku smiling"}))
 openai_image_response_pd
 ```
 
 Response:
-|	|created|	url|
+|	|0 (created)|	1 (url)|
 |---|---|---|
 |0|	1698040308|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-6pj3bL19ibc4VSS2r86Rt6l1.png?st=2023-10-23T04%3A51%3A48Z&se=2023-10-23T06%3A51%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-22T10%3A05%3A00Z&ske=2023-10-23T10%3A05%3A00Z&sks=b&skv=2021-08-06&sig=zht7nDEoyIzCcJpQ/D/CaolZkda/DX/5qTLJ0bWHc3U%3D |
 |1|	1698040308|	https://oaidalleapiprodscus.blob.core.windows.net/private/org-3bMaInw6MjKWFNTMv8GxqKri/user-wC1FjJwmLQdW3wa3GsnJQOH4/img-9dGtMNXrQ2BUg1MtTEpBRoJL.png?st=2023-10-23T04%3A51%3A48Z&se=2023-10-23T06%3A51%3A48Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2023-10-22T10%3A05%3A00Z&ske=2023-10-23T10%3A05%3A00Z&sks=b&skv=2021-08-06&sig=0MvEbVFN1CxXkLk7xZwi7k6wOQEJuHVVQS00e8tKCXA%3D |
@@ -147,11 +147,11 @@ from aidb.config.config_types import AIDBListType
 hf_nlp = HuggingFaceNLP(
   token=HF_KEY,
   default_args={"options": {"wait_for_model": True}},
-  columns_to_input_keys={'inputs': 'inputs'},
-  response_keys_to_columns={(AIDBListType(), 'sequence'): 'sequence',
-                            (AIDBListType(), 'score'): 'score',
-                            (AIDBListType(), 'token'): 'token',
-                            (AIDBListType(), 'token_str'): 'token_str'},
+  columns_to_input_keys=['inputs'],
+  response_keys_to_columns=[(AIDBListType(), 'sequence'),
+                            (AIDBListType(), 'score'),
+                            (AIDBListType(), 'token'),
+                            (AIDBListType(), 'token_str')]
   model="bert-base-uncased")
 
 hf_nlp_response_pd = hf_nlp.infer_one(pd.Series({"inputs": "The answer to the universe is [MASK]."}))
@@ -159,7 +159,7 @@ hf_nlp_response_pd
 ```
 
 Response:
-|	|sequence|	score|	token|	token_str|
+|	|0 (sequence)|1	(score)|2	(token)|3	(token_str)|
 |---|---|---|---|---|
 |0|	the answer to the universe is no.|	0.169641|	2053|	no|
 |1|	the answer to the universe is nothing.|	0.073448|	2498|	nothing|
@@ -177,14 +177,14 @@ Example usage:
 from aidb.inference.examples.huggingface_inference_service import HuggingFaceVisionAudio
 from aidb.config.config_types import AIDBListType
 
-map_response_to_output = {
-  (AIDBListType(), 'score'): 'score',
-  (AIDBListType(), 'label'): 'label',
-  (AIDBListType(), 'box', 'xmin'): 'box.xmin',
-  (AIDBListType(), 'box', 'ymin'): 'box.ymin',
-  (AIDBListType(), 'box', 'xmax'): 'box.xmax',
-  (AIDBListType(), 'box', 'ymax'): 'box.ymax',
-}
+map_response_to_output = [
+  (AIDBListType(), 'score'),
+  (AIDBListType(), 'label'),
+  (AIDBListType(), 'box', 'xmin'),
+  (AIDBListType(), 'box', 'ymin'),
+  (AIDBListType(), 'box', 'xmax'),
+  (AIDBListType(), 'box', 'ymax'),
+]
 
 hf_cv = HuggingFaceVisionAudio(
   token=HF_KEY,
@@ -192,13 +192,13 @@ hf_cv = HuggingFaceVisionAudio(
   response_keys_to_columns=map_response_to_output,
   model="facebook/detr-resnet-50")
 hf_cv_response_pd = hf_cv.infer_one(pd.Series({
-    "filename": "/home/conrevo/图片/avatar.png" # key must be "filename"
+    "filename": "/path/to/image.png"
 }))
 hf_cv_response_pd
 ```
 
 Response:
-|	|score|	label|	box.xmin|	box.ymin|	box.xmax|	box.ymax|
+|	|0 (score)|1	(label)|2	(box.xmin)|3	(box.ymin)|4	(box.xmax)|5	(box.ymax)|
 |---|---|---|---|---|---|---|
 |0|	0.998632|	tie|	214|	254|	254|	426|
 |1|	0.997547|	person|	50|	26|	511|	509|
@@ -216,30 +216,7 @@ Example usage:
 import pandas as pd
 from aidb.inference.examples.google_inference_service import GoogleVisionAnnotate
 
-map_input_to_request = {
-  'imageUri': ('requests', '0', 'image', 'source', 'imageUri'),
-  'type': ('requests', '0', 'features', '0', 'type'),
-  '0': ('requests',
-    '0',
-    'imageContext',
-    'cropHintsParams',
-    'aspectRatios',
-    '0'),
-  '1': ('requests',
-    '0',
-    'imageContext',
-    'cropHintsParams',
-    'aspectRatios',
-    '1'),
-  '2': ('requests',
-    '0',
-    'imageContext',
-    'cropHintsParams',
-    'aspectRatios',
-    '2'),
-  'parent': ('parent',)
-}
-
+map_input_to_request = <omit, too long>
 map_response_to_output = <omit, too long>
 
 google_cv = GoogleVisionAnnotate(
@@ -253,7 +230,7 @@ google_cv_response_pd
 
 Input Series:
 ```
-imageUri    https://upload.wikimedia.org/wikipedia/commons/5/56/Donald_Trump_official_portrait.jpg
+imageUri                            https://path/to/image.jpg
 type                                           FACE_DETECTION
 0                                                         0.8
 1                                                           1

@@ -1,8 +1,7 @@
-from collections import defaultdict
+import copy
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List
-import copy
 
 import sqlglot.expressions as exp
 from sqlglot.rewriter import Rewriter
@@ -375,11 +374,21 @@ class Query(object):
             if inference_col not in visited:
               stack.append(inference_col)
               visited.add(inference_col)
-    return list(inference_engines_required)
+
+    inference_engines_ordered = [
+      inference_engine
+      for inference_engine in self.config.inference_topological_order
+      if inference_engine in inference_engines_required
+    ]
+
+    return inference_engines_ordered
 
 
   @cached_property
   def blob_tables_required_for_query(self):
+    '''
+    get required blob tables for a query
+    '''
     blob_tables = set()
     for inference_engine in self.inference_engines_required_for_query:
       for input_col in inference_engine.binding.input_columns:
@@ -401,12 +410,13 @@ class Query(object):
     return value
 
 
-  def get_limit_cardinality(self):
+  @cached_property
+  def limit_cardinality(self):
     return self._get_keyword_arg(exp.Limit)
 
 
   def is_limit_query(self):
-    cardinality = self.get_limit_cardinality()
+    cardinality = self.limit_cardinality
     if cardinality is None:
       return False
     return True

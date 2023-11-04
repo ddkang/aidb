@@ -7,21 +7,12 @@ from aidb.inference.bound_inference_service import BoundInferenceService
 from aidb.query.query import Query
 
 class FullScanEngine(BaseEngine):
-  def _get_required_bound_services_order(self, query: Query) -> List[BoundInferenceService]:
-    bound_service_list_ordered = [
-        bound_service
-        for bound_service in self._config.inference_topological_order
-        if bound_service in query.inference_engines_required_for_query
-    ]
-    return bound_service_list_ordered
-
-
   async def execute_full_scan(self, query: Query, **kwargs):
     '''
     Executes a query by doing a full scan and returns the results.
     '''
     # The query is irrelevant since we do a full scan anyway
-    bound_service_list = self._get_required_bound_services_order(query)
+    bound_service_list = query.inference_engines_required_for_query
     inference_services_executed = set()
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service,

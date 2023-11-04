@@ -38,10 +38,10 @@ class LimitEngine(TastiEngine):
     # sorted blob id based on proxy score
     id_score = [(i, s) for i, s in zip(proxy_score_for_all_blobs.index, proxy_score_for_all_blobs.values)]
     sorted_list = sorted(id_score, key=lambda x: x[1], reverse=True)
-    desired_cardinality = int(query.get_limit_cardinality())
+    desired_cardinality = query.limit_cardinality
 
     # TODO: rewrite query, use full scan to execute query
-    bound_service_list = self._get_required_bound_services_order(query)
+    bound_service_list = query.inference_engines_required_for_query
     for index, _ in sorted_list:
       for bound_service in bound_service_list:
         inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service,

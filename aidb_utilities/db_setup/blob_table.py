@@ -40,12 +40,15 @@ class BaseTablesSetup(object):
                              [('table_name', sqlalchemy.String(20), True), ('blob_key', sqlalchemy.String(20), True)])
     async with self._sql_engine.begin() as conn:
       for c_name, _, is_pk in table_columns:
-        if is_pk:
-          # Insert into blob metadata table
-          await conn.execute(
-            text(f'INSERT INTO {BLOB_TABLE_NAMES_TABLE} VALUES (:table_name, :blob_key)')
-            .bindparams(table_name=table_name, blob_key=c_name)
-          )
+        try:
+          if is_pk:
+            # Insert into blob metadata table
+            await conn.execute(
+              text(f'INSERT INTO {BLOB_TABLE_NAMES_TABLE} VALUES (:table_name, :blob_key)')
+              .bindparams(table_name=table_name, blob_key=c_name)
+            )
+        except sqlalchemy.exc.IntegrityError:
+          print(f"Skipping: Blob config table already have {table_name} and {c_name}")
 
 
   async def _insert_data_in_table(self, table_name: str, data: pd.DataFrame):
@@ -53,7 +56,10 @@ class BaseTablesSetup(object):
     inserts rows in the table
     '''
     async with self._sql_engine.begin() as conn:
-      await conn.run_sync(lambda conn: data.to_sql(table_name, conn, if_exists='append', index=False))
+      try:
+        await conn.run_sync(lambda conn: data.to_sql(table_name, conn, if_exists='append', index=False))
+      except sqlalchemy.exc.IntegrityError:
+        print(f"Skipping: Blob table is already populated with the blobs")
 
 
   def insert_blob_meta_data(self, table_name, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
