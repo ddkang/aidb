@@ -5,7 +5,7 @@ import sqlglot.expressions as exp
 import statsmodels.stats.proportion
 from typing import List
 
-from aidb.engine.base_engine import BaseEngine
+from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
@@ -13,7 +13,7 @@ from aidb.query.query import Query
 _NUM_PILOT_SAMPLES = 1000
 
 
-class ApproximateAggregateEngine(BaseEngine):
+class ApproximateAggregateEngine(FullScanEngine):
   async def execute_aggregate_query(self, query: Query):
     '''
     Execute aggregation query using approximate processing
@@ -52,8 +52,9 @@ class ApproximateAggregateEngine(BaseEngine):
       # FIXME: what to return when num_sample is 0
       if num_samples == 0:
         return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
-      elif num_samples + _NUM_PILOT_SAMPLES > self.blob_count:
-        raise Exception('Not enough blob ids to sample')
+      # when there is not enough data samples, directly run full scan engine and get exact result
+      elif num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
+        return self.execute_full_scan(query)
 
       new_sample_results = await self.get_results_on_sampled_data(num_samples,
                                                                   query,
@@ -68,11 +69,10 @@ class ApproximateAggregateEngine(BaseEngine):
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
     '''Function that returns a query, to get total number of blob ids'''
     join_str = self._get_inner_join_query(table_names)
-    where_str = f'WHERE {blob_key_filtering_predicates_str}' if blob_key_filtering_predicates_str else ''
     return f'''
             SELECT COUNT(*)
             {join_str}
-            {where_str};
+            {blob_key_filtering_predicates_str};
             '''
 
 
@@ -99,12 +99,12 @@ class ApproximateAggregateEngine(BaseEngine):
     select_column_str = ', '.join(select_column)
     # FIXME: add condition that samples are not in previous sampled data
     sample_blobs_query_str = f'''
-                SELECT {select_column_str}
-                {join_str}
-                {blob_key_filtering_predicates_str}
-                ORDER BY RANDOM()
-                LIMIT {num_samples};
-                 '''
+                              SELECT {select_column_str}
+                              {join_str}
+                              {blob_key_filtering_predicates_str}
+                              ORDER BY RANDOM()
+                              LIMIT {num_samples};
+                              '''
     return sample_blobs_query_str
 
 
@@ -112,7 +112,7 @@ class ApproximateAggregateEngine(BaseEngine):
     '''
     Executed inference services on sampled data
     '''
-    bound_service_list = query.inference_engines_required_for_filtering_predicates
+    bound_service_list = query.inference_engines_required_for_query
     inference_services_executed = set()
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service, query,
@@ -158,9 +158,9 @@ class ApproximateAggregateEngine(BaseEngine):
     results_for_each_blob = []
     for index, row in res_df.iterrows():
       results_for_each_blob.append(SampledBlob(weight=1. / self.blob_count,
-                                             mass=1,
-                                             statistic=row[0],
-                                             num_items=int(row[1])))
+                                               mass=1,
+                                               statistic=row[0],
+                                               num_items=int(row[1])))
 
     return results_for_each_blob
 
@@ -175,6 +175,9 @@ class ApproximateAggregateEngine(BaseEngine):
   ):
     sample_blobs_query_str = self.get_sample_blobs_query(blob_tables, num_samples, blob_key_filtering_predicates_str)
     sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_blobs_query_str), conn))
+
+    if len(sample_blobs_df) < num_samples:
+      raise Exception(f'Require {num_samples} samples, but only get {len(sample_blobs_df)} samples')
 
     await self.execute_inference_services(query, sample_blobs_df, conn)
 

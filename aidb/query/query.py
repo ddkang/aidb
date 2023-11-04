@@ -433,6 +433,7 @@ class Query(object):
   def confidence(self):
     return self._get_keyword_arg(exp.Confidence)
 
+
   @cached_property
   def is_approx_agg_query(self):
     return self.error_target is not None and self.confidence is not None
@@ -449,8 +450,14 @@ class Query(object):
     for expression in self.base_sql_no_aqp.args['expressions']:
       expression_counts[type(expression)] += 1
 
+    if len(expression_counts) > 1:
+      raise Exception('Multiple expression types found')
+
+    if exp.Count or exp.Sum in expression_counts:
+      raise Exception("We haven't supported approximation for SUM/COUNT query yet")
+
     if exp.Avg not in expression_counts:
-      raise Exception('Supported aggregates are not found in aggregation query')
+      raise Exception('We only support approximation for Average query currently.')
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
