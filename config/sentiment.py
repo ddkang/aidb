@@ -4,6 +4,7 @@ from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
 DB_URL = 'sqlite+aiosqlite://'
 DB_NAME = 'aidb_test_amazon.sqlite'
 HF_KEY = 'your-hf-key'
+USE_TASTI = False
 
 sentiment_inference_service = HuggingFaceNLP(
   name="sentiment_classification",

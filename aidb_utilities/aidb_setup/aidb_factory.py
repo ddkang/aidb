@@ -9,7 +9,11 @@ class AIDB:
   def from_config(config_path):
     config = importlib.import_module(config_path)
 
-    aidb_engine = Engine(f'{config.DB_URL}/{config.DB_NAME}', debug=False)
+    if config.USE_TASTI:
+      tasti_config = importlib.import_module()
+      aidb_engine = Engine(f'{config.DB_URL}/{config.DB_NAME}', debug=False)
+    else:
+      aidb_engine = Engine(f'{config.DB_URL}/{config.DB_NAME}', debug=False)
 
     for inference_engine in config.inference_engines:
       service = inference_engine["service"]
