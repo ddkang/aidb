@@ -56,3 +56,6 @@ jobs:
 
     - name: Run aggregation query Avg tests
       run: python3 -m tests.test_aggregation
+
+    - name: Run aggregation query Avg Gaussian tests
+      run: python3 -m tests.test_aggregation_gaussian
