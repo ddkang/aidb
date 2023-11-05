@@ -1,9 +1,11 @@
 import copy
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List
 
 import sqlglot.expressions as exp
+from sqlglot.rewriter import Rewriter
 from sqlglot import Parser, Tokenizer, parse_one
 from sympy import sympify
 from sympy.logic.boolalg import to_cnf
@@ -12,6 +14,20 @@ from aidb.config.config import Config
 from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
                               change_literal_type_to_col_type,
                               extract_column_or_value)
+
+
+def is_aqp_exp(node):
+  return isinstance(node, exp.ErrorTarget) \
+      or isinstance(node, exp.RecallTarget) \
+      or isinstance(node, exp.PrecisionTarget) \
+      or isinstance(node, exp.Confidence) \
+      or isinstance(node, exp.Budget)
+
+
+def _remove_aqp(node):
+  if is_aqp_exp(node):
+    return None
+  return node
 
 
 @dataclass(frozen=True)
@@ -32,6 +48,10 @@ class Query(object):
   @cached_property
   def _expression(self) -> exp.Expression:
     return Parser().parse(self._tokens)[0]
+
+
+  def get_expression(self):
+    return self._expression
 
 
   @cached_property
@@ -384,9 +404,8 @@ class Query(object):
     value = None
     for node, _, key in self._expression.walk():
       if isinstance(node, exp_type):
-        # FIXME: this is only for LIMIT query, modify later
         if value is not None:
-          raise Exception('Multiple LIMIT keywords found')
+          raise Exception(f'Multiple unexpected keywords found')
         else:
           value = float(node.args['this'].args['this'])
     return value
@@ -404,6 +423,69 @@ class Query(object):
     return True
 
 
+  @cached_property
+  def error_target(self):
+    error_target = self._get_keyword_arg(exp.ErrorTarget)
+    return error_target / 100. if error_target else None
+
+
+  @cached_property
+  def confidence(self):
+    return self._get_keyword_arg(exp.Confidence)
+
+
+  @cached_property
+  def is_approx_agg_query(self):
+    return self.error_target is not None and self.confidence is not None
+
+
+  # Validate AQP
+  def is_valid_aqp_query(self):
+    # Only accept select statements
+    if not isinstance(self.base_sql_no_aqp, exp.Select):
+      raise Exception('Not a select statement')
+
+    # Count the number of distinct aggregates
+    expression_counts = defaultdict(int)
+    for expression in self.base_sql_no_aqp.args['expressions']:
+      expression_counts[type(expression)] += 1
+
+    if len(expression_counts) > 1:
+      raise Exception('Multiple expression types found')
+
+    if exp.Count in expression_counts or exp.Sum in expression_counts:
+      raise Exception("We haven't supported approximation for SUM/COUNT query yet")
+
+    if exp.Avg not in expression_counts:
+      raise Exception('We only support approximation for Average query currently.')
+
+    if not self.error_target or not self.confidence:
+      raise Exception('Aggregation query should contain error target and confidence')
+
+    return True
+
+
+  @cached_property
+  def base_sql_no_aqp(self):
+    _exp_no_aqp = self._expression.transform(_remove_aqp)
+    if _exp_no_aqp is None:
+      raise Exception('SQL contains no non-AQP statements')
+    return _exp_no_aqp
+
+
+  # Get aggregation type
+  @cached_property
+  def get_agg_type(self):
+    # Only support one aggregation for the time being
+    if len(self.base_sql_no_aqp.args['expressions']) != 1:
+      raise Exception('Multiple expressions found')
+    select_exp = self.base_sql_no_aqp.args['expressions'][0]
+    if isinstance(select_exp, exp.Avg):
+      return exp.Avg
+    else:
+      raise Exception('Unsupported aggregation')
+
+
   # FIXME: move it to sqlglot.rewriter
   def add_where_condition(self, expression, operator:str , where_condition):
     expression = copy.deepcopy(expression)
@@ -419,3 +501,9 @@ class Query(object):
       where_expr = exp.Where(this=new_condition)
       expression.args['where'] = where_expr
       return expression
+
+
+  def add_select(self, expression, selects):
+    re = Rewriter(expression)
+    e = re.add_selects(selects)
+    return e.expression

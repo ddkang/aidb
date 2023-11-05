@@ -61,7 +61,7 @@ class TastiEngine(FullScanEngine):
     score_df = score_df.groupby(level=0).mean()
     score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
-     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
+    # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
     return score_for_all_df, score_connected
 
 
