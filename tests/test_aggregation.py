@@ -34,6 +34,21 @@ queries = [
     '''SELECT AVG(y_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT AVG(y_min) FROM objects00;'''
   ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 WHERE x_min > 1000;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min) FROM objects00 WHERE y_max < 900 ERROR_TARGET 10% CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 WHERE y_max < 900;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min) FROM objects00 WHERE x_min < 700 ERROR_TARGET 10% CONFIDENCE 95;''',
+    '''SELECT AVG(x_min) FROM objects00 WHERE x_min < 700;'''
+  ),
 ]
 
 
