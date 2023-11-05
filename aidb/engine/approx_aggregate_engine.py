@@ -40,11 +40,13 @@ class ApproximateAggregateEngine(FullScanEngine):
       self.blob_count = blob_count_res.fetchone()[0]
 
       # run inference on pilot blobs
-      sample_results = await self.get_results_on_sampled_data(_NUM_PILOT_SAMPLES,
-                                                              query,
-                                                              blob_tables,
-                                                              blob_key_filtering_predicates_str,
-                                                              conn)
+      sample_results = await self.get_results_on_sampled_data(
+          _NUM_PILOT_SAMPLES,
+          query,
+          blob_tables,
+          blob_key_filtering_predicates_str,
+          conn
+      )
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
@@ -56,11 +58,13 @@ class ApproximateAggregateEngine(FullScanEngine):
       elif num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
 
-      new_sample_results = await self.get_results_on_sampled_data(num_samples,
-                                                                  query,
-                                                                  blob_tables,
-                                                                  blob_key_filtering_predicates_str,
-                                                                  conn)
+      new_sample_results = await self.get_results_on_sampled_data(
+          num_samples,
+          query,
+          blob_tables,
+          blob_key_filtering_predicates_str,
+          conn
+      )
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
@@ -116,14 +120,19 @@ class ApproximateAggregateEngine(FullScanEngine):
     bound_service_list = query.inference_engines_required_for_query
     inference_services_executed = set()
     for bound_service in bound_service_list:
-      inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service, query,
-                                                                                inference_services_executed)
+      inp_query_str = self.get_input_query_for_inference_service_filter_service(
+          bound_service,
+          query,
+          inference_services_executed
+      )
       new_query = Query(inp_query_str, self._config)
       expression = new_query.get_expression()
-      query_str, _ = self.add_filter_key_into_query(list(bound_service.binding.input_columns),
-                                                    sample_df,
-                                                    new_query,
-                                                    expression)
+      query_str, _ = self.add_filter_key_into_query(
+          list(bound_service.binding.input_columns),
+          sample_df,
+          new_query,
+          expression
+      )
 
       input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str.sql()), conn))
       await bound_service.infer(input_df)
@@ -143,10 +152,12 @@ class ApproximateAggregateEngine(FullScanEngine):
     query_expression = query_no_aqp_sql.get_expression()
 
     table_columns = [f'{table}.{col.name}' for table in tables_in_query for col in self._config.tables[table].columns]
-    query_expression, selected_column = self.add_filter_key_into_query(table_columns,
-                                                                       sample_df,
-                                                                       query_no_aqp_sql,
-                                                                       query_expression)
+    query_expression, selected_column = self.add_filter_key_into_query(
+        table_columns,
+        sample_df,
+        query_no_aqp_sql,
+        query_expression
+    )
 
     query_expression = query_no_aqp_sql.add_select(query_expression, 'COUNT(*) AS num_items')
     query_str = f'''
@@ -157,11 +168,13 @@ class ApproximateAggregateEngine(FullScanEngine):
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
 
     results_for_each_blob = []
-    for index, row in res_df.iterrows():
-      results_for_each_blob.append(SampledBlob(weight=1. / self.blob_count,
-                                               mass=1,
-                                               statistic=row[0],
-                                               num_items=int(row[1])))
+    for _, row in res_df.iterrows():
+      results_for_each_blob.append(SampledBlob(
+          weight=1. / self.blob_count,
+          mass=1,
+          statistic=row[0],
+          num_items=int(row[1])
+      ))
 
     return results_for_each_blob
 
