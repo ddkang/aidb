@@ -36,17 +36,17 @@ class TastiTests():
     self.vd_type = vector_database_type
     self.seed = seed
 
-    self.data, vector_ids = self.generate_data(self.data_size, embedding_dim)
+    self.data, self.vector_ids = self.generate_data(self.data_size, embedding_dim)
     self.user_database = self.simulate_user_providing_database(index_path, weaviate_auth)
 
-    self.tasti = Tasti(index_name, vector_ids, self.user_database, nb_buckets, percent_fpf, seed)
+    self.tasti = Tasti(index_name, self.user_database, nb_buckets, percent_fpf, seed)
 
 
   def generate_data(self, data_size, emb_size):
     np.random.seed(self.seed)
     embeddings = np.random.rand(data_size, emb_size)
     data = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size), 'values': embeddings.tolist()})
-    vector_ids = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size)})
+    vector_ids = pd.DataFrame({'vector_id': range(self.total_data, self.total_data + data_size)})
     self.total_data += data_size
     return data, vector_ids
 
@@ -85,6 +85,7 @@ class TastiTests():
 
 
   def test(self):
+    self.tasti.set_vector_ids(self.vector_ids)
     representative_vector_ids = self.tasti.get_representative_vector_ids()
     print('The shape of cluster representative ids', representative_vector_ids.shape)
     # get culster representatives ids

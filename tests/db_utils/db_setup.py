@@ -9,7 +9,7 @@ from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 from aidb.config.config_types import python_type_to_sqlalchemy_type
-from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
+from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping
 from sqlalchemy.sql import text
 from dataclasses import dataclass
 from typing import Optional
@@ -145,6 +145,10 @@ async def insert_data_in_tables(engine, data_dir: str, only_blob_data: bool):
       for column in df.columns:
         column_info = extract_column_info(table_name, column)
         df.rename(columns={column: column_info.name}, inplace=True)
+
+      if table_name.startswith('mapping'):
+        _, _, blob_mapping_table_name = table_name_for_rep_and_topk_and_blob_mapping(['blobs_00'])
+        table_name = blob_mapping_table_name
       # FIXME: in case of mysql, this function doesn't wait, hence throwing integrity error
       await conn.run_sync(lambda conn: df.to_sql(table_name, conn, if_exists='append', index=False))
 

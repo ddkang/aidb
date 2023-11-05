@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Union, NewType, Optional
 
-from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE
+from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping
 from aidb.utils.db import create_sql_engine, infer_dialect
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
@@ -15,7 +15,6 @@ class VectorDatabaseSetup:
       self,
       connection_uri: str,
       blob_table_name: str,
-      blob_mapping_table_name: str,
       vd_type: str,
       index_name: str,
       auth: Union[IndexPath, WeaviateAuth]
@@ -23,7 +22,6 @@ class VectorDatabaseSetup:
     self._dialect = infer_dialect(connection_uri)
     self._sql_engine = create_sql_engine(connection_uri)
     self.blob_table_name = blob_table_name
-    self.blob_mapping_table_name = blob_mapping_table_name
     self.vd_type = vd_type.upper()
     self.index_name = index_name
     self.auth = auth
@@ -98,7 +96,8 @@ class VectorDatabaseSetup:
       df['vector_id'] = list(range(len(df)))
       blob_mapping_table_df = df.drop(columns=path_column)
       # create blob mapping table
-      await conn.run_sync(lambda conn: blob_mapping_table_df.to_sql(self.blob_mapping_table_name, conn,
+      _, _, blob_mapping_table_name = table_name_for_rep_and_topk_and_blob_mapping([self.blob_table_name])
+      await conn.run_sync(lambda conn: blob_mapping_table_df.to_sql(blob_mapping_table_name, conn,
                                                                     index=False, if_exists='append'))
 
     vector_database_df = df[['vector_id', path_column]]

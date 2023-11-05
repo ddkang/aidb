@@ -18,12 +18,11 @@ class TastiConfig:
   :param reps: representative ids
   '''
   index_name: str
-  vector_ids: pd.DataFrame
   vector_database: VectorDatabase
-  nb_buckets: int
+  nb_buckets: int = 1000
   percent_fpf: float = 0.75
   seed: int = 1234
-  reps: Optional[np.ndarray] = field(default=None)
+
 
   # Initialize supplementary parameters in Tasti; without this step, these parameters remain uninitialized
   def __post_init__(self):

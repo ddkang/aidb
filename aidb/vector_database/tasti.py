@@ -21,9 +21,21 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
 class Tasti(TastiConfig):
   def __post_init__(self):
     self.rep_index_name = f'{self.index_name}__representatives'
+    self.vector_ids = None
+    self.reps = None
     self.rand = np.random.RandomState(self.seed)
-    self.embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                                self.vector_ids.values.reshape(1, -1)[0])
+
+
+  def set_vector_ids(self, vector_ids: pd.DataFrame):
+    self.vector_ids = vector_ids
+    self.embeddings = self.vector_database.get_embeddings_by_id(
+      self.index_name,
+      self.vector_ids.values.reshape(1, -1)[0]
+    )
+
+
+  def set_existing_reps(self, reps: np.ndarray):
+    self.reps = reps
 
 
   # # TODO: Add memory efficient FPF Random Bucketter
@@ -35,6 +47,9 @@ class Tasti(TastiConfig):
       buckets = nb_buckets
     else:
       buckets = self.nb_buckets
+
+    if self.vector_ids is None:
+      raise Exception('Vector_ids is None, please set it first.')
 
     reps = np.full(buckets, -1)
     min_dists = np.full(len(self.embeddings), np.Inf, dtype=np.float32)
@@ -65,7 +80,7 @@ class Tasti(TastiConfig):
     if self.reps is None:
       self._FPF()
     rep_id = self.vector_ids.iloc[self.reps]
-    rep_id.set_index('id', inplace=True, drop=True)
+    rep_id.set_index('vector_id', inplace=True, drop=True)
     return rep_id
 
 

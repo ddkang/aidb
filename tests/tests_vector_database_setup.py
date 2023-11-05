@@ -29,7 +29,6 @@ def test_equality(value):
 
 
 blob_table_name = 'blob00'
-blob_mapping_table_name = 'blob_mapping_00'
 index_name = 'tasti'
 
 class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
@@ -39,7 +38,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     vd_type = 'FAISS'
     auth = './'
 
-    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, blob_mapping_table_name, vd_type, index_name, auth)
+    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, vd_type, index_name, auth)
     await vector_database.setup()
 
     existing_vector_database = FaissVectorDatabase(auth)
@@ -52,7 +51,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     vd_type = 'chroma'
     auth = './'
 
-    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, blob_mapping_table_name, vd_type, index_name, auth)
+    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, vd_type, index_name, auth)
     await vector_database.setup()
 
     existing_vector_database = ChromaVectorDatabase(auth)
@@ -68,7 +67,7 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     api_key = os.environ.get('WEAVIATE_API_KEY')
     auth = WeaviateAuth(url=url, api_key=api_key)
 
-    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, blob_mapping_table_name, vd_type, index_name, auth)
+    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, vd_type, index_name, auth)
     await vector_database.setup()
 
     existing_vector_database = WeaviateVectorDatabase(auth)
