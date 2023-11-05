@@ -53,7 +53,7 @@ class ApproximateAggregateEngine(FullScanEngine):
       print('num_samples', num_samples)
       # FIXME: what to return when num_sample is 0
       if num_samples == 0:
-        return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
+        return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence / 100.).estimate,)]
       # when there is not enough data samples, directly run full scan engine and get exact result
       elif num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
