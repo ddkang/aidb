@@ -17,7 +17,7 @@ def get_tasti_config(tasti_config_path):
     'WEAVIATE': WeaviateVectorDatabase
   }
   vector_database_config = tasti_config.vector_database
-  vector_database_type = vector_database_config['vector_database_type']
+  vector_database_type = vector_database_config['vector_database_type'].upper()
   try:
     user_vector_database = vector_database[vector_database_type](**vector_database_config['auth'])
   except KeyError:

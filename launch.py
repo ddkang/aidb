@@ -19,7 +19,7 @@ def setup_blob_tables(config):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument("--config", type=str)
-  parser.add_argument("--tasti-config", type=str, help='tasti config is optional')
+  parser.add_argument("--tasti-config", type=str, help='The path of tasti_config module')
   parser.add_argument("--setup-blob-table", action='store_true')
   parser.add_argument("--setup-output-tables", action='store_true')
   args = parser.parse_args()
