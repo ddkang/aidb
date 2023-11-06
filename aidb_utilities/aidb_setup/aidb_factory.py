@@ -28,7 +28,7 @@ def get_tasti_config(tasti_config_path):
 
   if tasti_config.vector_id_csv:
     vector_id_df = pd.read_csv(tasti_config.vector_id_csv)
-    if len(vector_id_df.columns):
+    if len(vector_id_df.columns) != 1:
       raise Exception('Vector id csv file should contain one column for vector id')
     vector_id_df.columns.values[0] = 'vector_id'
 
