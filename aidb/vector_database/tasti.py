@@ -30,7 +30,8 @@ class Tasti(TastiConfig):
     self.vector_ids = vector_ids
     self.embeddings = self.vector_database.get_embeddings_by_id(
       self.index_name,
-      self.vector_ids.values.reshape(1, -1)[0]
+      self.vector_ids.values.reshape(1, -1)[0],
+      reload=True
     )
 
 
@@ -105,8 +106,11 @@ class Tasti(TastiConfig):
     get topk representatives and distances for new embeddings using stale cluster representatives,
     in other words, we don't need to use FPF to reselect cluster representatives
     '''
-    new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name, new_vector_ids.values.reshape(1, -1)[0],
-                                                               reload=True)
+    new_embeddings = self.vector_database.get_embeddings_by_id(
+        self.index_name,
+        new_vector_ids.values.reshape(1, -1)[0],
+        reload=True
+    )
     topk_reps, topk_dists = self.vector_database.query_by_embedding(self.rep_index_name, new_embeddings, top_k)
     topk_reps = self.vector_ids.iloc[np.concatenate(topk_reps)].values.reshape(-1, top_k)
     data = {'topk_reps': list(topk_reps), 'topk_dists': list(topk_dists)}
@@ -124,8 +128,11 @@ class Tasti(TastiConfig):
     '''
     #TODO: do we need to check if there is override bewteen vector_ids and new_vector_ids?
     self.vector_ids = pd.concat([self.vector_ids, new_vector_ids])
-    new_embeddings = self.vector_database.get_embeddings_by_id(self.index_name,
-                                                               new_vector_ids.values.reshape(1, -1)[0], reload=True)
+    new_embeddings = self.vector_database.get_embeddings_by_id(
+        self.index_name,
+        new_vector_ids.values.reshape(1, -1)[0],
+        reload=True
+    )
     self.embeddings = np.concatenate((self.embeddings, new_embeddings), axis=0)
 
     self._FPF(nb_buckets)
