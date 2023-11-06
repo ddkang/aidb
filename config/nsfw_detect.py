@@ -23,21 +23,21 @@ nsfw_detect_service = GoogleVisionAnnotate(
 inference_engines = [
   {
     "service": nsfw_detect_service,
-    "input_col": ("image.image_url", "image.image_id"),
-    "output_col": ("nsfw.adult", "nsfw.spoof", "nsfw.medical", "nsfw.violence", "nsfw.racy", "nsfw.image_id")
+    "input_col": ("images_source.image_url", "images_source.image_id"),
+    "output_col": ("images.adult", "images.spoof", "images.medical", "images.violence", "images.racy", "images.image_id")
   }
 ]
 
-blobs_csv_file = "image_path_data.csv"
-blob_table_name = "image"
+blobs_csv_file = "tests/data/image_path_data.csv"
+blob_table_name = "images_source"
 blobs_keys_columns = ["image_id"]
 
 """
 dictionary of table names to list of columns
 """
 
-tables = {"nsfw": [
-  {"name": "image_id", "is_primary_key": True, "refers_to": ("image", "image_id"), "dtype": int},
+tables = {"images": [
+  {"name": "image_id", "is_primary_key": True, "refers_to": ("images_source", "image_id"), "dtype": int},
   {"name": "adult", "dtype": str},
   {"name": "spoof", "dtype": str},
   {"name": "medical", "dtype": str},
