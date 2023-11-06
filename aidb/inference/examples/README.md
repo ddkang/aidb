@@ -34,7 +34,7 @@ map_input_to_request = [
 ]
 ```
 
-The order of columns match the order of your bindings. You can import `AIDBListType` to ease your conversion.
+**The order of columns match the order of your bindings.** You can import `AIDBListType` to ease your conversion.
 
 For input to request conversion, you can either provide explicit list index if your JSON request contains list, or use `AIDBListType` to span your input column to a JSON list of arbitrary length (length of the list is your batch size) inside your JSON request. Each item in the key map list should contain at most 1 `AIDBListType` key.
 
@@ -46,7 +46,7 @@ If an input column has index which is greater than or equal to the length of key
 
 You can optionally write your own `HTTPInferenceService.convert_input_to_request` and `HTTPInferenceService.convert_response_to_output` methods if you want to do more complicated conversion.
 
-You can optionally move some arguments to `default_args` during initialization. For example, if you want to use the same `model` for all requests to OpenAI Chat API, you can do:
+You can optionally move some arguments to `default_args` during initialization. `default_args` are a dictionary whose keys are in the same format as items in `map_input_to_request` above. They will be converted to JSON in the same way as input dataframe. For example, if you want to use the same `model` for all requests to OpenAI Chat API, you can do:
 ```python
 openai_text = OpenAIText(
   token=OPENAI_KEY,
@@ -146,7 +146,7 @@ from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
 from aidb.config.config_types import AIDBListType
 hf_nlp = HuggingFaceNLP(
   token=HF_KEY,
-  default_args={"options": {"wait_for_model": True}},
+  default_args={("options", "wait_for_model"): True},
   columns_to_input_keys=['inputs'],
   response_keys_to_columns=[(AIDBListType(), 'sequence'),
                             (AIDBListType(), 'score'),
@@ -188,7 +188,7 @@ map_response_to_output = [
 
 hf_cv = HuggingFaceVisionAudio(
   token=HF_KEY,
-  default_args={"options": {"wait_for_model": True}},
+  default_args={("options", "wait_for_model"): True},
   response_keys_to_columns=map_response_to_output,
   model="facebook/detr-resnet-50")
 hf_cv_response_pd = hf_cv.infer_one(pd.Series({
@@ -214,33 +214,37 @@ You must provide project id during initialization.
 Example usage:
 ```python
 import pandas as pd
+
+from aidb.config.config_types import AIDBListType
 from aidb.inference.examples.google_inference_service import GoogleVisionAnnotate
 
-map_input_to_request = <omit, too long>
-map_response_to_output = <omit, too long>
+nsfw_detect_service = GoogleVisionAnnotate(
+  name="nsfw_detect",
+  token=None, # automatically get token from gcloud
+  columns_to_input_keys=[
+    ('requests', AIDBListType(), 'image', 'source', 'imageUri')],
+  response_keys_to_columns=[
+    ('responses', AIDBListType(), 'safeSearchAnnotation', 'adult'),
+    ('responses', AIDBListType(), 'safeSearchAnnotation', 'spoof'),
+    ('responses', AIDBListType(), 'safeSearchAnnotation', 'medical'),
+    ('responses', AIDBListType(), 'safeSearchAnnotation', 'violence'),
+    ('responses', AIDBListType(), 'safeSearchAnnotation', 'racy')],
+  input_columns_types=[str],
+  output_columns_types=[str, str, str, str, str],
+  project_id="coral-sanctuary-400802",
+  default_args={('requests', AIDBListType(), 'features', 'type'): 'SAFE_SEARCH_DETECTION',
+                'parent': 'projects/coral-sanctuary-400802'})
 
-google_cv = GoogleVisionAnnotate(
-  token=GOOGLE_KEY,
-  columns_to_input_keys=map_input_to_request,
-  response_keys_to_columns=map_response_to_output,
-  project_id='<project-id>')
-google_cv_response_pd = google_cv.infer_one(google_cv_request_pd)
-google_cv_response_pd
-```
-
-Input Series:
-```
-imageUri                            https://path/to/image.jpg
-type                                           FACE_DETECTION
-0                                                         0.8
-1                                                           1
-2                                                         1.2
-parent                        projects/coral-sanctuary-400802
-dtype: object
+nsfw_detect_service_response_pd = nsfw_detect_service.infer_one(pd.Series({
+    "url": "https://static.wikia.nocookie.net/bandori/images/3/3d/Togawa_Sakiko_-_Casual_Live2D_Model.png"
+}))
+nsfw_detect_service_response_pd
 ```
 
 Response:
-\<omit, too long\>
+|	|0 (adult)|1 (spoof)|	2 (medical)|	3 (violence)|	4 (racy)|
+|---|---|---|---|---|--|
+|0|VERY_UNLIKELY|	VERY_UNLIKELY|	VERY_UNLIKELY|	VERY_UNLIKELY|	UNLIKELY|
 
 The way to obtain a Google API key is tricky. Please
 1. initiate a project in [Google cloud console](ttps://console.cloud.google.com/welcome/new)
@@ -251,6 +255,8 @@ The way to obtain a Google API key is tricky. Please
     gcloud auth application-default print-access-token
     ```
     in your terminal. You may need additional steps as prompted.
+
+After these steps, AIDB can automatically retrieve your API key. You do not need to provide it explicitly during initialization.
 
 ## Local inference
 

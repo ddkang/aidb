@@ -55,7 +55,7 @@ In this section, we will walk through an example of configuring an inference ser
     
     Order matters when you define bindings. In the above example,
     - `blobs00.review` and `blobs00.review_id` will be passed to the inference service as the first and second argument, respectively. Only `blobs00.review` will be converted to JSON request according to `columns_to_input_keys` map. 
-    - The output of the inference service will be passed to `sentiment.label`, `sentiment.score` and `sentiment.review_id` as the first, second and third argument, respectively. `sentiment.label` and `sentiment.score` are from the inference service, which are converted from JSON to pandas DataFrame according to `response_keys_to_columns` map. `sentiment.review_id` is copied from `blobs00.review_id`. Keep column name the same if you want to copy from input.
+    - The output of the inference service will be passed to `sentiment.label`, `sentiment.score` and `sentiment.review_id` as the first, second and third argument, respectively. `sentiment.label` and `sentiment.score` are from the inference service - they are converted from JSON to pandas DataFrame according to `response_keys_to_columns` map. `sentiment.review_id` is copied from `blobs00.review_id`. Keep column name the same if you want to copy from input.
 
 4. Set up your database configuration, including the URL to your database and its name.
     ```python
