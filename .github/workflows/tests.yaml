@@ -21,7 +21,7 @@ jobs:
 
     - name: Download test data
       run: |
-        gdown https://drive.google.com/uc?id=1QKKj99s01qoL-kpNfcoYUBTY3TyPML9f
+        gdown https://drive.google.com/uc?id=1SyHRaJNvVa7V08mw-4_Vqj7tCynRRA3x
         unzip data.zip -d tests/
 
     - name: Run db setup tests
