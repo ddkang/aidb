@@ -24,15 +24,15 @@ def get_tasti_config(tasti_config_path):
     raise ValueError(f'{vector_database_type} is not a supported type. We support FAISS, Chroma and Weaviate.')
   tasti_index = Tasti(vector_database=user_vector_database, **tasti_config.tasti_engine)
 
-  vector_id_df = None
+  selected_vector_id_df = None
 
   if tasti_config.vector_id_csv:
-    vector_id_df = pd.read_csv(tasti_config.vector_id_csv)
-    if len(vector_id_df.columns) != 1:
+    selected_vector_id_df = pd.read_csv(tasti_config.vector_id_csv)
+    if len(selected_vector_id_df.columns) != 1:
       raise Exception('Vector id csv file should contain one column for vector id')
-    vector_id_df.columns.values[0] = 'vector_id'
+    selected_vector_id_df.columns.values[0] = 'vector_id'
 
-  return tasti_index, vector_id_df
+  return tasti_index, selected_vector_id_df
 
 
 class AIDB:
