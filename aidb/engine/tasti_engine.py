@@ -8,7 +8,7 @@ from aidb.config.config_types import Table
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.query.query import Query
 from aidb.query.utils import predicate_to_str
-from aidb.utils.constants import table_name_for_rep_and_topk
+from aidb.utils.constants import table_name_for_rep_and_topk_and_blob_mapping
 from aidb.vector_database.tasti import Tasti
 
 
@@ -18,8 +18,8 @@ class TastiEngine(FullScanEngine):
       connection_uri: str,
       infer_config: bool = True,
       debug: bool = False,
-      blob_mapping_table_name: Optional[str] = None,
       tasti_index: Optional[Tasti] = None,
+      user_specified_vector_ids: Optional[pd.DataFrame] = None
   ):
     super().__init__(connection_uri, infer_config, debug)
 
@@ -27,8 +27,9 @@ class TastiEngine(FullScanEngine):
     # TODO: modify to same rep table with different topk table
     self.topk_table_name = None
     # table for mapping blob keys to blob ids
-    self.blob_mapping_table_name = blob_mapping_table_name
+    self.blob_mapping_table_name = None
     self.tasti_index = tasti_index
+    self.user_specified_vector_ids = user_specified_vector_ids
 
 
   async def get_proxy_scores_for_all_blobs(self, query: Query, **kwargs):
@@ -40,7 +41,9 @@ class TastiEngine(FullScanEngine):
     bound_service_list = query.inference_engines_required_for_query
     blob_tables = query.blob_tables_required_for_query
 
-    self.rep_table_name, self.topk_table_name = table_name_for_rep_and_topk(blob_tables)
+    self.rep_table_name, self.topk_table_name, self.blob_mapping_table_name = \
+        table_name_for_rep_and_topk_and_blob_mapping(blob_tables)
+
     if self.rep_table_name not in self._config.tables or self.topk_table_name not in self._config.tables:
       await self.initialize_tasti()
 
@@ -210,16 +213,30 @@ class TastiEngine(FullScanEngine):
     """
     if self.tasti_index is None:
       raise Exception('TASTI hasn\'t been initialized, please provide tasti_index')
+
+    if self.user_specified_vector_ids is not None:
+      vector_ids = self.user_specified_vector_ids
+    else:
+      vector_id_select_query_str = f'''
+                                    SELECT {self.blob_mapping_table_name}.vector_id
+                                    FROM {self.blob_mapping_table_name};
+                                    '''
+
+      async with self._sql_engine.begin() as conn:
+        vector_ids = await conn.run_sync(lambda conn: pd.read_sql(text(vector_id_select_query_str), conn))
+
+    self.tasti_index.set_vector_ids(vector_ids)
+
     rep_ids = self.tasti_index.get_representative_vector_ids()
     topk_for_all = self.tasti_index.get_topk_representatives_for_all()
     new_topk_for_all = self._format_topk_for_all(topk_for_all)
     topk = max(topk_for_all['topk_reps'].str.len())
 
     rep_blob_query_str = f'''
-                    SELECT *
-                    FROM {self.blob_mapping_table_name}
-                    WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
-                    '''
+                          SELECT *
+                          FROM {self.blob_mapping_table_name}
+                          WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
+                          '''
 
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: self._create_tasti_table(topk, conn))

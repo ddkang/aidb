@@ -1,7 +1,7 @@
 from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
 from aidb.engine import Engine
 
-async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, blob_mapping_table_name = None):
+async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None):
   # Set up the ground truth database
   gt_db_fname = 'aidb_gt.sqlite'
   await create_db(db_url, gt_db_fname)
@@ -20,7 +20,6 @@ async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, blob_ma
   engine = Engine(
     f'{db_url}/{aidb_db_fname}',
     debug=False,
-    blob_mapping_table_name=blob_mapping_table_name,
     tasti_index=tasti_index
   )
 
