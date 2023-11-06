@@ -23,7 +23,7 @@ vector_database = {
 tasti_engine = {
   'index_name': 'tasti',
   # below are optional config
-  'nb_buckets': 1000,
+  'nb_buckets': 100,
   'percent_fpf': 0.75,
   'seed': 1234,
 }
