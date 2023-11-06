@@ -3,6 +3,7 @@ import os
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth
 
 
+# required for Weaviate, not for FAISS or Chroma
 url = ''
 api_key = os.environ.get('WEAVIATE_API_KEY')
 weaviate_auth = WeaviateAuth(url=url, api_key=api_key)
