@@ -17,13 +17,13 @@ nsfw_detect_service = GoogleVisionAnnotate(
     ('responses', AIDBListType(), 'safeSearchAnnotation', 'racy')],
   input_columns_types=[str],
   output_columns_types=[str, str, str, str, str],
-  project_id="coral-sanctuary-400802",
+  project_id="your-project-id",
   default_args={('requests', AIDBListType(), 'features', 'type'): 'SAFE_SEARCH_DETECTION',
-                'parent': 'projects/coral-sanctuary-400802'})
+                'parent': 'projects/your-project-id'})
 inference_engines = [
   {
     "service": nsfw_detect_service,
-    "input_col": ("blobs00.image_url", "blobs00.image_id"),
+    "input_col": ("image.image_url", "image.image_id"),
     "output_col": ("nsfw.adult", "nsfw.spoof", "nsfw.medical", "nsfw.violence", "nsfw.racy", "nsfw.image_id")
   }
 ]

@@ -140,7 +140,6 @@ class HTTPInferenceService(CachedInferenceService):
     request = unflatten_list(request, self._separator)
     if remove_ghost_key:
       request = request['_']
-    print(request)
     return request
 
 
