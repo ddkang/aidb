@@ -9,8 +9,7 @@ from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
 
 
-def get_tasti_config(tasti_config_path):
-  tasti_config = importlib.import_module(tasti_config_path)
+def get_tasti_config(tasti_config):
   vector_database = {
     'FAISS': FaissVectorDatabase,
     'CHROMA': ChromaVectorDatabase,
@@ -37,11 +36,11 @@ def get_tasti_config(tasti_config_path):
 
 class AIDB:
   @staticmethod
-  def from_config(config_path, tasti_config_path=None):
+  def from_config(config_path):
     config = importlib.import_module(config_path)
 
-    if config.USE_TASTI and tasti_config_path:
-      tasti_index, vector_id_df = get_tasti_config(tasti_config_path)
+    if config.INITIALIZE_TASTI:
+      tasti_index, vector_id_df = get_tasti_config(config)
       aidb_engine = Engine(
           f'{config.DB_URL}/{config.DB_NAME}',
           debug=False,
