@@ -18,7 +18,8 @@ sentiment_inference_service = HuggingFaceNLP(
   input_columns_types=[str],
   output_columns_types=[str, float],
   model="LiYuan/amazon-review-sentiment-analysis",
-  default_args={("options", "wait_for_model"): True})
+  default_args={"options": {"wait_for_model": True}})
+
 inference_engines = [
   {
     "service": sentiment_inference_service,
