@@ -25,3 +25,6 @@ Show an example of new keywords i.e. TARGET_ERROR and CONFIDENCE
 
 # Contribution Guide
 
+# Contact Form
+
+[Google Form Link]()
