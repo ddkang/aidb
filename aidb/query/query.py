@@ -439,6 +439,10 @@ class Query(object):
     return self.error_target is not None and self.confidence is not None
 
 
+  def is_select_query(self):
+    return isinstance(self._expression, exp.Select)
+
+
   # Validate AQP
   def is_valid_aqp_query(self):
     # Only accept select statements
