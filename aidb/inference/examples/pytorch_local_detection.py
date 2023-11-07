@@ -15,9 +15,10 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
       use_batch: bool=True,
       batch_size: int=0,
       box_threshold: float=0.35,
+      device: str="cuda",
   ):
     super().__init__(name=name, preferred_batch_size=batch_size, is_single=is_single)
-    self._model = Model(model_config_path, model_checkpoint_path)
+    self._model = Model(model_config_path, model_checkpoint_path, device=device)
     self._caption = caption
     self._use_batch = use_batch
     self._box_threshold = box_threshold
@@ -32,7 +33,6 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
-        "image": image[0],
         "min_x": xyxy[0],
         "min_y": xyxy[1],
         "max_x": xyxy[2],
@@ -53,12 +53,11 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
       outputs = self._model.predict_with_caption(image_batch, self._caption, self._box_threshold)
       outputs = [
         {
-          "image": image,
           "min_x": xyxy[0],
           "min_y": xyxy[1],
           "max_x": xyxy[2],
           "max_y": xyxy[3],
           "confidence": conf,
-        } for image, output in zip(image_batch, outputs) for xyxy, conf in zip(output.xyxy, output.confidence)]
+        } for output in outputs for xyxy, conf in zip(output.xyxy, output.confidence)]
       outputs_merge.extend(outputs)
     return pd.DataFrame(outputs_merge)
