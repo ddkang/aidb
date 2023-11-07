@@ -26,6 +26,7 @@ def command_line_utility(engine):
       start_time = time.time()
       results = engine.execute(query)
       end_time = time.time()
-      print(f"Query Execution Time = {int((end_time - start_time)*100)/100} seconds")
-      print("Query Result")
-      print(pd.DataFrame(results))
+      if isinstance(results, list):
+        print(f"Query Execution Time = {int((end_time - start_time)*100)/100} seconds")
+        print("Query Result")
+        print(pd.DataFrame(results))
