@@ -231,9 +231,9 @@ nsfw_detect_service = GoogleVisionAnnotate(
     ('responses', AIDBListType(), 'safeSearchAnnotation', 'racy')],
   input_columns_types=[str],
   output_columns_types=[str, str, str, str, str],
-  project_id="coral-sanctuary-400802",
+  project_id="your-project-id",
   default_args={('requests', AIDBListType(), 'features', 'type'): 'SAFE_SEARCH_DETECTION',
-                'parent': 'projects/coral-sanctuary-400802'})
+                'parent': 'projects/your-project-id'})
 
 nsfw_detect_service_response_pd = nsfw_detect_service.infer_one(pd.Series({
     "url": "https://static.wikia.nocookie.net/bandori/images/3/3d/Togawa_Sakiko_-_Casual_Live2D_Model.png"
