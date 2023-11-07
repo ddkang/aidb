@@ -25,7 +25,7 @@ def get_tasti_config(tasti_config):
 
   selected_vector_id_df = None
 
-  if tasti_config.vector_id_csv:
+  if hasattr(tasti_config, 'vector_id_csv') and tasti_config.vector_id_csv is not None:
     selected_vector_id_df = pd.read_csv(tasti_config.vector_id_csv)
     if len(selected_vector_id_df.columns) != 1:
       raise Exception('Vector id csv file should contain one column for vector id')
@@ -39,7 +39,7 @@ class AIDB:
   def from_config(config_path):
     config = importlib.import_module(config_path)
 
-    if config.INITIALIZE_TASTI:
+    if hasattr(config, 'INITIALIZE_TASTI') and config.INITIALIZE_TASTI is True:
       tasti_index, vector_id_df = get_tasti_config(config)
       aidb_engine = Engine(
           f'{config.DB_URL}/{config.DB_NAME}',
