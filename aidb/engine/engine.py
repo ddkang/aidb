@@ -21,4 +21,4 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine):
       else:
         return asyncio_run(self.execute_non_select(parsed_query))
     except Exception as e:
-      print(e)
+      raise e
