@@ -101,6 +101,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
         if self._equality_check(aidb_res, gt_res, error_target):
           count_list[k] += 1
         k+=1
+      print('time of runs', i)
       print('count', count_list)
       del gt_engine
       del aidb_engine
