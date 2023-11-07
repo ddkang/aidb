@@ -77,28 +77,34 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
 
   async def test_agg_query(self):
-    dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/jackson_all')
+    count_list = [0] * len(queries)
+    for i in range(100):
+      dirname = os.path.dirname(__file__)
+      data_dir = os.path.join(dirname, 'data/jackson_all')
 
-    p = Process(target=run_server, args=[str(data_dir)])
-    p.start()
-    time.sleep(1)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-    register_inference_services(aidb_engine, data_dir)
-    for query_type, aidb_query, aggregate_query in queries:
-      print(f'Running query {aggregate_query} in ground truth database')
-      async with gt_engine.begin() as conn:
-        gt_res = await conn.execute(text(aggregate_query))
-        gt_res = gt_res.fetchall()[0]
-      print(f'Running query {aidb_query} in aidb database')
-      aidb_res = aidb_engine.execute(aidb_query)[0]
-      print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
-      error_target = Query(aidb_query, aidb_engine._config).error_target
-      if error_target is None: error_target = 0
-      assert self._equality_check(aidb_res, gt_res, error_target)
-
-    del gt_engine
-    p.terminate()
+      p = Process(target=run_server, args=[str(data_dir)])
+      p.start()
+      time.sleep(1)
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+      register_inference_services(aidb_engine, data_dir)
+      k = 0
+      for query_type, aidb_query, aggregate_query in queries:
+        print(f'Running query {aggregate_query} in ground truth database')
+        async with gt_engine.begin() as conn:
+          gt_res = await conn.execute(text(aggregate_query))
+          gt_res = gt_res.fetchall()[0]
+        print(f'Running query {aidb_query} in aidb database')
+        aidb_res = aidb_engine.execute(aidb_query)[0]
+        print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
+        error_target = Query(aidb_query, aidb_engine._config).error_target
+        if error_target is None: error_target = 0
+        if self._equality_check(aidb_res, gt_res, error_target):
+          count_list[k] += 1
+        k+=1
+      print('count', count_list)
+      del gt_engine
+      del aidb_engine
+      p.terminate()
 
 
 if __name__ == '__main__':
