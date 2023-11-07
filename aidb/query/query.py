@@ -453,11 +453,8 @@ class Query(object):
     if len(expression_counts) > 1:
       raise Exception('Multiple expression types found')
 
-    if exp.Count in expression_counts or exp.Sum in expression_counts:
-      raise Exception("We haven't supported approximation for SUM/COUNT query yet")
-
-    if exp.Avg not in expression_counts:
-      raise Exception('We only support approximation for Average query currently.')
+    if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
+      raise Exception('We only support approximation for Avg, Sum and Count query currently.')
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
@@ -482,6 +479,10 @@ class Query(object):
     select_exp = self.base_sql_no_aqp.args['expressions'][0]
     if isinstance(select_exp, exp.Avg):
       return exp.Avg
+    elif isinstance(select_exp, exp.Sum):
+      return exp.Sum
+    elif isinstance(select_exp, exp.Count):
+      return exp.Count
     else:
       raise Exception('Unsupported aggregation')
 

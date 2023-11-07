@@ -6,7 +6,8 @@ import statsmodels.stats.proportion
 from typing import List
 
 from aidb.engine.full_scan_engine import FullScanEngine
-from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
+from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator,
+                                      WeightedCountSetEstimator, WeightedSumSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
 
@@ -38,7 +39,6 @@ class ApproximateAggregateEngine(FullScanEngine):
       blob_count_query_str = self.get_blob_count_query(blob_tables, blob_key_filtering_predicates_str)
       blob_count_res = await conn.execute(text(blob_count_query_str))
       self.blob_count = blob_count_res.fetchone()[0]
-
       # run inference on pilot blobs
       sample_results = await self.get_results_on_sampled_data(
           _NUM_PILOT_SAMPLES,
@@ -68,7 +68,7 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
-    return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
+    return [(estimator.estimate(sample_results, num_samples + _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
@@ -84,6 +84,10 @@ class ApproximateAggregateEngine(FullScanEngine):
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
     if agg_type == exp.Avg:
       return WeightedMeanSetEstimator(self.blob_count)
+    elif agg_type == exp.Sum:
+      return WeightedSumSetEstimator(self.blob_count)
+    elif agg_type == exp.Count:
+      return WeightedCountSetEstimator(self.blob_count)
     else:
       raise NotImplementedError("Avg aggregations are only supported right now")
 

@@ -16,6 +16,21 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
+    '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 20% CONFIDENCE 95;''',
+    '''SELECT SUM(x_min) FROM objects00;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT SUM(y_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
+    '''SELECT SUM(y_min) FROM objects00;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT COUNT(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT COUNT(x_min) FROM objects00;'''
+  ),
+  (
+    'approx_aggregate',
     '''SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT AVG(x_min) FROM objects00;'''
   ),
