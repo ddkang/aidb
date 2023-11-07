@@ -59,13 +59,13 @@ class Estimator(abc.ABC):
 
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob],  conf: float, **kwargs) -> Estimate:
     pass
 
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob],  conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     counts = np.array([sample.num_items for sample in samples])
@@ -82,26 +82,19 @@ class WeightedMeanSetEstimator(Estimator):
 
 
 class WeightedCountSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_sampled: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob],  conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
     # Statistics are already counts
     statistics = np.array([sample.statistic for sample in samples])
 
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
-    mean_est = _get_estimate_bennett(
+
+    return _get_estimate_bennett(
       wstats.mean,
       wstats.std,
       np.abs(statistics).max(),
       len(statistics),
       conf
-    )
-    inflation_factor = (len(samples) / num_sampled) * self._population_size
-    return Estimate(
-      mean_est.estimate * inflation_factor,
-      mean_est.upper_bound * inflation_factor,
-      mean_est.lower_bound * inflation_factor,
-      mean_est.std,
-      mean_est.std_ub
     )
 
 

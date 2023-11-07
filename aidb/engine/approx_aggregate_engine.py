@@ -51,11 +51,8 @@ class ApproximateAggregateEngine(FullScanEngine):
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
       print('num_samples', num_samples)
-      # FIXME: what to return when num_sample is 0
-      if num_samples == 0:
-        return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence / 100.).estimate,)]
       # when there is not enough data samples, directly run full scan engine and get exact result
-      elif num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
+      if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
 
       new_sample_results = await self.get_results_on_sampled_data(
@@ -68,7 +65,12 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
-    return [(estimator.estimate(sample_results, num_samples + _NUM_PILOT_SAMPLES, query.confidence/ 100.).estimate,)]
+    if agg_type == exp.Avg:
+      return [(
+              estimator.estimate(sample_results, query.confidence / 100.).estimate,)]
+    else:
+      inflation_factor = len(sample_results) / (num_samples + _NUM_PILOT_SAMPLES) * self.blob_count
+      return [(estimator.estimate(sample_results, query.confidence / 100.).estimate*inflation_factor,)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
@@ -210,14 +212,15 @@ class ApproximateAggregateEngine(FullScanEngine):
       sample_results: List[SampledBlob],
       estimator:Estimator
   ) -> int:
-    error_target = query.error_target * 100
+    error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
-    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf / 2)
-    p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2.)[0]
+    pilot_estimate = estimator.estimate(sample_results,  conf)
+    p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
+
     num_samples = int(
-      (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 * \
+      (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
       (1. / p_lb)
     )
 
-    return num_samples
+    return max(num_samples, 100)
