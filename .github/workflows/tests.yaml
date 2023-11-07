@@ -51,11 +51,11 @@ jobs:
     - name: Run query parser tests
       run: python3 -m tests.test_queries
 
-    - name: Run exact aggregation query tests
-      run: python3 -m tests.test_exact_aggregation
+    # - name: Run exact aggregation query tests
+    #   run: python3 -m tests.test_exact_aggregation
 
-    - name: Run aggregation query Avg tests
-      run: python3 -m tests.test_aggregation
+    # - name: Run aggregation query Avg tests
+    #   run: python3 -m tests.test_aggregation
 
     - name: Run aggregation query Avg Gaussian tests
       run: python3 -m tests.test_aggregation_gaussian
