@@ -103,9 +103,19 @@ class HTTPInferenceService(CachedInferenceService):
         if len(dict_input[k]) > 0:
           assert isinstance(dict_input[k][0], _type), f'Input column {k} must be of type {_type}'
 
+    columns_to_input_keys = self._columns_to_input_keys.copy()
+    if self._default_args is not None:
+      idx = len(columns_to_input_keys)
+      for k, v in self._default_args.items():
+        if k not in dict_input_keys:
+          dict_input_keys.insert(idx, k)
+          dict_input[k] = [v] * num_rows
+          columns_to_input_keys.append(k)
+          idx += 1
+
     # to support arbitrary batch size
     # assume all numerical index form lists
-    for k, v in enumerate(self._columns_to_input_keys):
+    for k, v in enumerate(columns_to_input_keys):
       if k > len(dict_input_keys):
         continue
       k = dict_input_keys[k]
@@ -130,17 +140,6 @@ class HTTPInferenceService(CachedInferenceService):
     request = unflatten_list(request, self._separator)
     if remove_ghost_key:
       request = request['_']
-    if self._default_args is not None:
-      if isinstance(request, dict):
-        for k, v in self._default_args.items():
-          if k not in request:
-            request[k] = v
-      else: # isinstance(request, list)
-        for r in request:
-          if isinstance(r, dict):
-            for k, v in self._default_args.items():
-              if k not in r:
-                r[k] = v
     return request
 
 
