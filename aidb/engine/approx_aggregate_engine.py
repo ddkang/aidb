@@ -6,7 +6,8 @@ import statsmodels.stats.proportion
 from typing import List
 
 from aidb.engine.full_scan_engine import FullScanEngine
-from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator)
+from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator,
+                                      WeightedCountSetEstimator, WeightedSumSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
 
@@ -38,7 +39,6 @@ class ApproximateAggregateEngine(FullScanEngine):
       blob_count_query_str = self.get_blob_count_query(blob_tables, blob_key_filtering_predicates_str)
       blob_count_res = await conn.execute(text(blob_count_query_str))
       self.blob_count = blob_count_res.fetchone()[0]
-
       # run inference on pilot blobs
       sample_results = await self.get_results_on_sampled_data(
           _NUM_PILOT_SAMPLES,
@@ -47,15 +47,19 @@ class ApproximateAggregateEngine(FullScanEngine):
           blob_key_filtering_predicates_str,
           conn
       )
+
+      if len(sample_results) == 0:
+        raise Exception(
+            '''We found no records that match your predicate in 1000 samples, so we can't guarantee the
+            error target. Try running without the error target if you are certain you want to run this query.'''
+        )
+
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
       print('num_samples', num_samples)
-      # FIXME: what to return when num_sample is 0
-      if num_samples == 0:
-        return [(estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, query.confidence / 100.).estimate,)]
       # when there is not enough data samples, directly run full scan engine and get exact result
-      elif num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
+      if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
 
       new_sample_results = await self.get_results_on_sampled_data(
@@ -68,7 +72,8 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
-    return [(estimator.estimate(sample_results, num_samples, query.confidence/ 100.).estimate,)]
+
+    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES + num_samples, query.confidence / 100.).estimate,)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
@@ -84,6 +89,10 @@ class ApproximateAggregateEngine(FullScanEngine):
   def _get_estimator(self, agg_type: exp.Expression) -> Estimator:
     if agg_type == exp.Avg:
       return WeightedMeanSetEstimator(self.blob_count)
+    elif agg_type == exp.Sum:
+      return WeightedSumSetEstimator(self.blob_count)
+    elif agg_type == exp.Count:
+      return WeightedCountSetEstimator(self.blob_count)
     else:
       raise NotImplementedError("Avg aggregations are only supported right now")
 
@@ -158,7 +167,6 @@ class ApproximateAggregateEngine(FullScanEngine):
         query_no_aqp_sql,
         query_expression
     )
-
     query_expression = query_no_aqp_sql.add_select(query_expression, 'COUNT(*) AS num_items')
     query_str = f'''
                   {query_expression.sql()}
@@ -204,16 +212,23 @@ class ApproximateAggregateEngine(FullScanEngine):
       self,
       query: Query,
       sample_results: List[SampledBlob],
-      estimator:Estimator
+      estimator: Estimator
   ) -> int:
-    error_target = query.error_target * 100
+
+    error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
-    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf / 2)
-    p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2.)[0]
+    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES,  conf)
+
+    agg_type = query.get_agg_type
+    if agg_type == exp.Avg:
+      p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
+    else:
+      p_lb = 1
+
     num_samples = int(
-      (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / error_target) ** 2 * \
+      (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
       (1. / p_lb)
     )
 
-    return num_samples
+    return max(num_samples, 100)

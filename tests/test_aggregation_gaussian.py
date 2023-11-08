@@ -47,13 +47,18 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
+    '''SELECT SUM(gaussian) FROM gaussian00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT SUM(gaussian) FROM gaussian00;'''
+  ),
+  (
+    'approx_aggregate',
     '''SELECT AVG(gaussian) FROM gaussian00 ERROR_TARGET 5% CONFIDENCE 95;''',
     '''SELECT AVG(gaussian) FROM gaussian00;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT AVG(gaussian) FROM gaussian00 ERROR_TARGET 10% CONFIDENCE 95;''',
-    '''SELECT AVG(gaussian) FROM gaussian00;'''
+    '''SELECT COUNT(gaussian) FROM gaussian00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT COUNT(gaussian) FROM gaussian00;'''
   )
 ]
 

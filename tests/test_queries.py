@@ -9,6 +9,20 @@ ERROR_TARGET 1%
 CONFIDENCE 95;
 '''
 
+valid_count_sql = '''
+SELECT COUNT(bar)
+FROM foo
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
+
+valid_sum_sql = '''
+SELECT SUM(bar)
+FROM foo
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
+
 # Invalid
 unsupported_agg_aqp_sql = '''
 SELECT MAX(bar)
@@ -34,19 +48,6 @@ INSERT INTO employees (id, name)
 VALUES (101, 'John');
 '''
 
-invalid_count_sql = '''
-SELECT COUNT(bar)
-FROM foo
-ERROR_TARGET 1%
-CONFIDENCE 95;
-'''
-
-invalid_sum_sql = '''
-SELECT COUNT(bar)
-FROM foo
-ERROR_TARGET 1%
-CONFIDENCE 95;
-'''
 
 class AQPKeywordTests(unittest.TestCase):
   def test_confidence(self):
@@ -65,6 +66,17 @@ class AQPValidationTests(unittest.TestCase):
     query = Query(valid_avg_sql, None)
     self.assertEqual(query.is_valid_aqp_query(), True)
 
+
+  def test_invalid_count_sql(self):
+    query = Query(valid_count_sql, None)
+    self.assertEqual(query.is_valid_aqp_query(), True)
+
+
+  def test_invalid_sum_sql(self):
+    query = Query(valid_sum_sql, None)
+    self.assertEqual(query.is_valid_aqp_query(), True)
+
+
   def test_invalid_unsupported_agg_aqp(self):
     query = Query(unsupported_agg_aqp_sql, None)
     with self.assertRaises(Exception):
@@ -82,16 +94,6 @@ class AQPValidationTests(unittest.TestCase):
 
   def test_invalid_not_select_sql(self):
     query = Query(not_select_sql, None)
-    with self.assertRaises(Exception):
-      query.is_valid_aqp_query()
-
-  def test_invalid_count_sql(self):
-    query = Query(invalid_count_sql, None)
-    with self.assertRaises(Exception):
-      query.is_valid_aqp_query()
-
-  def test_invalid_sum_sql(self):
-    query = Query(invalid_sum_sql, None)
     with self.assertRaises(Exception):
       query.is_valid_aqp_query()
 
