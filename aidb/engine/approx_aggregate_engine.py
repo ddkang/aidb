@@ -49,8 +49,10 @@ class ApproximateAggregateEngine(FullScanEngine):
       )
 
       if len(sample_results) == 0:
-        raise Exception('''We found no records that match your predicate in 1000 samples,so we can't guarantee the 
-                           error target. Try a full scan instead if you are certain you want to run this query.''')
+        raise Exception(
+            '''We found no records that match your predicate in 1000 samples, so we can't guarantee the
+            error target. Try running without the error target if you are certain you want to run this query.'''
+        )
 
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
