@@ -13,9 +13,9 @@ def command_line_utility(engine):
                            
   '''
   print(welcome)
-  print("Query AIDB using SQL....\n")
+  print("Query AIDB using SQL...\n")
   while True:
-    query = input(">>>")
+    query = input(">>> ")
     if query.strip() == "exit":
       return
     else:
