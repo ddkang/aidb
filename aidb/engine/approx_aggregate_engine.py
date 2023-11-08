@@ -47,6 +47,10 @@ class ApproximateAggregateEngine(FullScanEngine):
           blob_key_filtering_predicates_str,
           conn
       )
+
+      if len(sample_results) == 0:
+        raise Exception('Can not get any samples in the pilot sample, please run a full scan engine instead.')
+
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
@@ -207,9 +211,6 @@ class ApproximateAggregateEngine(FullScanEngine):
       sample_results: List[SampledBlob],
       estimator: Estimator
   ) -> int:
-    # set num_samples at least 100
-    if len(sample_results) == 0:
-      return 100
 
     error_target = query.error_target
     conf = query.confidence / 100.
