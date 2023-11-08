@@ -7,7 +7,6 @@ from aidb.vector_database.weaviate_vector_database import WeaviateAuth
 
 DB_URL = 'sqlite+aiosqlite://'
 DB_NAME = 'aidb_test_amazon.sqlite'
-HF_KEY = 'your-hf-key'
 
 sentiment_inference_service = HuggingFaceNLP(
   name="sentiment_classification",
