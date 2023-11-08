@@ -33,6 +33,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
+        "image": image[0],
         "min_x": xyxy[0],
         "min_y": xyxy[1],
         "max_x": xyxy[2],
@@ -53,11 +54,12 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
       outputs = self._model.predict_with_caption(image_batch, self._caption, self._box_threshold)
       outputs = [
         {
+          "image": image,
           "min_x": xyxy[0],
           "min_y": xyxy[1],
           "max_x": xyxy[2],
           "max_y": xyxy[3],
           "confidence": conf,
-        } for output in outputs for xyxy, conf in zip(output.xyxy, output.confidence)]
+        } for image, output in zip(image_batch, outputs) for xyxy, conf in zip(output.xyxy, output.confidence)]
       outputs_merge.extend(outputs)
     return pd.DataFrame(outputs_merge)
