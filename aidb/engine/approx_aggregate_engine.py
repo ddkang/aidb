@@ -207,6 +207,10 @@ class ApproximateAggregateEngine(FullScanEngine):
       sample_results: List[SampledBlob],
       estimator: Estimator
   ) -> int:
+    # set num_samples at least 100
+    if len(sample_results) == 0:
+      return 100
+
     error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf

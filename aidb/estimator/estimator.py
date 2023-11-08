@@ -66,6 +66,10 @@ class Estimator(abc.ABC):
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
   def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+    if len(samples) == 0:
+      # set lower bound as 0.1 to avoid num_samples be Nan
+      return Estimate(0, 0, 0.1, 0,0)
+
     weights = np.array([sample.weight for sample in samples])
     statistics = np.array([sample.statistic for sample in samples])
     counts = np.array([sample.num_items for sample in samples])
