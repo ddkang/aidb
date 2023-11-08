@@ -57,7 +57,6 @@ class DetectronLocalOCR(CachedInferenceService):
       cropped_y1 = min(im.shape[0], y1+30)
       cropped_im = im[cropped_y0:cropped_y1, cropped_x0:cropped_x1]
       ocr_text = pytesseract.image_to_string(cropped_im)
-    print(ocr_text)
     return pd.DataFrame([{'ocr_text': ocr_text}])
 
 

@@ -13,7 +13,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
       caption: str,
       is_single: bool=False,
       use_batch: bool=True,
-      batch_size: int=0,
+      batch_size: int=1,
       box_threshold: float=0.35,
       device: str="cuda",
   ):
@@ -29,7 +29,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    image = [input.to_dict().values()[0]]
+    image = [list(input.to_dict().values())[0]]
     output = self._model.predict_with_caption(image, self._caption, self._box_threshold)[0]
     output = [
       {
@@ -46,7 +46,7 @@ class PyTorchLocalObjectDetection(CachedInferenceService):
     if not self._use_batch:
       return super().infer_batch(inputs)
 
-    images = inputs.to_dict(orient="list").values()[0]
+    images = list(inputs.to_dict(orient="list").values())[0]
     outputs_merge = []
     for i in range(0, len(images), self.preferred_batch_size):
       image_batch = images[i:i+self.preferred_batch_size] if i+self.preferred_batch_size < len(images) else images[i:]
