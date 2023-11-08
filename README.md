@@ -19,10 +19,46 @@ unzip data.zip -d tests/
 ```
 
 ### Text Example (in CSV)
-Show an example of running on reviews or Tweets data
+
+We've set up an example of analyzing product reviews with HuggingFace. All you need to do is run
+```bash
+python launch.py --config=config.sentiment --setup-blob-table --setup-output-table
+```
+(note: if you run the command again, omit the last two arguments)
+
+To inspect the schema, you can run
+```sql
+TODO
+```
+and as an example query, you can run
+```sql
+TODO
+```
+
+You can see the mappings here: TODO. We use HuggingFace to generate sentiments from the reviews!
+
 
 ### Image Example (local directory)
-Show an example of images in the local directory
+
+We've also set up another example of analyzing whether or not user-generated content is adult content for filtering.
+In order to run this example, all you need to do is run
+```bash
+python launch.py --config=config.nsfw_detect --setup-blob-table --setup-output-table
+```
+(note: if you run the command again, omit the last two arguments)
+
+To inspect the schema, you can run
+```sql
+TODO
+```
+and as an example query, you can run
+```sql
+TODO
+```
+
+You can see the mappings here: TODO.
+We use the Google Vision API to generate the safety labels.
+
 
 
 ## Key Features
