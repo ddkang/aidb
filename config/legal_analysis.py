@@ -1,5 +1,3 @@
-import os
-
 from aidb.config.config_types import AIDBListType
 from aidb.inference.examples.detectron_local_ocr import DetectronLocalOCR
 from aidb.inference.examples.openai_inference_service import OpenAIText
@@ -10,19 +8,18 @@ DB_NAME = 'aidb_test_legal.sqlite'
 OPENAI_KEY = 'your-openai-key'
 
 ocr = DetectronLocalOCR(
-    name="ocr",
-    model_path="tests/data/model_final.pth")
+  name="ocr",
+  model_path="tests/data/model_final.pth")
 
 openai_gpt = OpenAIText(
-    name="openai_gpt",
-    token=OPENAI_KEY,
-    columns_to_input_keys=[('messages', AIDBListType(), 'content')],
-    response_keys_to_columns=[('choices', AIDBListType(), 'message', 'content')],
-    input_columns_types=[str],
-    output_columns_types=[str],
-    default_args={"model": "gpt-4-1106-preview",
-                  ('messages', AIDBListType(), 'role'): "user"}
-)
+  name="openai_gpt",
+  token=OPENAI_KEY,
+  columns_to_input_keys=[('messages', AIDBListType(), 'content')],
+  response_keys_to_columns=[('choices', AIDBListType(), 'message', 'content')],
+  input_columns_types=[str],
+  output_columns_types=[str],
+  default_args={"model": "gpt-4-1106-preview",
+                ('messages', AIDBListType(), 'role'): "user"})
 
 inference_engines = [
   {
