@@ -5,7 +5,7 @@ from aidb.inference.examples.openai_inference_service import OpenAIText
 
 DB_URL = 'sqlite+aiosqlite://'
 DB_NAME = 'aidb_test_legal.sqlite'
-OPENAI_KEY = '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'
+OPENAI_KEY = 'your-openai-key'
 
 ocr = DetectronLocalOCR(
   name="ocr",
