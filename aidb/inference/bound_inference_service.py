@@ -170,7 +170,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     # - Batch the inserts for new data
     # - Batch the selection for cached results... How to do this?
     async with self._engine.begin() as conn:
-      for idx, (_, inp_row) in tqdm.tqdm(enumerate(inputs.iterrows())):
+      for idx, (_, inp_row) in tqdm.tqdm(enumerate(inputs.iterrows()), total=len(inputs)):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(

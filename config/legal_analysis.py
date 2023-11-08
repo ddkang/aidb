@@ -5,7 +5,7 @@ from aidb.inference.examples.openai_inference_service import OpenAIText
 
 DB_URL = 'sqlite+aiosqlite://'
 DB_NAME = 'aidb_test_legal.sqlite'
-OPENAI_KEY = 'your-openai-key'
+OPENAI_KEY = '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'
 
 ocr = DetectronLocalOCR(
   name="ocr",
@@ -19,7 +19,12 @@ openai_gpt = OpenAIText(
   input_columns_types=[str],
   output_columns_types=[str],
   default_args={"model": "gpt-4-1106-preview",
-                ('messages', AIDBListType(), 'role'): "user"})
+                ('messages', AIDBListType(), 'role'): "user"},
+  prompt_prefix='"',
+  prompt_suffix='''"
+    The paragraph above is from a law document. 
+    Classify whether or not the reasoning of the given paragraph in an opinion is based on the legal framework of textualism. 
+    Only answer True or False. Do not provide any reason. Do not add \'.\' in the end.')''')
 
 inference_engines = [
   {
