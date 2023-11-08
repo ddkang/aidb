@@ -83,8 +83,13 @@ class WeightedMeanSetEstimator(Estimator):
 
 class WeightedCountSetEstimator(Estimator):
   def estimate(self, samples: List[SampledBlob], num_samples: int,  conf: float, **kwargs) -> Estimate:
-    weight = samples[0].weight
-    weights = np.array([weight] * num_samples)
+    if samples:
+      weight = samples[0].weight
+      weights = np.array([weight] * num_samples)
+    else:
+      # set lower bound as 0.1 to avoid num_samples be Nan
+      return Estimate(0, 0, 0.1, 0,0)
+
     # Statistics are already counts
 
     statistics = np.array([sample.statistic for sample in samples] + [0] * (num_samples - len(samples)))
