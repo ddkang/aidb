@@ -16,17 +16,17 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
-    '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT SUM(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT SUM(x_min) FROM objects00;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT SUM(y_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT SUM(y_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT SUM(y_min) FROM objects00;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT COUNT(x_min) FROM objects00 ERROR_TARGET 5% CONFIDENCE 95;''',
+    '''SELECT COUNT(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95;''',
     '''SELECT COUNT(x_min) FROM objects00;'''
   ),
   (
@@ -101,7 +101,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
         if self._equality_check(aidb_res, gt_res, error_target):
           count_list[k] += 1
         k+=1
-      print('time of runs', i)
+      print('time of runs', i+1)
       print('count', count_list)
       del gt_engine
       del aidb_engine

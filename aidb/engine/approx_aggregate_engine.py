@@ -65,12 +65,8 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
-    if agg_type == exp.Avg:
-      return [(
-              estimator.estimate(sample_results, query.confidence / 100.).estimate,)]
-    else:
-      inflation_factor = len(sample_results) / (num_samples + _NUM_PILOT_SAMPLES) * self.blob_count
-      return [(estimator.estimate(sample_results, query.confidence / 100.).estimate*inflation_factor,)]
+
+    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES+num_samples, query.confidence / 100.).estimate,)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
@@ -164,7 +160,6 @@ class ApproximateAggregateEngine(FullScanEngine):
         query_no_aqp_sql,
         query_expression
     )
-
     query_expression = query_no_aqp_sql.add_select(query_expression, 'COUNT(*) AS num_items')
     query_str = f'''
                   {query_expression.sql()}
@@ -210,13 +205,18 @@ class ApproximateAggregateEngine(FullScanEngine):
       self,
       query: Query,
       sample_results: List[SampledBlob],
-      estimator:Estimator
+      estimator: Estimator
   ) -> int:
     error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
-    pilot_estimate = estimator.estimate(sample_results,  conf)
-    p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
+    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES,  conf)
+
+    agg_type = query.get_agg_type
+    if agg_type == exp.Avg:
+      p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
+    else:
+      p_lb = 1
 
     num_samples = int(
       (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
