@@ -34,6 +34,13 @@ class CachedBoundInferenceService(BoundInferenceService):
   _columns: Dict[str, Column]
   _tables: Dict[str, Table]
   _dialect: str
+  _verbose: bool=False
+
+
+  def optional_tqdm(self, iterable, **kwargs):
+    if self._verbose:
+        return tqdm.tqdm(iterable, **kwargs)
+    return iterable
 
 
   def convert_normalized_col_name_to_cache_col_name(self, column_name: str):
@@ -170,7 +177,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     # - Batch the inserts for new data
     # - Batch the selection for cached results... How to do this?
     async with self._engine.begin() as conn:
-      for idx, (_, inp_row) in tqdm.tqdm(enumerate(inputs.iterrows()), total=len(inputs)):
+      for idx, (_, inp_row) in self.optional_tqdm(enumerate(inputs.iterrows()), total=len(inputs)):
         if is_in_cache[idx]:
           query = self._result_query_stub.where(
             sqlalchemy.sql.and_(

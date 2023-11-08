@@ -14,6 +14,8 @@ python3 launch.py --config=config.sentiment --setup-blob-table --setup-output-ta
 ```
 means running AIDB with configuration located at `config/sentiment.py` and setting up blob table and output tables according to your configuration.
 
+You may optionally add `--verbose` to your command line arguments to see the progress of your query execution.
+
 ## Inference Service Configuration
 
 In this section, we will walk through an example of configuring an inference service for AIDB.
