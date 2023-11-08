@@ -12,7 +12,7 @@ ocr = DetectronLocalOCR(
 
 openai_gpt = OpenAIText(
   name="openai_gpt",
-  token=None, # leave it None if you want AIDB to read token from env variable OPENAI_API_KEY. Otherwisr replace None with your own token in str.
+  token=None, # leave it None if you want AIDB to read token from env variable OPENAI_API_KEY. Otherwise replace None with your own token in str.
   columns_to_input_keys=[('messages', AIDBListType(), 'content')],
   response_keys_to_columns=[('choices', AIDBListType(), 'message', 'content')],
   input_columns_types=[str],
