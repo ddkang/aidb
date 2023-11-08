@@ -95,7 +95,8 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
           gt_res = gt_res.fetchall()[0]
         print(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)[0]
-        print(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
+        print(
+            f'aidb_res: {aidb_res}, gt_res: {gt_res}, % error: {abs(aidb_res[0] - gt_res[0]) / (gt_res[0]) * 100}')
         error_target = Query(aidb_query, aidb_engine._config).error_target
         if error_target is None: error_target = 0
         if self._equality_check(aidb_res, gt_res, error_target):
