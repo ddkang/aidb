@@ -11,7 +11,7 @@ HF_KEY = 'your-hf-key'
 
 sentiment_inference_service = HuggingFaceNLP(
   name="sentiment_classification",
-  token=HF_KEY,
+  token=None, # leave it None if you want AIDB to read token from env variable HF_API_KEY. Otherwise replace None with your own token in str.
   columns_to_input_keys=['inputs'],
   response_keys_to_columns=[(AIDBListType(), AIDBListType(), 'label'),
                             (AIDBListType(), AIDBListType(), 'score')],
