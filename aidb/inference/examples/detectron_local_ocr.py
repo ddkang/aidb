@@ -43,7 +43,7 @@ class DetectronLocalOCR(CachedInferenceService):
 
 
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
-    pdf_path = input.to_dict().values()[0]
+    pdf_path = list(input.to_dict().values())[0]
     im = np.array(pdf2image.convert_from_path(pdf_path, size=(2538, 3334))[0])
     outputs = self.od_model(im)
     boxes = list(outputs['instances'].pred_boxes)
