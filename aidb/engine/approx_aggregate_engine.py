@@ -66,7 +66,7 @@ class ApproximateAggregateEngine(FullScanEngine):
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
 
-    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES+num_samples, query.confidence / 100.).estimate,)]
+    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES + num_samples, query.confidence / 100.).estimate,)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):

@@ -87,7 +87,7 @@ class WeightedCountSetEstimator(Estimator):
     weights = np.array([weight] * num_samples)
     # Statistics are already counts
 
-    statistics = np.array([sample.statistic for sample in samples]+[0]*(num_samples-len(samples)))
+    statistics = np.array([sample.statistic for sample in samples] + [0] * (num_samples - len(samples)))
     wstats = DescrStatsW(statistics, weights=weights,  ddof=0)
     mean_est = _get_estimate_bennett(
       wstats.mean,
