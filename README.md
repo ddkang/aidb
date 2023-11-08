@@ -5,6 +5,19 @@ Analyze unstructured data blazingly fast with machine learning. Connect your own
 
 ## Quick Start
 
+In order to start using AIDB, all you need to do is install the requirements, specify a configuration, and query!
+Setting up on the environment is as simple as
+```bash
+git clone https://github.com/ddkang/aidb.git
+cd aidb
+pip install -r requirements.txt
+
+# Optional if you'd like to run the examples below
+gdown https://drive.google.com/uc?id=1SyHRaJNvVa7V08mw-4_Vqj7tCynRRA3x
+unzip data.zip -d tests/
+
+```
+
 ### Text Example (in CSV)
 Show an example of running on reviews or Tweets data
 
@@ -24,7 +37,23 @@ We keep interoperability high by allowing you to bring your own data source, ML 
 
 
 ## Approximate Querying
-Show an example of new keywords i.e. TARGET_ERROR and CONFIDENCE
+
+One key feature of AIDB is first-class support for approximate queries.
+Currently, we support approximate `AVG`, `COUNT`, and `SUM`.
+We don't currently support `GROUP BY` or `JOIN` for approximate aggregations, but it's on our roadmap.
+Please reach out if you'd like us to support your queries!
+
+In order to execute an approximate aggregation query, simply append `ERROR_TARGET <error percent>% CONFIDENCE <confidence>%` to your normal aggregation.
+As a full example, you can compute an approximate count by doing:
+```sql
+SELECT COUNT(xmin)
+FROM objects
+ERROR_TARGET 5%
+CONFIDENCE 95%;
+```
+
+The `ERROR_TARGET` specifies the percent error _compared to running the query exactly._
+For example, if the true answer is 100, you will get answers between 95 and 105 (95% of the time).
 
 
 ## Useful Links
