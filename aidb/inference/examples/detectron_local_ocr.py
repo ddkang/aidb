@@ -19,9 +19,9 @@ class DetectronLocalOCR(CachedInferenceService):
   def __init__(
       self,
       name: str,
-      is_single: bool=False,
-      model_path: str="model_final.pth",
+      model_path: str,
       device: str="cuda",
+      is_single: bool=False,
   ):
     super().__init__(name=name, preferred_batch_size=1, is_single=is_single)
     cfg = get_cfg()
