@@ -89,11 +89,10 @@ CONFIDENCE 95%;
 The `ERROR_TARGET` specifies the percent error _compared to running the query exactly._
 For example, if the true answer is 100, you will get answers between 95 and 105 (95% of the time).
 
-
 ## Useful Links
-- [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md) 
-- [How to connect to Datastore]() - TODO
+- [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md)
 - [How to define configuration file](https://github.com/ddkang/aidb/tree/main/config)
+- [Connecting to Data Store]()
 
 ## Contribute
 
