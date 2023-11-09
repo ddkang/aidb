@@ -1,7 +1,8 @@
-# AIDB
+<h1 style="text-align: center;">AIDB</h1>
 
-Analyze unstructured data blazingly fast with machine learning. Connect your own ML models to your own data sources and query away!
-
+<p align="center">
+  <img src="assets/aidbuse.gif" />
+</p>
 
 ## Quick Start
 
@@ -93,7 +94,7 @@ For example, if the true answer is 100, you will get answers between 95 and 105 
 
 
 ## Useful Links
-- [How to connect ML APIs]() - Link to ReadMe
+- [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md) 
 - [How to connect to Datastore]() - AWS S3 and all 
 - 
 
@@ -104,4 +105,6 @@ We have many improvements we'd like to implement. Please help us! For the time b
 
 ## Contact Us
 
-[Google Form Link]()
+Need help in setting up AIDB for your specific dataset or want a new feature? Please fill the following form:
+
+[Google Form Link](https://forms.gle/YyAXWxqzZPVBrvBR7)
