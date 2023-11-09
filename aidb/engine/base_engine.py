@@ -80,7 +80,7 @@ class BaseEngine():
     self._config.add_inference_service(service.name, service)
 
 
-  def bind_inference_service(self, service_name: str, binding: InferenceBinding):
+  def bind_inference_service(self, service_name: str, binding: InferenceBinding, verbose: bool=False):
     bound_service = CachedBoundInferenceService(
       self._config.inference_services[service_name],
       binding,
@@ -88,6 +88,7 @@ class BaseEngine():
       self._config.columns,
       self._config.tables,
       self._dialect,
+      verbose,
     )
     self._config.bind_inference_service(bound_service)
 

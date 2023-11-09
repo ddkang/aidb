@@ -21,6 +21,7 @@ if __name__ == '__main__':
   parser.add_argument("--config", type=str)
   parser.add_argument("--setup-blob-table", action='store_true')
   parser.add_argument("--setup-output-tables", action='store_true')
+  parser.add_argument("--verbose", action='store_true')
   args = parser.parse_args()
 
   config = importlib.import_module(args.config)
@@ -31,5 +32,5 @@ if __name__ == '__main__':
   if args.setup_output_tables:
     asyncio_run(create_output_tables(config.DB_URL, config.DB_NAME, config.tables))
 
-  aidb_engine = AIDB.from_config(args.config)
+  aidb_engine = AIDB.from_config(args.config, args.verbose)
   command_line_utility(aidb_engine)

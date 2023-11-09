@@ -85,7 +85,7 @@ openai_text = OpenAIText(
     'id',
     'created',
     'model',
-    ('choices', AIDBListType(), 'message', 'content'):,
+    ('choices', AIDBListType(), 'message', 'content'),
   ])
 openai_text_response_pd = openai_text.infer_one(pd.Series({
   "role": "user",
@@ -247,7 +247,7 @@ Response:
 |0|VERY_UNLIKELY|	VERY_UNLIKELY|	VERY_UNLIKELY|	VERY_UNLIKELY|	UNLIKELY|
 
 The way to obtain a Google API key is tricky. Please
-1. initiate a project in [Google cloud console](ttps://console.cloud.google.com/welcome/new)
+1. initiate a project in [Google cloud console](https://console.cloud.google.com/welcome/new)
 1. install [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 1. run
     ```bash
