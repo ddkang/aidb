@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
   # Metadata
-  name="aidb",
+  name="ai-db",
   version="0.0.1",
   description="Analyze your unstructured data",
   # long_description=open("README.md").read(),
