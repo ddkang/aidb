@@ -25,16 +25,17 @@ We've set up an example of analyzing product reviews with HuggingFace. Set your 
 ```bash
 python launch.py --config=config.sentiment --setup-blob-table --setup-output-table
 ```
-(note: if you run the command again, omit the last two arguments)
 
-To inspect the schema, you can run
+As an example query, you can run
 ```sql
-TODO
+SELECT AVG(score)
+FROM sentiment
+WHERE label = '5 stars'
+ERROR_TARGET 10%
+CONFIDENCE 95%;
 ```
-and as an example query, you can run
-```sql
-TODO
-```
+
+You can see the mappings [here](https://github.com/ddkang/aidb/blob/main/config/sentiment.py#L15). We use the HuggingFace API to generate sentiments from the reviews.
 
 
 ### Image Example (local directory)
@@ -45,17 +46,14 @@ In order to run this example, all you need to do is run
 python launch.py --config=config.nsfw_detect --setup-blob-table --setup-output-table
 ```
 
-To inspect the schema, you can run
+As an example query, you can run
 ```sql
-TODO
-```
-and as an example query, you can run
-```sql
-TODO
+SELECT *
+FROM nsfw
+WHERE racy LIKE 'POSSIBLE';
 ```
 
-You can see the mappings here: TODO.
-We use the Google Vision API to generate the safety labels.
+You can see the mappings [here](https://github.com/ddkang/aidb/blob/main/config/nsfw_detect.py#L10). We use the Google Vision API to generate the safety labels.
 
 
 
@@ -97,7 +95,7 @@ For example, if the true answer is 100, you will get answers between 95 and 105 
 
 ## Contribute
 
-We have many improvements we'd like to implement. Please help us! For the time being, please reach out to us directly using the form below if you'd like to help contribute.
+We have many improvements we'd like to implement. Please help us! For the time being, please [email](mailto:ddkang@g.illinois.edu) us, if you'd like to help contribute.
 
 
 ## Contact Us
