@@ -1,7 +1,9 @@
 <h1 style="text-align: center;">AIDB</h1>
 
+<p align="center"> Analyze unstructured data blazingly fast with machine learning. Connect your own ML models to your own data sources and query away! </p>
+
 <p align="center">
-  <img src="assets/aidbuse.gif" />
+  <img src="assets/aidbuse.gif" style="width:550px;"/>
 </p>
 
 ## Quick Start
