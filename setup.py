@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 setup(
   # Metadata
   name="ai-db",
-  version="0.0.1",
+  version="0.0.2",
   description="Analyze your unstructured data",
   long_description=open("README.md").read(),
   long_description_content_type="text/markdown",
