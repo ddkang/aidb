@@ -5,8 +5,8 @@ setup(
   name="aidb",
   version="0.0.1",
   description="Analyze your unstructured data",
-  long_description=open("README.md").read(),
-  long_description_content_type="text/markdown",
+  # long_description=open("README.md").read(),
+  # long_description_content_type="text/markdown",
   author="Daniel Kang",
   author_email="daniel.d.kang@gmail.com",
   # Packages
