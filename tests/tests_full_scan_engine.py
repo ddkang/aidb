@@ -50,6 +50,19 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;''',
         '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;'''
       ),
+      (
+        'full_scan',
+        '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;''',
+        '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;'''
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+           and objects00.object_id = colors02.object_id;''',
+
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+           and objects00.object_id = colors02.object_id;'''
+      ),
     ]
 
     for query_type, aidb_query, exact_query in queries:
