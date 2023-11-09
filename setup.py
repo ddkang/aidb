@@ -14,7 +14,7 @@ setup(
   python_requires=">=3.9",
   classifiers=[
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: SQL",
     "Programming Language :: Python :: 3 :: Only",
