@@ -48,7 +48,21 @@ INSERT INTO employees (id, name)
 VALUES (101, 'John');
 '''
 
+approximate_agg_group_by_sql = '''
+SELECT AVG(bar)
+FROM foo
+GROUP BY (frame)
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
 
+approximate_agg_join_sql = '''
+SELECT AVG(bar)
+FROM foo join joo
+on foo.x = joo.x
+ERROR_TARGET 1%
+CONFIDENCE 95;
+'''
 class AQPKeywordTests(unittest.TestCase):
   def test_confidence(self):
     query = Query(valid_avg_sql, None)
@@ -94,6 +108,16 @@ class AQPValidationTests(unittest.TestCase):
 
   def test_invalid_not_select_sql(self):
     query = Query(not_select_sql, None)
+    with self.assertRaises(Exception):
+      query.is_valid_aqp_query()
+
+  def test_invalid_approximate_agg_group_by_sql(self):
+    query = Query(approximate_agg_group_by_sql, None)
+    with self.assertRaises(Exception):
+      query.is_valid_aqp_query()
+
+  def test_invalid_approximate_agg_join_sql(self):
+    query = Query(approximate_agg_join_sql, None)
     with self.assertRaises(Exception):
       query.is_valid_aqp_query()
 
