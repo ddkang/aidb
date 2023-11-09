@@ -449,6 +449,18 @@ class Query(object):
     if not isinstance(self.base_sql_no_aqp, exp.Select):
       raise Exception('Not a select statement')
 
+    if self._expression.find(exp.Group) is not None:
+      raise Exception(
+          '''We do not support GROUP BY for approximate aggregation queries. 
+          Try running without the error target and confidence.'''
+      )
+
+    if self._expression.find(exp.Join) is not None:
+      raise Exception(
+          '''We do not support Join for approximate aggregation queries. 
+          Try running without the error target and confidence.'''
+      )
+
     # Count the number of distinct aggregates
     expression_counts = defaultdict(int)
     for expression in self.base_sql_no_aqp.args['expressions']:

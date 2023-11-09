@@ -36,7 +36,7 @@ def get_tasti_config(tasti_config):
 
 class AIDB:
   @staticmethod
-  def from_config(config_path):
+  def from_config(config_path, verbose=False):
     config = importlib.import_module(config_path)
 
     if hasattr(config, 'INITIALIZE_TASTI') and config.INITIALIZE_TASTI is True:
@@ -57,5 +57,6 @@ class AIDB:
       aidb_engine.register_inference_service(service)
       aidb_engine.bind_inference_service(
         service.name,
-        InferenceBinding(input_col, output_col))
+        InferenceBinding(input_col, output_col),
+        verbose)
     return aidb_engine
