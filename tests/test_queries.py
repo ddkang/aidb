@@ -6,21 +6,21 @@ valid_avg_sql = '''
 SELECT AVG(bar)
 FROM foo
 ERROR_TARGET 1%
-CONFIDENCE 95;
+CONFIDENCE 95%;
 '''
 
 valid_count_sql = '''
 SELECT COUNT(bar)
 FROM foo
 ERROR_TARGET 1%
-CONFIDENCE 95;
+CONFIDENCE 95%;
 '''
 
 valid_sum_sql = '''
 SELECT SUM(bar)
 FROM foo
 ERROR_TARGET 1%
-CONFIDENCE 95;
+CONFIDENCE 95%;
 '''
 
 # Invalid
@@ -28,13 +28,13 @@ unsupported_agg_aqp_sql = '''
 SELECT MAX(bar)
 FROM foo
 ERROR_TARGET 1%
-CONFIDENCE 95;
+CONFIDENCE 95%;
 '''
 
 agg_no_et_sql = '''
 SELECT AVG(bar)
 FROM foo
-CONFIDENCE 95;
+CONFIDENCE 95%;
 '''
 
 agg_no_conf_sql = '''
