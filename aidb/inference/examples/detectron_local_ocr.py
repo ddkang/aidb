@@ -51,11 +51,11 @@ class DetectronLocalOCR(CachedInferenceService):
     if len(boxes) > 0:
       box = boxes[0].detach().cpu().numpy()
       x0, y0, x1, y1 = box.astype(int)
-      cropped_x0 = max(0, x0-30)
-      cropped_x1 = min(im.shape[1], x1+30)
-      cropped_y0 = max(0, y0-30)
-      cropped_y1 = min(im.shape[0], y1+30)
-      cropped_im = im[cropped_y0:cropped_y1, cropped_x0:cropped_x1]
+      margin_x0 = max(0, x0-30)
+      margin_x1 = min(im.shape[1], x1+30)
+      margin_y0 = max(0, y0-30)
+      margin_y1 = min(im.shape[0], y1+30)
+      cropped_im = im[margin_y0:margin_y1, margin_x0:margin_x1]
       ocr_text = pytesseract.image_to_string(cropped_im)
     return pd.DataFrame([{'ocr_text': ocr_text}])
 
