@@ -92,7 +92,7 @@ For example, if the true answer is 100, you will get answers between 95 and 105 
 ## Useful Links
 - [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md)
 - [How to define configuration file](https://github.com/ddkang/aidb/tree/main/config)
-- [Connecting to Data Store]()
+- [Connecting to Data Store](https://github.com/ddkang/aidb/tree/main/aidb_utilities/blob_store)
 
 ## Contribute
 
