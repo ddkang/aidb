@@ -94,7 +94,7 @@ class ApproximateAggregateEngine(FullScanEngine):
     elif agg_type == exp.Count:
       return WeightedCountSetEstimator(self.blob_count)
     else:
-      raise NotImplementedError("Avg aggregations are only supported right now")
+      raise NotImplementedError('We only support AVG, COUNT, and SUM for approximate aggregations.')
 
 
   def get_sample_blobs_query(self, blob_tables: List[str], num_samples: int, blob_key_filtering_predicates_str: str):
