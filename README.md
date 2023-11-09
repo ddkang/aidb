@@ -101,6 +101,4 @@ We have many improvements we'd like to implement. Please help us! For the time b
 
 ## Contact Us
 
-Need help in setting up AIDB for your specific dataset or want a new feature? Please fill the following form:
-
-[Google Form Link](https://forms.gle/YyAXWxqzZPVBrvBR7)
+Need help in setting up AIDB for your specific dataset or want a new feature? Please fill [this form](https://forms.gle/YyAXWxqzZPVBrvBR7).
