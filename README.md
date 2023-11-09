@@ -21,7 +21,7 @@ unzip data.zip -d tests/
 
 ### Text Example (in CSV)
 
-We've set up an example of analyzing product reviews with HuggingFace. All you need to do is run
+We've set up an example of analyzing product reviews with HuggingFace. Set your HuggingFace API key. After this, all you need to do is run
 ```bash
 python launch.py --config=config.sentiment --setup-blob-table --setup-output-table
 ```
@@ -36,8 +36,6 @@ and as an example query, you can run
 TODO
 ```
 
-You can see the mappings here: TODO. We use HuggingFace to generate sentiments from the reviews!
-
 
 ### Image Example (local directory)
 
@@ -46,7 +44,6 @@ In order to run this example, all you need to do is run
 ```bash
 python launch.py --config=config.nsfw_detect --setup-blob-table --setup-output-table
 ```
-(note: if you run the command again, omit the last two arguments)
 
 To inspect the schema, you can run
 ```sql
@@ -95,8 +92,8 @@ For example, if the true answer is 100, you will get answers between 95 and 105 
 
 ## Useful Links
 - [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md) 
-- [How to connect to Datastore]() - AWS S3 and all 
-- 
+- [How to connect to Datastore]() - TODO
+- [How to define configuration file](https://github.com/ddkang/aidb/tree/main/config)
 
 ## Contribute
 
