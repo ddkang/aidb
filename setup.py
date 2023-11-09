@@ -4,7 +4,7 @@ setup(
   # Metadata
   name="aidb",
   version="0.0.1",
-  description="",
+  description="Analyze your unstructured data",
   long_description=open("README.md").read(),
   long_description_content_type="text/markdown",
   author="Daniel Kang",
@@ -13,12 +13,8 @@ setup(
   packages=find_packages(include=["aidb", "aidb.*", "aidb_utilities", "aidb_utilities.*"]),
   python_requires=">=3.9",
   classifiers=[
-    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Information Technology",
-    "Intended Audience :: Legal Industry",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache License",
     "Operating System :: OS Independent",
     "Programming Language :: SQL",
     "Programming Language :: Python :: 3 :: Only",
