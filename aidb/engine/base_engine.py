@@ -294,21 +294,25 @@ class BaseEngine():
     param query_expression: sqlglot parsed query expression
     '''
     selected_column = []
-    col_name_set = set()
+    col_name_list = []
 
     if len(sample_df) == 0:
       return query_expression, selected_column
 
-
     for col in table_columns:
       col_name = col.split('.')[1]
-      if col_name in sample_df.columns and col_name not in col_name_set:
-        # FIXME: for different database, the IN grammar maybe different
-        # FIXME: this logic is wrong for multiple blob keys input
-        filtered_key_str = f'{col_name} IN ({", ".join(str(value) for value in sample_df[col_name].tolist())})'
-        query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
+      if col_name in sample_df.columns and col_name not in col_name_list:
         selected_column.append(col)
-        col_name_set.add(col.split('.')[1])
+        col_name_list.append(col_name)
+
+    col_tuple = ', '.join(selected_column)
+    value_list = []
+    for index, row in sample_df[col_name_list].iterrows():
+      value_list.append(f'({", ".join([str(value) for value in row])})')
+
+    # FIXME: for different database, the IN grammar maybe different
+    filtered_key_str = f'({col_tuple}) IN ({", ".join(value_list)})'
+    query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
 
     return query_expression, selected_column
 
