@@ -60,7 +60,9 @@ class ApproximateAggregateEngine(FullScanEngine):
       print('num_samples', num_samples)
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
-        return self.execute_full_scan(query)
+        query_no_aqp_sql = Query(query.base_sql_no_aqp.sql(), self._config)
+        res = await self.execute_full_scan(query_no_aqp_sql)
+        return res
 
       new_sample_results = await self.get_results_on_sampled_data(
           num_samples,
