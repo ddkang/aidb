@@ -12,6 +12,8 @@ def asyncio_run(future, as_task=True):
   else:
     nest_asyncio.apply(loop)
     return asyncio.run(_to_task(future, as_task, loop))
+  finally:
+    loop.close()
   
 def _to_task(future, as_task, loop):
   if not as_task or isinstance(future, asyncio.Task):
