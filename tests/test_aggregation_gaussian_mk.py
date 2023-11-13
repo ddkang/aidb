@@ -1,3 +1,7 @@
+'''
+This file is used to test aggregation query with multiple blob keys. It draws samples from gaussian distribution,
+and test the accuracy of approximate aggregation engine for Sum/Count/Avg query.
+'''
 from multiprocessing import Process
 import numpy as np
 import os
