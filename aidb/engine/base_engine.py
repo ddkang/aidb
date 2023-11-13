@@ -310,7 +310,6 @@ class BaseEngine():
     for index, row in sample_df[col_name_list].iterrows():
       value_list.append(f'({", ".join([str(value) for value in row])})')
 
-    # FIXME: for different database, the IN grammar maybe different
     filtered_key_str = f'({col_tuple}) IN ({", ".join(value_list)})'
     query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
 
