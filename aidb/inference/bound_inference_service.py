@@ -149,7 +149,9 @@ class CachedBoundInferenceService(BoundInferenceService):
     if len(inp_rows) > 0:
       inp_rows_df = pd.DataFrame(inp_rows).reset_index(drop=True)
       inp_rows_df.columns = [self.convert_normalized_col_name_to_cache_col_name(col) for col in inp_rows_df.columns]
+      # convert the pandas datatype to python native type
       inp_rows_df = inp_rows_df.astype('object')
+      # this doesn't support upsert queries
       await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
 
 
@@ -160,8 +162,10 @@ class CachedBoundInferenceService(BoundInferenceService):
       for table in tables:
         columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
         tmp_df = inference_results[columns]
+        # convert the pandas datatype to python native type
         tmp_df = tmp_df.astype('object')
         tmp_df.columns = [col.split('.')[1] for col in tmp_df.columns]
+        # this doesn't support upsert queries
         await conn.run_sync(lambda conn: tmp_df.to_sql(table, conn, if_exists='append', index=False))
 
 
