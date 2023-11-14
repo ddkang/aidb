@@ -58,7 +58,7 @@ class HTTPInferenceService(CachedInferenceService):
       input_columns_types: Union[List, None]=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
       output_columns_types: Union[List, None]=None,
-      gap_between_requests: float=0.0,
+      rate_limit: int=100,
       **kwargs
   ):
     '''
@@ -82,7 +82,7 @@ class HTTPInferenceService(CachedInferenceService):
     self._output_columns_types = output_columns_types
 
     self._separator = '~'
-    self._gap_between_requests = gap_between_requests
+    self._rate_limit = rate_limit
 
 
   def signature(self) -> Tuple[List, List]:
@@ -149,8 +149,8 @@ class HTTPInferenceService(CachedInferenceService):
   def request(self, request: Dict) -> Dict:
     response = requests.post(self._url, json=request, headers=self._headers)
     response.raise_for_status()
-    if self._gap_between_requests > 0:
-      time.sleep(self._gap_between_requests)
+    if self._rate_limit > 0:
+      time.sleep(60 / self._rate_limit)
     return response.json()
 
 
