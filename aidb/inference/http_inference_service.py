@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 import requests
+import time
 
 from aidb.config.config_types import AIDBListType
 from aidb.inference.cached_inference_service import CachedInferenceService
@@ -57,6 +58,7 @@ class HTTPInferenceService(CachedInferenceService):
       input_columns_types: Union[List, None]=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
       output_columns_types: Union[List, None]=None,
+      rate_limit: Union[int, None]=None,
       **kwargs
   ):
     '''
@@ -80,6 +82,7 @@ class HTTPInferenceService(CachedInferenceService):
     self._output_columns_types = output_columns_types
 
     self._separator = '~'
+    self._rate_limit = rate_limit
 
 
   def signature(self) -> Tuple[List, List]:
@@ -144,8 +147,13 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def request(self, request: Dict) -> Dict:
+    time_before_request = time.time()
     response = requests.post(self._url, json=request, headers=self._headers)
     response.raise_for_status()
+    if self._rate_limit is not None:
+      sleep_time = 60 / self._rate_limit - (time.time() - time_before_request)
+      if sleep_time > 0:
+        time.sleep(sleep_time)
     return response.json()
 
 

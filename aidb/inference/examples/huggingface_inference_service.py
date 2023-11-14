@@ -15,6 +15,7 @@ class HuggingFaceNLP(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
       model: str=None):
@@ -30,6 +31,7 @@ class HuggingFaceNLP(HTTPInferenceService):
       default_args=default_args,
       batch_supported=False,
       is_single=is_single,
+      rate_limit=rate_limit,
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=response_keys_to_columns,
       input_columns_types=input_columns_types,
@@ -45,6 +47,7 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
       token: str=None,
       default_args: Dict[str, Union[str, int]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
+      rate_limit: Union[int, None]=None,
       output_columns_types: Union[List, None]=None,
       model: str=None):
     if token is None:
@@ -59,6 +62,7 @@ class HuggingFaceVisionAudio(HTTPInferenceService):
       default_args=default_args,
       batch_supported=False,
       is_single=is_single,
+      rate_limit=rate_limit,
       response_keys_to_columns=response_keys_to_columns,
       output_columns_types=output_columns_types,
     )

@@ -39,6 +39,7 @@ In this section, we will walk through an example of configuring an inference ser
       output_columns_types=[str, float], # optional, output type check
       model="LiYuan/amazon-review-sentiment-analysis", # model for hf
       default_args={("options", "wait_for_model"): True} # default args
+      rate_limit=100 # number of requests per minute. Fine-tune this to avoid rate limit error
     )
     ```
 
