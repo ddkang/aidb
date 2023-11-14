@@ -68,8 +68,8 @@ class ApproximateAggregateEngine(FullScanEngine):
             )
           )
           agg_index += 1
-      print('num_samples', num_samples)
       num_samples = max(num_samples)
+      print('num_samples', num_samples)
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
