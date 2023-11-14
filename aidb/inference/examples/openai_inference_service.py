@@ -16,7 +16,7 @@ class OpenAIAudio(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: int=100,
+      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
       infer_type: str='transcriptions'):
@@ -53,7 +53,7 @@ class OpenAIImage(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: int=100,
+      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
       infer_type: str='generations'
@@ -92,7 +92,7 @@ class OpenAIText(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: int=100,
+      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
       prompt_prefix: str='',

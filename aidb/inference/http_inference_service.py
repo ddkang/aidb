@@ -58,7 +58,7 @@ class HTTPInferenceService(CachedInferenceService):
       input_columns_types: Union[List, None]=None,
       response_keys_to_columns: List[Union[str, tuple]]=None,
       output_columns_types: Union[List, None]=None,
-      rate_limit: int=100,
+      rate_limit: Union[int, None]=None,
       **kwargs
   ):
     '''
@@ -147,10 +147,13 @@ class HTTPInferenceService(CachedInferenceService):
 
 
   def request(self, request: Dict) -> Dict:
+    time_before_request = time.time()
     response = requests.post(self._url, json=request, headers=self._headers)
     response.raise_for_status()
-    if self._rate_limit > 0:
-      time.sleep(60 / self._rate_limit)
+    if self._rate_limit is not None:
+      sleep_time = 60 / self._rate_limit - (time.time() - time_before_request)
+      if sleep_time > 0:
+        time.sleep(sleep_time)
     return response.json()
 
 
