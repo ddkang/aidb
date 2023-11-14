@@ -188,7 +188,6 @@ class CachedBoundInferenceService(BoundInferenceService):
       inputs_to_insert_in_cache_table = []
       # TODO
       # - Batch the service inference
-      # - Batch the inserts for new data
       # - Batch the selection for cached results... How to do this?
       for idx, (_, inp_row) in self.optional_tqdm(enumerate(inputs.iterrows()), total=len(inputs)):
         if is_in_cache[idx]:
