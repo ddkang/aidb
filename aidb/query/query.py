@@ -333,24 +333,67 @@ class Query(object):
     return tables_required_predicates
 
 
+  def _get_columns_in_expression_tree(self, exp_tree):
+    '''
+    Return column_set of columns in query and
+    ordered list of columns, expression wise
+    eg: SELECT AVG(col1), COUNT(*) FROM table1;
+        column_set = {col1, col2, col3, col4}
+        exp_wise_columns = [[col1], [col1, col2, col3, col4]]
+    '''
+    column_set = set()
+    exp_wise_columns = []
+    for node, _, _ in exp_tree.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          normalized_col = self._get_normalized_col_name_from_col_exp(node)
+          column_set.add(normalized_col)
+          exp_wise_columns.append([normalized_col])
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            all_cols = []
+            for col, _ in self._tables[table].items():
+              table_column = f"{table}.{col}"
+              column_set.add(table_column)
+              all_cols.append(table_column)
+            exp_wise_columns.append(all_cols)
+        else:
+          raise Exception('Unsupported column type')
+    return column_set, exp_wise_columns
+
+
   @cached_property
   def columns_in_query(self):
     """
     nested queries are not supported for the time being
     * is supported
     """
-    column_set = set()
-    for node, _, _ in self._expression.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          column_set.add(self._get_normalized_col_name_from_col_exp(node))
-        elif isinstance(node.args['this'], exp.Star):
-          for table in self.tables_in_query:
-            for col, _ in self._tables[table].items():
-              column_set.add(f"{table}.{col}")
-        else:
-          raise Exception('Unsupported column type')
-    return column_set
+    return self._get_columns_in_expression_tree(self._expression)[0]
+
+
+  # Get aggregation types with columns corresponding
+  @cached_property
+  def aggregated_columns_and_types(self):
+    '''
+    Return aggregation types and corresponding columns,
+    even with multi aggregations
+    eg: SELECT avg(column1) from table1;
+    agg_type_with_cols = [(exp.Avg, [[column1]])]
+    SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    agg_type_with_cols = [(exp.Avg, [[col1], [col2]])
+            (exp.Count, [[col1, col2, col3, col4]])]
+    '''
+    select_exp = self.base_sql_no_aqp.args['expressions']
+    agg_type_with_cols = []
+    for expression in select_exp:
+      columns_in_expression = self._get_columns_in_expression_tree(expression)[1]
+      if isinstance(expression, exp.Avg):
+        agg_type_with_cols.append((exp.Avg, columns_in_expression))
+      elif isinstance(expression, exp.Count):
+        agg_type_with_cols.append((exp.Count, columns_in_expression))
+      elif isinstance(expression, exp.Sum):
+        agg_type_with_cols.append((exp.Sum, columns_in_expression))
+    return agg_type_with_cols
 
 
   @cached_property
@@ -466,9 +509,6 @@ class Query(object):
     for expression in self.base_sql_no_aqp.args['expressions']:
       expression_counts[type(expression)] += 1
 
-    if len(expression_counts) > 1:
-      raise Exception('Multiple expression types found')
-
     if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
       raise Exception('We only support approximation for Avg, Sum and Count query currently.')
 
@@ -484,23 +524,6 @@ class Query(object):
     if _exp_no_aqp is None:
       raise Exception('SQL contains no non-AQP statements')
     return _exp_no_aqp
-
-
-  # Get aggregation type
-  @cached_property
-  def get_agg_type(self):
-    # Only support one aggregation for the time being
-    if len(self.base_sql_no_aqp.args['expressions']) != 1:
-      raise Exception('Multiple expressions found')
-    select_exp = self.base_sql_no_aqp.args['expressions'][0]
-    if isinstance(select_exp, exp.Avg):
-      return exp.Avg
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    else:
-      raise Exception('Unsupported aggregation')
 
 
   # FIXME: move it to sqlglot.rewriter

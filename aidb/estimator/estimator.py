@@ -7,6 +7,7 @@ import numpy as np
 import scipy
 import scipy.stats
 from statsmodels.stats.weightstats import DescrStatsW
+import statsmodels.stats.proportion
 
 from aidb.samplers.sampler import SampledBlob
 from aidb.utils.logger import logger
@@ -65,10 +66,9 @@ class Estimator(abc.ABC):
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
-
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
-    statistics = np.array([sample.statistic for sample in samples])
+    statistics = np.array([sample.statistic[agg_index] for sample in samples])
     counts = np.array([sample.num_items for sample in samples])
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
@@ -81,16 +81,19 @@ class WeightedMeanSetEstimator(Estimator):
       conf
     )
 
+  def get_confint_lb(self, num_success, num_samples, alpha):
+    return statsmodels.stats.proportion.proportion_confint(num_success, num_samples, alpha)[0]
+
 
 class WeightedCountSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int,  conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
     weight = samples[0].weight
     weights = np.array([weight] * num_samples)
 
     # Statistics are already counts
 
-    statistics = np.array([sample.statistic for sample in samples] + [0] * (num_samples - len(samples)))
-    wstats = DescrStatsW(statistics, weights=weights,  ddof=0)
+    statistics = np.array([sample.statistic[agg_index] for sample in samples] + [0] * (num_samples - len(samples)))
+    wstats = DescrStatsW(statistics, weights=weights, ddof=0)
     mean_est = _get_estimate_bennett(
       wstats.mean,
       wstats.std,
@@ -106,6 +109,9 @@ class WeightedCountSetEstimator(Estimator):
       mean_est.std,
       mean_est.std_ub
     )
+
+  def get_confint_lb(self, num_success, num_samples, alpha):
+    return 1
 
 
 # Logic is exactly the same for the count estimator

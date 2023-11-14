@@ -2,7 +2,6 @@ import pandas as pd
 import scipy
 from sqlalchemy.sql import text
 import sqlglot.expressions as exp
-import statsmodels.stats.proportion
 from typing import List
 
 from aidb.engine.full_scan_engine import FullScanEngine
@@ -54,10 +53,23 @@ class ApproximateAggregateEngine(FullScanEngine):
             error target. Try running without the error target if you are certain you want to run this query.'''
         )
 
-      agg_type = query.get_agg_type
-      estimator = self._get_estimator(agg_type)
-      num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
+      num_samples = []
+      agg_index = 0
+      # loop to determine max number of samples required
+      for agg_type, columns_per_agg in query.aggregated_columns_and_types:
+        estimator = self._get_estimator(agg_type)
+        for _ in columns_per_agg:
+          num_samples.append(
+            self.get_additional_required_num_samples(
+                query,
+                sample_results,
+                estimator,
+                agg_index
+            )
+          )
+          agg_index += 1
       print('num_samples', num_samples)
+      num_samples = max(num_samples)
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         return self.execute_full_scan(query)
@@ -72,9 +84,22 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     sample_results.extend(new_sample_results)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
+    agg_index = 0
+    estimates = []
+    for agg_type, columns_per_agg in query.aggregated_columns_and_types:
+      estimator = self._get_estimator(agg_type)
+      for _ in columns_per_agg:
+        estimates.append(
+            estimator.estimate(
+                sample_results,
+                _NUM_PILOT_SAMPLES + num_samples,
+                query.confidence / 100.,
+                agg_index
+            ).estimate
+        )
+        agg_index += 1
 
-    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES + num_samples, query.confidence / 100.).estimate,)]
-
+    return [tuple(estimates)]
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
     '''Function that returns a query, to get total number of blob ids'''
@@ -180,8 +205,8 @@ class ApproximateAggregateEngine(FullScanEngine):
       results_for_each_blob.append(SampledBlob(
           weight=1. / self.blob_count,
           mass=1,
-          statistic=row[0],
-          num_items=int(row[1])
+          statistic=row[:-1],
+          num_items=int(row[-1])
       ))
 
     return results_for_each_blob
@@ -212,19 +237,15 @@ class ApproximateAggregateEngine(FullScanEngine):
       self,
       query: Query,
       sample_results: List[SampledBlob],
-      estimator: Estimator
+      estimator: Estimator,
+      agg_index: int
   ) -> int:
 
     error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
-    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES,  conf)
-
-    agg_type = query.get_agg_type
-    if agg_type == exp.Avg:
-      p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
-    else:
-      p_lb = 1
+    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf, agg_index)
+    p_lb = estimator.get_confint_lb(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)
 
     num_samples = int(
       (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
