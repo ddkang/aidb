@@ -10,14 +10,15 @@ DB_NAME = 'aidb_test_amazon.sqlite'
 
 sentiment_inference_service = HuggingFaceNLP(
   name="sentiment_classification",
-  token=None, # leave it None if you want AIDB to read token from env variable HF_API_KEY. Otherwise replace None with your own token in str.
+  token='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', # leave it None if you want AIDB to read token from env variable HF_API_KEY. Otherwise replace None with your own token in str.
   columns_to_input_keys=['inputs'],
   response_keys_to_columns=[(AIDBListType(), AIDBListType(), 'label'),
                             (AIDBListType(), AIDBListType(), 'score')],
   input_columns_types=[str],
   output_columns_types=[str, float],
   model="LiYuan/amazon-review-sentiment-analysis",
-  default_args={("options", "wait_for_model"): True})
+  default_args={("options", "wait_for_model"): True},
+  gap_between_requests=0.1)
 
 inference_engines = [
   {
