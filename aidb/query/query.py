@@ -479,6 +479,40 @@ class Query(object):
 
 
   @cached_property
+  def recall_target(self):
+    recall_target = self._get_keyword_arg(exp.RecallTarget)
+    return recall_target / 100. if recall_target else None
+
+
+  @cached_property
+  def precision_target(self):
+    precision_target = self._get_keyword_arg(exp.PrecisionTarget)
+    return precision_target / 100. if precision_target else None
+
+
+  @cached_property
+  def oracle_bughet(self):
+    oracle_budget = self._get_keyword_arg(exp.Budget)
+    return oracle_budget if oracle_budget else None
+
+
+  @cached_property
+  def is_approx_select_query(self):
+    return self.recall_target or self.precision_target
+
+
+  @cached_property
+  def is_valid_approx_select_query(self):
+    if self.recall_target and self.precision_target:
+      raise Exception('Both recall_target and precision_target found')
+
+    if not self.oracle_bughet or not self.confidence:
+      raise Exception('Approx select query should contain oracle budget and confidence')
+
+    return True
+
+
+  @cached_property
   def base_sql_no_aqp(self):
     _exp_no_aqp = self._expression.transform(_remove_aqp)
     if _exp_no_aqp is None:

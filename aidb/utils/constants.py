@@ -7,6 +7,8 @@ CONFIG_PREFIX = '__config'
 REP_PREFIX = '__rep'
 TOPK_PREFIX = '__topk'
 BLOB_MAPPING_PREFIX = '__blob_mapping'
+
+VECTOR_ID_COLUMN = 'vector_id'
 '''
 The schema of the blob metadata table is as follows:
   table_name: str
