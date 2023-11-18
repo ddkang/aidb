@@ -4,6 +4,12 @@ from typing import Optional
 
 from aidb.vector_database.vector_database_config import TastiConfig
 
+def _get_and_update_dists_shared(x, i, min_dists, embeddings):
+  dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
+  if dists < min_dists[i]:
+    min_dists[i] = dists
+
+
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
   '''
   :param x: embedding of cluster representatives
@@ -17,17 +23,13 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
     def _get_and_update_dists_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
 
       for i in prange(len(embeddings)):
-        dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
-        if dists < min_dists[i]:
-          min_dists[i] = dists
+        _get_and_update_dists_shared(x, i, min_dists, embeddings)
     _get_and_update_dists_numba(x, embeddings, min_dists)
 
   except:
     def _get_and_update_dists_no_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
       for i in range(len(embeddings)):
-        dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
-        if dists < min_dists[i]:
-          min_dists[i] = dists
+        _get_and_update_dists_shared(x, i, min_dists, embeddings)
     _get_and_update_dists_no_numba(x, embeddings, min_dists)
 
 
