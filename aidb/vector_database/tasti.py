@@ -20,17 +20,17 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
     from numba import njit, prange
 
     @njit(parallel=True)
-    def _get_and_update_dists_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
+    def _get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
 
       for i in prange(len(embeddings)):
         _get_and_update_dists_shared(x, i, min_dists, embeddings)
-    _get_and_update_dists_numba(x, embeddings, min_dists)
 
   except:
-    def _get_and_update_dists_no_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
+    def _get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
       for i in range(len(embeddings)):
         _get_and_update_dists_shared(x, i, min_dists, embeddings)
-    _get_and_update_dists_no_numba(x, embeddings, min_dists)
+  
+  _get_and_update_dists(x, embeddings, min_dists)
 
 
 class Tasti(TastiConfig):
