@@ -14,7 +14,7 @@ setup(
   author_email="daniel.d.kang@gmail.com",
   # Packages
   packages=find_packages(include=["aidb", "aidb.*", "aidb_utilities", "aidb_utilities.*"]),
-  python_requires=">=3.9",
+  python_requires=">=3.9,<3.12",
   install_requires=required,
   classifiers=[
     "Intended Audience :: Developers",
