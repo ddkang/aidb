@@ -1,21 +1,34 @@
 import numpy as np
 import pandas as pd
-from numba import njit, prange
 from typing import Optional
 
 from aidb.vector_database.vector_database_config import TastiConfig
 
-@njit(parallel=True)
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
   '''
   :param x: embedding of cluster representatives
   :param embeddings: embeddings of all data
   :min_dists: array to record the minimum distance for each embedding to the embedding of cluster representatives
   '''
-  for i in prange(len(embeddings)):
-    dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
-    if dists < min_dists[i]:
-      min_dists[i] = dists
+  try:
+    from numba import njit, prange
+
+    @njit(parallel=True)
+    def _get_and_update_dists_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
+
+      for i in prange(len(embeddings)):
+        dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
+        if dists < min_dists[i]:
+          min_dists[i] = dists
+    _get_and_update_dists_numba(x, embeddings, min_dists)
+
+  except:
+    def _get_and_update_dists_no_numba(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
+      for i in range(len(embeddings)):
+        dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
+        if dists < min_dists[i]:
+          min_dists[i] = dists
+    _get_and_update_dists_no_numba(x, embeddings, min_dists)
 
 
 class Tasti(TastiConfig):
