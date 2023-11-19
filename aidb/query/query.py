@@ -397,6 +397,11 @@ class Query(object):
 
 
   @cached_property
+  def num_aggregations(self):
+    return sum([len(columns) for _, columns in self.aggregated_columns_and_types])
+
+
+  @cached_property
   def inference_engines_required_for_query(self):
     """
     Inference services required for sql query, will return a list of inference service

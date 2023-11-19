@@ -2,6 +2,7 @@ import pandas as pd
 import scipy
 from sqlalchemy.sql import text
 import sqlglot.expressions as exp
+import statsmodels.stats.proportion
 from typing import List
 
 from aidb.engine.full_scan_engine import FullScanEngine
@@ -64,6 +65,7 @@ class ApproximateAggregateEngine(FullScanEngine):
                 query,
                 sample_results,
                 estimator,
+                agg_type,
                 agg_index
             )
           )
@@ -238,14 +240,22 @@ class ApproximateAggregateEngine(FullScanEngine):
       query: Query,
       sample_results: List[SampledBlob],
       estimator: Estimator,
+      agg_type: exp.AggFunc,
       agg_index: int
   ) -> int:
-
     error_target = query.error_target
     conf = query.confidence / 100.
     alpha = 1. - conf
     pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf, agg_index)
-    p_lb = estimator.get_confint_lb(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)
+
+    if agg_type == exp.Avg:
+      p_lb = statsmodels.stats.proportion.proportion_confint(
+        len(sample_results),
+        _NUM_PILOT_SAMPLES,
+        alpha / query.num_aggregations
+      )[0]
+    else:
+      p_lb = 1
 
     num_samples = int(
       (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
