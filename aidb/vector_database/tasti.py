@@ -4,11 +4,6 @@ from typing import Optional
 
 from aidb.vector_database.vector_database_config import TastiConfig
 
-def _get_and_update_dists_shared(x, i, min_dists, embeddings):
-  dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
-  if dists < min_dists[i]:
-    min_dists[i] = dists
-
 
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
   '''
@@ -16,6 +11,11 @@ def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.nd
   :param embeddings: embeddings of all data
   :min_dists: array to record the minimum distance for each embedding to the embedding of cluster representatives
   '''
+  def _get_and_update_dists_shared(x, i, min_dists, embeddings):
+    dists = np.sqrt(np.sum((x - embeddings[i]) ** 2))
+    if dists < min_dists[i]:
+      min_dists[i] = dists
+
   try:
     from numba import njit, prange
 
