@@ -30,6 +30,12 @@ def _remove_aqp(node):
   return node
 
 
+def _remove_where(node):
+  if isinstance(node, exp.Where):
+    return None
+  return node
+
+
 @dataclass(frozen=True)
 class Query(object):
   """
@@ -520,6 +526,14 @@ class Query(object):
     return _exp_no_aqp
 
 
+  @cached_property
+  def base_sql_no_where(self):
+    _exp_no_where = self._expression.transform(_remove_where)
+    if _exp_no_where is None:
+      raise Exception('SQL contains no non-AQP statements')
+    return _exp_no_where
+
+
   # Get aggregation type
   @cached_property
   def get_agg_type(self):
@@ -558,3 +572,33 @@ class Query(object):
     re = Rewriter(expression)
     e = re.add_selects(selects)
     return e.expression
+
+
+  def add_join(self, expression, new_join):
+    # parse_one can't parse join directly
+    join_condition = 'select fake from fake ' + new_join
+    new_condition = parse_one(join_condition)
+
+    expression.args['joins'].append(new_condition.args['joins'][0])
+    return expression
+
+
+  @cached_property
+  def expression_after_normalize_columns(self):
+    '''
+    this function is used to normalize columns name in expression
+    e.g. for this query: SELECT frame FROM blobs b WHERE timestamp > 100
+    this query will return the expression of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
+    '''
+
+    # FIXME: decide if we need in-place modification
+    expression = self._expression.copy()
+    for node, _, _ in expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          affiliate_table_name = self._get_table_of_column(node.args['this'].args['this'])
+          if affiliate_table_name in self.table_name_to_aliases:
+            affiliate_table_name = self.table_name_to_aliases[affiliate_table_name]
+          node.args['table'] = exp.Identifier(this=affiliate_table_name, quoted=False)
+
+    return expression

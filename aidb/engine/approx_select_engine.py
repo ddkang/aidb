@@ -1,22 +1,22 @@
-import numpy as np
+import logging
 import math
+import multiprocessing as mp
+import numpy as np
 import pandas as pd
 from sqlalchemy.sql import text
 from typing import List
-import time
 
 from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
 from aidb.utils.constants import VECTOR_ID_COLUMN
 
 PROXY_SCORE = 'proxy_score'
-LABEL = 'label'
 MASS = 'mass'
 WEIGHT = 'weight'
 BUDGET = 2000
 
 class ApproxSelectEngine(TastiEngine):
-  # TODO: design a better algorithm
+  # TODO: design a better algorithm, this function is same as the function in Limit Engine
   def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
     '''
     convert query result to score, return a Dataframe contains score column, the index is blob index
@@ -42,29 +42,52 @@ class ApproxSelectEngine(TastiEngine):
     proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
-    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT)
-    # sorted blob id based on proxy score
+
+    # This is used for parallel test
+    seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
+    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT, random_state=seed)
+
 
     async with self._sql_engine.begin() as conn:
-      time1 = time.time()
-      sampled_results = await self.get_inference_results(query, list(sampled_df.index), conn)
+      satisfied_sampled_results, all_sampled_results = await self.get_inference_results(
+          query,
+          list(sampled_df.index),
+          conn
+      )
 
-      true_vector_id = await self.get_sampled_true_vecor_id(sampled_results, list(sampled_df.index), conn)
+      satisfied_sampled_index = list(set(satisfied_sampled_results.index).intersection(set(sampled_df.index)))
+      satisfied_sampled_results = satisfied_sampled_results.loc[satisfied_sampled_index]
+      satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
+      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
 
-      sampled_df.loc[true_vector_id, LABEL] = 1
-      sorted_sampled_df = sampled_df.sort_values(by=PROXY_SCORE, ascending=False)
+      all_sampled_index = list(set(all_sampled_results.index).intersection(set(sampled_df.index)))
+      all_sampled_results = all_sampled_results.loc[all_sampled_index]
+      all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
 
       recall_target = query.recall_target
       confidence = query.confidence / 100
-      tau_modified = self.tau_modified(recall_target, sorted_sampled_df, confidence)
+      tau_modified = self.tau_modified(
+          sorted_satisfied_sampled_results,
+          recall_target,
+          confidence,
+          len(all_sampled_results)
+      )
 
-      R1 = sampled_df[sampled_df[LABEL] == 1].index
-      R2 = dataset[dataset[PROXY_SCORE] > tau_modified].index
+      R1 = sorted_satisfied_sampled_results.index
+      R2 = dataset[dataset[PROXY_SCORE] >= tau_modified].index
 
-      print('num_samples', len(list(set(R1).union(set(R2)))))
-      results = await self.get_inference_results(query, list(set(R1).union(set(R2))), conn)
+      additional_samples = list(set(R1).union(set(R2)))
 
-    return results
+      print('num_samples', len(additional_samples))
+      logging.info(f'num_samples: {len(additional_samples)}')
+
+      additional_satisfied_sampled_results,  additional_all_sampled_results = await self.get_inference_results(
+          query,
+          additional_samples,
+          conn
+      )
+
+    return additional_satisfied_sampled_results
 
 
   async def get_inference_results(self, query:Query, sampled_index: List[int], conn):
@@ -77,61 +100,69 @@ class ApproxSelectEngine(TastiEngine):
       inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query.base_sql_no_aqp.sql()), conn))
-    return res_df
 
-
-  async def get_sampled_true_vecor_id(self, results_df, sampled_index: List[int], conn):
-
-    blob_mapping_table_cols = [f'{self.blob_mapping_table_name}.{col.name}'
-        for col in self._config.tables[self.blob_mapping_table_name].columns]
-
-
-    select_vector_id_query = f'''SELECT {VECTOR_ID_COLUMN} FROM {self.blob_mapping_table_name};'''
-    select_vector_id_query = Query(select_vector_id_query, config=self._config)
-    query_expression = select_vector_id_query.get_expression()
-    select_vector_id_query, _ = self.add_filter_key_into_query(
-        blob_mapping_table_cols,
-        results_df,
-        select_vector_id_query,
-        query_expression
+    no_aqp_query = Query(query.base_sql_no_aqp.sql(), self._config)
+    new_exp = no_aqp_query.add_select(
+        no_aqp_query.expression_after_normalize_columns,
+        f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}'
     )
 
-    true_vector_id_df = await conn.run_sync(lambda conn: pd.read_sql(text(select_vector_id_query.sql()), conn))
-    true_vector_id_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
-    true_vector_id = list(set(sampled_index).intersection(set(true_vector_id_df.index)))
+    blob_keys = [col.name for col in self._config.tables[self.blob_mapping_table_name].columns]
+    added_cols = set()
+    join_conditions = []
+    tables_in_query = no_aqp_query.tables_in_query
+    table_alias = no_aqp_query.table_name_to_aliases
+    for table_name in tables_in_query:
+      for col in self._config.tables[table_name].columns:
+        col_name = col.name
+        if col_name in blob_keys and col_name not in added_cols:
+          if table_name in table_alias:
+            table_name = table_alias[table_name]
+          join_conditions.append(f'{self.blob_mapping_table_name}.{col_name} = {table_name}.{col_name}')
+          added_cols.add(col_name)
+    join_conditions_str = ' AND '.join(join_conditions)
 
-    return true_vector_id
+    new_exp = no_aqp_query.add_join(new_exp, f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}')
+    new_query = Query(new_exp.sql(), self._config)
+
+    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(new_query.base_sql_no_where.sql()), conn))
+
+    # drop duplicated columns, this will happen when 'select *'
+    all_df = all_df.loc[:, ~all_df.columns.duplicated()]
+    all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
+
+    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(new_query.sql_query_text), conn))
+    res_df = res_df.loc[:, ~res_df.columns.duplicated()]
+    res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
+
+    return res_df, all_df
 
 
   def get_sampled_proxy_blob(self, proxy_score_for_all_blobs, defensive_mixing: int = 0.1):
     weights = proxy_score_for_all_blobs.values ** 0.5
     normalized_weights = (1 - defensive_mixing) * (weights / sum(weights)) + defensive_mixing / len(weights)
     mass = 1 / len(weights) / normalized_weights
-    label = [0] * len(weights)
+
     dataset = pd.DataFrame({
         PROXY_SCORE: proxy_score_for_all_blobs.values,
         WEIGHT: normalized_weights,
-        MASS: mass,
-        LABEL: label},
+        MASS: mass},
         index=proxy_score_for_all_blobs.index
     )
 
     return dataset
 
 
-  def tau_estimate(self, recall_target, sampled_blobs):
+  def tau_estimate(self, recall_target, satisfied_sampled_results):
     estimated_tau = 0.0
-    # TODO: sorted blobs based on proxy score
     recall_score = 0
-    count = 0
-    for index, blob in sampled_blobs.iterrows():
-      count += 1
-      recall_score += blob[LABEL] * blob[MASS]
+
+    for index, blob in satisfied_sampled_results.iterrows():
+      recall_score += blob[MASS]
       if recall_score >= recall_target:
         estimated_tau = blob[PROXY_SCORE]
         break
-    return estimated_tau, count
+    return estimated_tau
 
 
   def _get_confidence_bounds(self, mu, sigma, s, delta):
@@ -141,18 +172,16 @@ class ApproxSelectEngine(TastiEngine):
     return mu - val, mu + val
 
 
-  def tau_modified(self, recall_target, sampled_blobs, confidence):
-    z = sampled_blobs[MASS] * sampled_blobs[LABEL]
-    estimated_tau, top_index = self.tau_estimate(
+  def tau_modified(self, satisfied_sampled_results, recall_target, confidence, total_length):
+    z = satisfied_sampled_results[MASS]
+    estimated_tau = self.tau_estimate(
       recall_target * sum(z),
-      sampled_blobs
+      satisfied_sampled_results
     )
+    positive_length = len(satisfied_sampled_results[satisfied_sampled_results[PROXY_SCORE] >= estimated_tau])
 
-    # proxy scores samples are sorted
-    z1_mask = np.array([1] * top_index + [0] * (len(sampled_blobs) - top_index))
-    z2_mask = 1 - z1_mask
-    estimated_z1 = z * z1_mask
-    estimated_z2 = z * z2_mask
+    estimated_z1 = list(z[:positive_length]) + [0] * (total_length - len(z[:positive_length]))
+    estimated_z2 = list(z[positive_length:]) + [0] * (total_length - len(z[positive_length:]))
     z1_mean, z1_std = np.mean(estimated_z1), np.std(estimated_z1)
     z2_mean, z2_std = np.mean(estimated_z2), np.std(estimated_z2)
 
@@ -167,10 +196,11 @@ class ApproxSelectEngine(TastiEngine):
     else:
       modified_recall_target = ub / (ub + lb)
 
-    modified_tau, _ = self.tau_estimate(
+    modified_tau = self.tau_estimate(
       modified_recall_target * sum(z),
-      sampled_blobs
+      satisfied_sampled_results
     )
 
     print(modified_tau)
+    logging.info(f'modified_tau: {modified_tau}')
     return modified_tau

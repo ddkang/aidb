@@ -1,7 +1,8 @@
+import logging
 from multiprocessing import Process
+import multiprocessing as mp
 import numpy as np
 import os
-
 import pandas as pd
 from sqlalchemy.sql import text
 import time
@@ -12,11 +13,21 @@ from aidb.vector_database.tasti import Tasti
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.tasti_test.tasti_test import TastiTests, VectorDatabaseType
 from tests.utils import setup_gt_and_aidb_engine
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+
+file_handler = logging.FileHandler('approx_select.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+logger.addHandler(file_handler)
 
 DB_URL = 'sqlite+aiosqlite://'
 DATA_SET = 'law'
+BUDGET = 5000
 # DB_URL = 'mysql+aiomysql://aidb:aidb@localhost'
 class LimitEngineTests(IsolatedAsyncioTestCase):
 
@@ -38,22 +49,20 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     user_database = FaissVectorDatabase(index_path)
     user_database.create_index(index_name, embedding_dim, recreate_index=True)
     user_database.insert_data(index_name, embedding_df)
-    tasti = Tasti(index_name, user_database, 5000)
+    seed = mp.current_process().pid
+    tasti = Tasti(index_name, user_database, BUDGET, seed=seed)
 
     count = 0
-    for i in range(10):
+    for i in range(100):
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir, tasti)
 
-
+      RECALL_TARGET = 80
       register_inference_services(aidb_engine, data_dir)
       queries = [
-        # (
-        #   '''SELECT * FROM objects00 WHERE x_min > 1000 RECALL_TARGET 40 CONFIDENCE 95% BUDGET 2000;''',
-        #   '''SELECT * FROM objects00 WHERE x_min > 1000;'''
-        # ),
         (
-          '''SELECT blob_id, entity_id FROM entities00 where type LIKE 'PERSON' RECALL_TARGET 40 CONFIDENCE 95% BUDGET 2000;''',
-          '''SELECT blob_id, entity_id FROM entities00 where type LIKE 'PERSON';'''
+          f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON' 
+              RECALL_TARGET {RECALL_TARGET} CONFIDENCE 95% BUDGET 2000;''',
+          '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
         ),
       ]
 
@@ -66,9 +75,10 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
           gt_res = await conn.execute(text(exact_query))
           gt_res = gt_res.fetchall()
         print(len(aidb_res), len(gt_res), len(aidb_res) / len(gt_res))
-        if len(aidb_res) / len(gt_res) > 0.4:
+        if len(aidb_res) / len(gt_res) > RECALL_TARGET / 100:
           count += 1
-        print(count, i+1)
+      logging.info(f'aidb: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
+                   f' Runs:{i + 1}, Count: {count}')
 
       del gt_engine
       del aidb_engine
