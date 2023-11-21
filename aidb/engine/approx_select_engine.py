@@ -61,8 +61,12 @@ class ApproxSelectEngine(TastiEngine):
       sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
 
       all_sampled_index = list(set(all_sampled_results.index).intersection(set(sampled_df.index)))
+
+      no_result_length = BUDGET - len(sampled_df.loc[all_sampled_index])
       all_sampled_results = all_sampled_results.loc[all_sampled_index]
       all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
+
+      total_length = no_result_length + len(all_sampled_results)
 
       recall_target = query.recall_target
       confidence = query.confidence / 100
@@ -70,7 +74,7 @@ class ApproxSelectEngine(TastiEngine):
           sorted_satisfied_sampled_results,
           recall_target,
           confidence,
-          len(all_sampled_results)
+          total_length
       )
 
       R1 = sorted_satisfied_sampled_results.index

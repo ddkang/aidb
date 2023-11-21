@@ -512,8 +512,11 @@ class Query(object):
     if self.recall_target and self.precision_target:
       raise Exception('Both recall_target and precision_target found')
 
-    if not self.oracle_bughet or not self.confidence:
-      raise Exception('Approx select query should contain oracle budget and confidence')
+    if self.recall_target and self.oracle_bughet:
+      raise Exception('Apporx select recall query should not contain budget')
+
+    if not self.confidence:
+      raise Exception('Approx select query should contain confidence')
 
     return True
 
