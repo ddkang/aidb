@@ -36,6 +36,7 @@ class ApproxSelectEngine(TastiEngine):
 
 
   async def execute_approx_select_query(self, query: Query):
+    query.is_valid_approx_select_query()
     # generate proxy score for each blob
     score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
 
