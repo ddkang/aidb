@@ -130,14 +130,14 @@ if __name__ == '__main__':
     test('faiss', VectorDatabaseType.FAISS.value, data_size=10000,
          embedding_dim=128, nb_buckets=1000, index_path='./')
 
-    # print(f'Running Chroma vector database')
-    # test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
-    #      embedding_dim=128, nb_buckets=1000, index_path='./')
-    #
-    # # too slow
-    # print(f'Running Weaviate vector database')
-    # url = ''
-    # api_key = os.environ.get('WEAVIATE_API_KEY')
-    # weaviate_auth = WeaviateAuth(url, api_key=api_key)
-    # test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
-    #      embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
+    print(f'Running Chroma vector database')
+    test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
+         embedding_dim=128, nb_buckets=1000, index_path='./')
+
+    # too slow
+    print(f'Running Weaviate vector database')
+    url = ''
+    api_key = os.environ.get('WEAVIATE_API_KEY')
+    weaviate_auth = WeaviateAuth(url, api_key=api_key)
+    test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
+         embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
