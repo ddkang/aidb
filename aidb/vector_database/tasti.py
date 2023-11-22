@@ -4,6 +4,8 @@ from numba import njit, prange
 from typing import Optional
 
 from aidb.vector_database.vector_database_config import TastiConfig
+from aidb.utils.constants import VECTOR_ID_COLUMN
+
 
 @njit(parallel=True)
 def get_and_update_dists(x: np.ndarray, embeddings: np.ndarray, min_dists: np.ndarray):
@@ -81,7 +83,7 @@ class Tasti(TastiConfig):
     if self.reps is None:
       self._FPF()
     rep_id = self.vector_ids.iloc[self.reps]
-    rep_id.set_index('vector_id', inplace=True, drop=True)
+    rep_id.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
     return rep_id
 
 
