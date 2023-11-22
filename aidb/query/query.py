@@ -507,7 +507,6 @@ class Query(object):
     return self.recall_target or self.precision_target
 
 
-  @cached_property
   def is_valid_approx_select_query(self):
     if self.recall_target and self.precision_target:
       raise Exception('Both recall_target and precision_target found')

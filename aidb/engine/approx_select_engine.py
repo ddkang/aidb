@@ -13,7 +13,7 @@ from aidb.utils.constants import VECTOR_ID_COLUMN
 PROXY_SCORE = 'proxy_score'
 MASS = 'mass'
 WEIGHT = 'weight'
-BUDGET = 2000
+BUDGET = 10000
 
 class ApproxSelectEngine(TastiEngine):
   # TODO: design a better algorithm, this function is same as the function in Limit Engine
@@ -206,6 +206,5 @@ class ApproxSelectEngine(TastiEngine):
       satisfied_sampled_results
     )
 
-    print(modified_tau)
     logging.info(f'modified_tau: {modified_tau}')
     return modified_tau
