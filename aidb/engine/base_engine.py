@@ -11,6 +11,7 @@ from aidb.inference.inference_service import InferenceService
 from aidb.query.query import FilteringClause, Query
 from aidb.query.utils import predicate_to_str
 from aidb.utils.asyncio import asyncio_run
+from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.db import infer_dialect, create_sql_engine
 
 
@@ -219,7 +220,7 @@ class BaseEngine():
 
     # used to select inp rows based on blob ids
     if vector_id_table:
-      root_inp_cols.append(f'{vector_id_table}.vector_id')
+      root_inp_cols.append(f'{vector_id_table}.{VECTOR_ID_COLUMN}')
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
@@ -337,8 +338,8 @@ class BaseEngine():
 
     new_query = Query(select_join_str, self._config)
     # FIXME: avoid hard strings
-    sample_df = pd.DataFrame({'vector_id': filtered_id_list})
-    filter_column = [f'{vector_id_table}.vector_id']
+    sample_df = pd.DataFrame({VECTOR_ID_COLUMN: filtered_id_list})
+    filter_column = [f'{vector_id_table}.{VECTOR_ID_COLUMN}']
     query_expression, _ = self.add_filter_key_into_query(filter_column,
                                                          sample_df,
                                                          new_query,
