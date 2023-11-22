@@ -3,7 +3,7 @@ import pandas as pd
 
 from aidb.config.config_types import InferenceBinding
 from aidb.engine import Engine
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+# from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
@@ -12,7 +12,7 @@ from aidb.vector_database.tasti import Tasti
 def get_tasti_config(tasti_config):
   vector_database = {
     'FAISS': FaissVectorDatabase,
-    'CHROMA': ChromaVectorDatabase,
+    # 'CHROMA': ChromaVectorDatabase,
     'WEAVIATE': WeaviateVectorDatabase
   }
   vector_database_config = tasti_config.vector_database
