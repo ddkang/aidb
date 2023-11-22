@@ -8,6 +8,8 @@ from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
+from aidb.utils.constants import VECTOR_ID_COLUMN
+
 
 class VectorDatabaseType(Enum):
   FAISS = 'FAISS'
@@ -46,7 +48,7 @@ class TastiTests():
     np.random.seed(self.seed)
     embeddings = np.random.rand(data_size, emb_size)
     data = pd.DataFrame({'id': range(self.total_data, self.total_data + data_size), 'values': embeddings.tolist()})
-    vector_ids = pd.DataFrame({'vector_id': range(self.total_data, self.total_data + data_size)})
+    vector_ids = pd.DataFrame({VECTOR_ID_COLUMN: range(self.total_data, self.total_data + data_size)})
     self.total_data += data_size
     return data, vector_ids
 
@@ -128,14 +130,14 @@ if __name__ == '__main__':
     test('faiss', VectorDatabaseType.FAISS.value, data_size=10000,
          embedding_dim=128, nb_buckets=1000, index_path='./')
 
-    print(f'Running Chroma vector database')
-    test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
-         embedding_dim=128, nb_buckets=1000, index_path='./')
-
-    # too slow
-    print(f'Running Weaviate vector database')
-    url = ''
-    api_key = os.environ.get('WEAVIATE_API_KEY')
-    weaviate_auth = WeaviateAuth(url, api_key=api_key)
-    test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
-         embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
+    # print(f'Running Chroma vector database')
+    # test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
+    #      embedding_dim=128, nb_buckets=1000, index_path='./')
+    #
+    # # too slow
+    # print(f'Running Weaviate vector database')
+    # url = ''
+    # api_key = os.environ.get('WEAVIATE_API_KEY')
+    # weaviate_auth = WeaviateAuth(url, api_key=api_key)
+    # test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
+    #      embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
