@@ -14,7 +14,7 @@ from multiprocessing import Process
 DB_URL = "sqlite+aiosqlite://"
 
 
-class FullScanEngineTests(IsolatedAsyncioTestCase):
+class FullScanEngineTwitterTests(IsolatedAsyncioTestCase):
 
   async def test_twitter(self):
 
