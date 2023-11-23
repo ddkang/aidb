@@ -21,7 +21,7 @@ jobs:
 
     - name: Download test data
       run: |
-        gdown https://drive.google.com/uc?id=1a0EA7sH_m0m9c1127Geq_bNnDmi7nj3x
+        gdown https://drive.google.com/uc?id=1VbPyTdHFAjoS6gNkwEjx1DHk_vAIN3ju
         unzip data.zip -d tests/
 
     - name: Run db setup tests
@@ -53,6 +53,9 @@ jobs:
 
     - name: Run exact aggregation query tests
       run: python3 -m tests.test_exact_aggregation
+
+    - name: Run Twitter Full Scan Tests
+      run: python3 -m tests.tests_full_scan_engine_twitter
 
     # - name: Run aggregation query tests
     #   run: python3 -m tests.test_aggregation
