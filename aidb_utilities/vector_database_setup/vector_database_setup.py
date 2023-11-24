@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Union, NewType, Optional
 
-from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping
+from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping, VECTOR_ID_COLUMN
 from aidb.utils.db import create_sql_engine, infer_dialect
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
@@ -44,14 +44,14 @@ class VectorDatabaseSetup:
   def _get_embedding(self, vector_database_df: pd.DataFrame) -> pd.DataFrame:
     '''
     This function is used to generate embedding based on blob file, the input has foramt
-    pd.DataFrame({'vector_id':[], 'path':[]}, the output should have format pd.DataFrame({'id':[], 'values':[]}
+    pd.DataFrame({'__vector_id':[], 'path':[]}, the output should have format pd.DataFrame({'id':[], 'values':[]}
     '''
 
     # FIXME: this should be replaced real generate_embedding function
     def generate_data(vector_database_df):
       np.random.seed(1234)
       embeddings = np.random.rand(len(vector_database_df), 128)
-      data = pd.DataFrame({'id': vector_database_df['vector_id'], 'values': embeddings.tolist()})
+      data = pd.DataFrame({'id': vector_database_df[VECTOR_ID_COLUMN], 'values': embeddings.tolist()})
       return data
 
     return generate_data(vector_database_df)
@@ -93,14 +93,14 @@ class VectorDatabaseSetup:
 
       df = await conn.run_sync(lambda conn: pd.read_sql(query_str, conn))
 
-      df['vector_id'] = list(range(len(df)))
+      df[VECTOR_ID_COLUMN] = list(range(len(df)))
       blob_mapping_table_df = df.drop(columns=path_column)
       # create blob mapping table
       _, _, blob_mapping_table_name = table_name_for_rep_and_topk_and_blob_mapping([self.blob_table_name])
       await conn.run_sync(lambda conn: blob_mapping_table_df.to_sql(blob_mapping_table_name, conn,
                                                                     index=False, if_exists='append'))
 
-    vector_database_df = df[['vector_id', path_column]]
+    vector_database_df = df[[VECTOR_ID_COLUMN, path_column]]
     embeddings_df = self._get_embedding(vector_database_df)
 
     self._create_vector_database_index(embeddings_df)
