@@ -61,7 +61,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
       queries = [
         (
           f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON' 
-              RECALL_TARGET {RECALL_TARGET} CONFIDENCE 95% BUDGET 2000;''',
+              RECALL_TARGET {RECALL_TARGET} CONFIDENCE 95%;''',
           '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
         ),
       ]
