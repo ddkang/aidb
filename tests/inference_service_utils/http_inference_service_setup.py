@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 
 from multiprocessing import Process
 
-def run_server(data_dir: str):
+def run_server(data_dir: str, port=8000):
   app = FastAPI()
 
   inference_dir = f'{data_dir}/inference'
@@ -59,7 +59,7 @@ def run_server(data_dir: str):
 
   # config = Config(app=app, host="127.0.0.1", port=8000)
   # server = Server(config=config)
-  uvicorn.run(app, host="127.0.0.1", port=8000, log_level='warning')
+  uvicorn.run(app, host="127.0.0.1", port=port, log_level='warning')
 
 if __name__=='__main__':
   run_server(sys.argv[1])
