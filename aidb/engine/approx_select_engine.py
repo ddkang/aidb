@@ -96,6 +96,7 @@ class ApproxSelectEngine(TastiEngine):
 
 
   async def get_inference_results(self, query:Query, sampled_index: List[int], conn):
+    # TODO: rewrite query, use full scan to execute query
     bound_service_list = query.inference_engines_required_for_query
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service,

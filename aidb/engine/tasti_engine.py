@@ -224,7 +224,6 @@ class TastiEngine(FullScanEngine):
 
       async with self._sql_engine.begin() as conn:
         vector_ids = await conn.run_sync(lambda conn: pd.read_sql(text(vector_id_select_query_str), conn))
-    print(vector_ids)
     self.tasti_index.set_vector_ids(vector_ids)
 
     rep_ids = self.tasti_index.get_representative_vector_ids()
