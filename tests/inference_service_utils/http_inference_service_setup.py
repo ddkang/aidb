@@ -1,3 +1,4 @@
+import sys
 import glob
 import os
 import pandas as pd
@@ -61,5 +62,4 @@ def run_server(data_dir: str, port=8000):
   uvicorn.run(app, host="127.0.0.1", port=port, log_level='warning')
 
 if __name__=='__main__':
-  p = Process(target=run_server, args=["/home/akash/Documents/aidb-new/tests/data/jackson"])
-  p.start()
+  run_server(sys.argv[1])

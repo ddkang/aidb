@@ -6,6 +6,7 @@ import tqdm
 import pandas as pd
 import sqlalchemy.ext.asyncio
 from sqlalchemy.schema import ForeignKeyConstraint
+from sqlalchemy.sql import text
 
 from aidb.config.config_types import Column, InferenceBinding, Table
 from aidb.inference.inference_service import InferenceService
@@ -169,24 +170,32 @@ class CachedBoundInferenceService(BoundInferenceService):
         await conn.run_sync(lambda conn: tmp_df.to_sql(table, conn, if_exists='append', index=False))
 
 
+  async def _check_inputs_in_cache_table(self, inputs: pd.DataFrame, conn):
+    """
+    checks the presence of inputs in the cache table
+    """
+    cache_entries = await conn.run_sync(lambda conn: pd.read_sql(text(str(self._cache_query_stub.compile())), conn))
+    cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
+    normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
+                             self._cache_columns]
+    is_in_cache = []
+    if len(normalized_cache_cols) == 1:
+      for ind, row in inputs.iterrows():
+        is_in_cache.append(row[normalized_cache_cols[0]] in cache_entries.index)
+    else:
+      for ind, row in inputs.iterrows():
+        is_in_cache.append(tuple([row[col] for col in normalized_cache_cols]) in cache_entries.index)
+    return is_in_cache
+
+
   async def infer(self, inputs: pd.DataFrame):
     # FIXME: figure out where to put the column renaming
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
 
     # Note: the input columns are assumed to be in order
-    query_futures = []
     async with self._engine.begin() as conn:
-      for ind, row in inputs.iterrows():
-        cache_query = self._cache_query_stub.where(
-          sqlalchemy.sql.and_(
-            *[col == pandas_dtype_to_native_type(row[self.convert_cache_column_name_to_normalized_column_name(col.name)]) for idx, col in enumerate(self._cache_columns)]
-          )
-        )
-        query_futures.append(conn.execute(cache_query))
-      query_futures = await asyncio.gather(*query_futures)
-      is_in_cache = [len(result.fetchall()) > 0 for result in query_futures]
-
+      is_in_cache = await self._check_inputs_in_cache_table(inputs, conn)
       results = []
       records_to_insert_in_table = []
       inputs_to_insert_in_cache_table = []
