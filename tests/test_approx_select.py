@@ -28,6 +28,8 @@ logger.addHandler(file_handler)
 DB_URL = 'sqlite+aiosqlite://'
 DATA_SET = 'law'
 BUDGET = 5000
+RECALL_TARGET = 90
+
 # DB_URL = 'mysql+aiomysql://aidb:aidb@localhost'
 class LimitEngineTests(IsolatedAsyncioTestCase):
 
@@ -56,12 +58,11 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     for i in range(100):
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir, tasti)
 
-      RECALL_TARGET = 80
       register_inference_services(aidb_engine, data_dir)
       queries = [
         (
-          f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON' 
-              RECALL_TARGET {RECALL_TARGET} CONFIDENCE 95%;''',
+          f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON'
+              RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
           '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
         ),
       ]
@@ -74,9 +75,10 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
         async with gt_engine.begin() as conn:
           gt_res = await conn.execute(text(exact_query))
           gt_res = gt_res.fetchall()
-        print(len(aidb_res), len(gt_res), len(aidb_res) / len(gt_res))
+
         if len(aidb_res) / len(gt_res) > RECALL_TARGET / 100:
           count += 1
+
       logging.info(f'aidb: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
                    f' Runs:{i + 1}, Count: {count}')
 

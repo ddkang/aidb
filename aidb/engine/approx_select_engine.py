@@ -56,15 +56,11 @@ class ApproxSelectEngine(TastiEngine):
           conn
       )
 
-      satisfied_sampled_index = list(set(satisfied_sampled_results.index).intersection(set(sampled_df.index)))
-      satisfied_sampled_results = satisfied_sampled_results.loc[satisfied_sampled_index]
       satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
       sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
 
-      all_sampled_index = list(set(all_sampled_results.index).intersection(set(sampled_df.index)))
+      no_result_length = BUDGET - len(sampled_df.loc[list(set(all_sampled_results.index))])
 
-      no_result_length = BUDGET - len(sampled_df.loc[all_sampled_index])
-      all_sampled_results = all_sampled_results.loc[all_sampled_index]
       all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
 
       total_length = no_result_length + len(all_sampled_results)
@@ -131,13 +127,30 @@ class ApproxSelectEngine(TastiEngine):
     new_exp = no_aqp_query.add_join(new_exp, f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}')
     new_query = Query(new_exp.sql(), self._config)
 
-    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(new_query.base_sql_no_where.sql()), conn))
+    table_columns = [f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}']
+    sampled_df = pd.DataFrame({VECTOR_ID_COLUMN: sampled_index})
 
+    all_query_exp, _ = self.add_filter_key_into_query(
+        table_columns,
+        sampled_df,
+        new_query,
+        new_query.base_sql_no_where
+    )
+
+    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(all_query_exp.sql()), conn))
     # drop duplicated columns, this will happen when 'select *'
     all_df = all_df.loc[:, ~all_df.columns.duplicated()]
     all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(new_query.sql_query_text), conn))
+    sample_query_exp, _ = self.add_filter_key_into_query(
+        table_columns,
+        sampled_df,
+        new_query,
+        new_query.get_expression()
+    )
+
+    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_query_exp.sql()), conn))
+    # drop duplicated columns, this will happen when 'select *'
     res_df = res_df.loc[:, ~res_df.columns.duplicated()]
     res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
