@@ -1,8 +1,10 @@
 name: Run Tests
 
 on:
-  push: {}  # Remove the branch restriction to trigger the workflow for any branch
-
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
 jobs:
   test:
     runs-on: ubuntu-latest
