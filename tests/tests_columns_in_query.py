@@ -35,7 +35,7 @@ class ColumnsInQueryTests(IsolatedAsyncioTestCase):
                        ]
     for query, ground_truth in test_query_list:
       q = Query(query, aidb_engine._config)
-      columns_in_query = q.columns_in_query
+      columns_in_query = q.columns_in_query_recursive
       assert len(columns_in_query) == ground_truth
     del aidb_engine
 

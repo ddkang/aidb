@@ -1,15 +1,19 @@
 from dataclasses import dataclass
-from typing import Any, Union
+from enum import Enum
+from typing import Any, Union, List
 
 import sqlalchemy
 import sqlglot.expressions as exp
 
+class ExpressionType(Enum):
+  COLUMN = "column"
+  LITERAL = "literal"
+  SUBQUERY = "subquery"
 
 @dataclass
 class Expression:
-  type: str  # column or literal
+  type: ExpressionType  # column, literal, or select
   value: Any  # if column then, table.column form
-
 
 @dataclass
 class FilteringClause:
@@ -17,8 +21,7 @@ class FilteringClause:
   op: exp
   left_exp: Expression
   # in case of boolean column, right expression can be none
-  right_exp: Union[Expression, None]
-
+  right_exp: Union[Expression, List[Expression], None]
 
 @dataclass
 class FilteringPredicate:
@@ -50,15 +53,19 @@ def get_expr_string(node):
     return "LIKE"
   elif node == exp.NEQ:
     return "!="
+  elif node == exp.In:
+    return "IN"
   else:
     raise NotImplementedError
 
 
 def predicate_to_str(p: FilteringClause):
-  def exp_to_str(e: Expression):
-    if e.type == "column":
+  def exp_to_str(e: Union[Expression, List[Expression]]):
+    if isinstance(e, list):
+      return "(" + ", ".join([str(exp_to_str(x)) for x in e]) + ")"
+    elif e.type == ExpressionType.COLUMN:
       return e.value
-    elif e.type == "literal":
+    elif e.type == ExpressionType.LITERAL:
       try:
         val = float(e.value)
         if '.' in e.value:
@@ -67,6 +74,8 @@ def predicate_to_str(p: FilteringClause):
           return int(val)
       except ValueError:
         return f"'{e.value}'"
+    elif e.type == ExpressionType.SUBQUERY:
+      return f"({e.value.sql_query_text})"
     else:
       raise NotImplementedError
 
@@ -77,19 +86,3 @@ def predicate_to_str(p: FilteringClause):
   if p.is_negation:
     sql_expr = "NOT " + sql_expr
   return sql_expr
-
-
-def extract_column_or_value(node):
-  """
-  return a tuple containing if this is column or literal
-  :param node:
-  :return:
-  """
-  if isinstance(node, exp.Paren):
-    return extract_column_or_value(node.args["this"])
-  elif isinstance(node, exp.Column):
-    return ("column", node)
-  elif isinstance(node, exp.Literal) or isinstance(node, exp.Boolean):
-    return ("literal", node.args["this"])
-  else:
-    raise Exception("Not Supported Yet")

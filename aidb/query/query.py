@@ -2,9 +2,10 @@ import copy
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import sqlglot.expressions as exp
+from sqlglot.helper import ensure_list
 from sqlglot.rewriter import Rewriter
 from sqlglot import Parser, Tokenizer, parse_one
 from sympy import sympify
@@ -13,7 +14,7 @@ from sympy.logic.boolalg import to_cnf
 from aidb.config.config import Config
 from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
                               change_literal_type_to_col_type,
-                              extract_column_or_value)
+                              ExpressionType)
 
 
 def is_aqp_exp(node):
@@ -106,12 +107,29 @@ class Query(object):
 
   @cached_property
   def tables_in_query(self):
+    # does NOT include tables in subqueries
+    table_list = set()
+    queue = [(self._expression, self._expression.parent, None)]
+    while queue:
+      item, parent, key = queue.pop()
+      if isinstance(item, exp.Table):
+        table_list.add(item.args["this"].args["this"])
+      elif isinstance(item, exp.Expression):
+        for k, v in item.args.items():
+          nodes = ensure_list(v)
+          for node in nodes:
+            if not isinstance(node, exp.Select):
+              queue.append((node, item, k))
+    return table_list
+
+  @cached_property
+  def tables_in_query_recursive(self):
+    # includes tables in subqueries
     table_list = set()
     for node, _, _ in self._expression.walk():
       if isinstance(node, exp.Table):
         table_list.add(node.args["this"].args["this"])
     return table_list
-
 
   def _get_predicate_name(self, predicate_count):
     predicate_name = f"P{predicate_count}"
@@ -141,6 +159,11 @@ class Query(object):
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
       return f"({e1} | {e2})", p2
+    elif isinstance(node, exp.In):
+      assert "this" in node.args
+      predicate_name = self._get_predicate_name(predicate_count)
+      predicate_mappings[predicate_name] = node
+      return predicate_name, predicate_count + 1
     elif isinstance(node, exp.GT) or \
             isinstance(node, exp.LT) or \
             isinstance(node, exp.GTE) or \
@@ -187,6 +210,30 @@ class Query(object):
       or_expressions_connected_by_ands_repr.append(connected_by_ors)
     return or_expressions_connected_by_ands_repr
 
+  def _extract_expression(self, node):
+    if isinstance(node, exp.Paren):
+      return self._extract_expression(node.args["this"])
+    elif isinstance(node, exp.Column):
+      return Expression(ExpressionType.COLUMN, self._get_normalized_col_name_from_col_exp(node))
+    elif isinstance(node, exp.Literal) or isinstance(node, exp.Boolean):
+      return Expression(ExpressionType.LITERAL, node.args["this"])
+    elif isinstance(node, exp.Select):
+      return Expression(ExpressionType.SUBQUERY, Query(node.sql(), self.config))
+    else:
+      raise Exception("Not Supported Yet")
+
+  def _unify_type(self, e1: Expression, e2: Expression):
+    if e1.type == ExpressionType.LITERAL and e2.type == ExpressionType.COLUMN:
+      t_name, c_name = e2.value.split('.')
+      e1.value = change_literal_type_to_col_type(self._tables[t_name][c_name], e1.value)
+      # change compare_value_2 to float or int
+    elif e2.type == ExpressionType.LITERAL and e1.type == ExpressionType.COLUMN:
+      t_name, c_name = e1.value.split('.')
+      e2.value = change_literal_type_to_col_type(self._tables[t_name][c_name], e2.value)
+    elif e1.type == ExpressionType.LITERAL and e2.type == ExpressionType.LITERAL:
+      # both left and right cannot be literals
+      raise Exception("Comparisons among literals not supported in filtering predicate")
+    return e1, e2
 
   @cached_property
   def filtering_predicates(self) -> List[List[FilteringClause]]:
@@ -223,33 +270,25 @@ class Query(object):
             # in case of boolean type columns
             column_name = self._get_normalized_col_name_from_col_exp(fp.predicate)
             or_connected_clauses.append(
-              FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
-          else:
-            t1, v1 = extract_column_or_value(fp.predicate.args["this"])
-            t2, v2 = extract_column_or_value(fp.predicate.args["expression"])
-            if t1 == "column":
-              left_value = self._get_normalized_col_name_from_col_exp(v1)
-            else:
-              left_value = v1
-            if t2 == "column":
-              right_value = self._get_normalized_col_name_from_col_exp(v2)
-            else:
-              right_value = v2
-
-            if t1 == "literal" and t2 == "column":
-              t_name, c_name = right_value.split('.')
-              left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
-              # change compare_value_2 to float or int
-            elif t2 == "literal" and t1 == "column":
-              t_name, c_name = left_value.split('.')
-              right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
-            elif t1 == "literal" and t2 == "literal":
-              # both left and right cannot be literals
-              raise Exception("Comparisons among literals not supported in filtering predicate")
+              FilteringClause(fp.is_negation, exp.Column, Expression(ExpressionType.COLUMN, column_name), None))
+          elif isinstance(fp.predicate, exp.Binary):
+            e1 = self._extract_expression(fp.predicate.args["this"])
+            e2 = self._extract_expression(fp.predicate.args["expression"])
+            e1, e2 = self._unify_type(e1, e2)
 
             or_connected_clauses.append(
-              FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
-                              Expression(t2, right_value)))
+              FilteringClause(fp.is_negation, type(fp.predicate), e1, e2))
+          elif isinstance(fp.predicate, exp.In):
+            e1 = self._extract_expression(fp.predicate.args["this"])
+            if "expressions" in fp.predicate.args:
+              right_value = [self._unify_type(e1, self._extract_expression(e))[1] for e in fp.predicate.args["expressions"]]
+            elif "query" in fp.predicate.args:
+              right_value = Expression(ExpressionType.SUBQUERY, Query(fp.predicate.args["query"].sql(), self.config))
+            else:
+              raise Exception("Unsupported IN clause")
+            or_connected_clauses.append(
+              FilteringClause(fp.is_negation, exp.In, e1, right_value))
+            pass
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
@@ -284,6 +323,10 @@ class Query(object):
       table_name = self._get_table_of_column(node.args["this"].args["this"])
     return f"{table_name}.{node.args['this'].args['this']}"
 
+  def _resolve_inference_service_from_column(self, col_name, inference_engines_required: Set[str]):
+    originated_from = self.config.columns_to_root_column.get(col_name, col_name)
+    if originated_from in self.config.column_by_service:
+      inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
 
   @cached_property
   def inference_engines_required_for_filtering_predicates(self):
@@ -296,19 +339,23 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       inference_engines_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
-                                                                   or_connected_predicate.left_exp.value)
-          if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
-        if or_connected_predicate.right_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
-                                                                   or_connected_predicate.right_exp.value)
-          if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+        if or_connected_predicate.left_exp.type == ExpressionType.COLUMN:
+          self._resolve_inference_service_from_column(or_connected_predicate.left_exp.value, inference_engines_required)
+        elif or_connected_predicate.left_exp.type == ExpressionType.SUBQUERY:
+          inference_engines_required.update(*or_connected_predicate.left_exp.value.inference_engines_required_for_filtering_predicates)
+
+        if isinstance(or_connected_predicate.right_exp, list):  # WHERE IN clause
+          for exp in or_connected_predicate.right_exp:
+            if exp.type == ExpressionType.COLUMN:
+              self._resolve_inference_service_from_column(exp.value, inference_engines_required)
+            elif exp.type == ExpressionType.SUBQUERY:
+              inference_engines_required.update(*exp.value.inference_engines_required_for_query)
+        elif or_connected_predicate.right_exp.type == ExpressionType.COLUMN:
+          self._resolve_inference_service_from_column(or_connected_predicate.right_exp.value.inference_engines_required_for_filtering_predicates)
+        elif or_connected_predicate.right_exp.type == ExpressionType.SUBQUERY:
+          inference_engines_required.update(*or_connected_predicate.right_exp.value.inference_engines_required_for_filtering_predicates)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
-
 
   @cached_property
   def tables_in_filtering_predicates(self):
@@ -321,35 +368,58 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       tables_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
+        if or_connected_predicate.left_exp.type == ExpressionType.COLUMN:
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
                                                                    or_connected_predicate.left_exp.value)
           tables_required.add(originated_from.split('.')[0])
-        if or_connected_predicate.right_exp.type == "column":
+        elif or_connected_predicate.left_exp.type == ExpressionType.SUBQUERY:
+          tables_required.update(or_connected_predicate.left_exp.value.tables_in_query_recursive)
+
+        if isinstance(or_connected_predicate.right_exp, list):  # WHERE IN clause
+          for exp in or_connected_predicate.right_exp:
+            if exp.type == ExpressionType.COLUMN:
+              originated_from = self.config.columns_to_root_column.get(exp.value, exp.value)
+              tables_required.add(originated_from.split('.')[0])
+            elif exp.type == ExpressionType.SUBQUERY:
+              tables_required.update(exp.value.tables_in_query_recursive)
+        elif or_connected_predicate.right_exp.type == ExpressionType.COLUMN:
           originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
                                                                    or_connected_predicate.right_exp.value)
           tables_required.add(originated_from.split('.')[0])
+        elif or_connected_predicate.right_exp.type == ExpressionType.SUBQUERY:
+          tables_required.update(or_connected_predicate.right_exp.value.tables_in_query_recursive)
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 
 
   @cached_property
-  def columns_in_query(self):
+  def columns_in_query_recursive(self):
     """
     nested queries are not supported for the time being
     * is supported
     """
     column_set = set()
-    for node, _, _ in self._expression.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          column_set.add(self._get_normalized_col_name_from_col_exp(node))
-        elif isinstance(node.args['this'], exp.Star):
+
+    queue = [(self._expression, self._expression.parent, None)]
+    while queue:
+      item, parent, key = queue.pop()
+      if isinstance(item, exp.Column):
+        if isinstance(item.args['this'], exp.Identifier):
+          column_set.add(self._get_normalized_col_name_from_col_exp(item))
+        elif isinstance(item.args['this'], exp.Star):
           for table in self.tables_in_query:
             for col, _ in self._tables[table].items():
               column_set.add(f"{table}.{col}")
         else:
           raise Exception('Unsupported column type')
+      elif isinstance(item, exp.Expression):
+        for k, v in item.args.items():
+          nodes = ensure_list(v)
+          for node in nodes:
+            if not isinstance(node, exp.Select):
+              queue.append((node, item, k))
+            else:
+              column_set.update(Query(node.sql(), self.config).columns_in_query_recursive)
     return column_set
 
 
@@ -358,7 +428,7 @@ class Query(object):
     """
     Inference services required for sql query, will return a list of inference service
     """
-    visited = self.columns_in_query.copy()
+    visited = self.columns_in_query_recursive.copy()
     stack = list(visited)
     inference_engines_required = set()
 
