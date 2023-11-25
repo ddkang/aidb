@@ -98,7 +98,7 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
 
       assert len(gt_res) == len(aidb_res)
 
-      # Sort by first element of tuple in list
+      # Sort results
       gt_res = sorted(gt_res)
       aidb_res = sorted(aidb_res)
 
