@@ -57,6 +57,9 @@ jobs:
     - name: Run Twitter Full Scan Tests
       run: python3 -m tests.tests_full_scan_engine_twitter
 
+    - name: Run Full Scan Tests for nested queries
+      run: python3 -m tests.tests_full_scan_nested_query
+
     # - name: Run aggregation query tests
     #   run: python3 -m tests.test_aggregation
 
