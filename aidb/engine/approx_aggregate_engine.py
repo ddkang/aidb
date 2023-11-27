@@ -88,6 +88,8 @@ class ApproximateAggregateEngine(FullScanEngine):
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
     agg_index = 0
     estimates = []
+    alpha = (1. - (query.confidence / 100.)) / query.num_aggregations
+    conf = 1. - alpha
     for agg_type, columns_per_agg in query.aggregated_columns_and_types:
       estimator = self._get_estimator(agg_type)
       for _ in columns_per_agg:
@@ -95,7 +97,7 @@ class ApproximateAggregateEngine(FullScanEngine):
             estimator.estimate(
                 sample_results,
                 _NUM_PILOT_SAMPLES + num_samples,
-                query.confidence / 100.,
+                conf,
                 agg_index
             ).estimate
         )
@@ -244,15 +246,15 @@ class ApproximateAggregateEngine(FullScanEngine):
       agg_index: int
   ) -> int:
     error_target = query.error_target
-    conf = query.confidence / 100.
-    alpha = 1. - conf
+    alpha = (1. - (query.confidence / 100.)) / query.num_aggregations
+    conf = 1. - alpha
     pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf, agg_index)
 
     if agg_type == exp.Avg:
       p_lb = statsmodels.stats.proportion.proportion_confint(
         len(sample_results),
         _NUM_PILOT_SAMPLES,
-        alpha / query.num_aggregations
+        alpha
       )[0]
     else:
       p_lb = 1

@@ -83,9 +83,9 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
     for aidb_item, gt_item in zip(aidb_res, gt_res):
       relative_diff = abs(aidb_item - gt_item) / (gt_item)
       print(f'% error: {relative_diff * 100}')
-      if relative_diff <= error_target:
-        return True
-    return False
+      if relative_diff > error_target:
+        return False
+    return True
 
 
   async def test_agg_query(self):
