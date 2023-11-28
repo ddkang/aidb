@@ -497,7 +497,7 @@ class Query(object):
 
 
   @cached_property
-  def oracle_bughet(self):
+  def oracle_budget(self):
     oracle_budget = self._get_keyword_arg(exp.Budget)
     return oracle_budget if oracle_budget else None
 
@@ -509,14 +509,12 @@ class Query(object):
     return self.recall_target is not None
 
 
+  @cached_property
   def is_valid_approx_select_query(self):
-    if self.oracle_bughet:
-      raise Exception('Apporx select recall query should not contain budget')
-
-    if not self.confidence:
-      raise Exception('Approx select query should contain confidence')
-
-    return True
+    if self.oracle_budget or self.confidence is None:
+      return False
+    else:
+      return True
 
 
   @cached_property

@@ -7,6 +7,7 @@ from sqlalchemy.sql import text
 import time
 
 from aidb.utils.asyncio import asyncio_run
+from aidb.utils.logger import logger
 from aidb.vector_database.tasti import Tasti
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from tests.inference_service_utils.inference_service_setup import register_inference_services
@@ -14,10 +15,10 @@ from tests.inference_service_utils.http_inference_service_setup import run_serve
 from tests.utils import setup_gt_and_aidb_engine
 
 
-logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-file_handler = logging.FileHandler('approx_selection.log')
+
+file_handler = logging.FileHandler('approx_select_parallel.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
@@ -64,10 +65,10 @@ async def test_jackson_number_objects(i):
   ]
 
   for aidb_query, exact_query in queries:
-    print(f'Running query {aidb_query} in approx select engine')
+    logger.info(f'Running query {aidb_query} in approx select engine')
     aidb_res = aidb_engine.execute(aidb_query)
 
-    print(f'Running query {exact_query} in ground truth database')
+    logger.info(f'Running query {exact_query} in ground truth database')
     async with gt_engine.begin() as conn:
       gt_res = await conn.execute(text(exact_query))
       gt_res = gt_res.fetchall()
@@ -75,8 +76,8 @@ async def test_jackson_number_objects(i):
     if len(aidb_res) / len(gt_res) > RECALL_TARGET / 100:
       count += 1
 
-  logging.info(f'aidb: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
-               f' port:{i}, Count: {count}')
+  logger.info(f'AIDB_res: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
+              f' port:{i}, Count: {count}')
   del gt_engine
   del aidb_engine
   p.terminate()

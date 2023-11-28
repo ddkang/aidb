@@ -9,6 +9,7 @@ from typing import List
 from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
 from aidb.utils.constants import VECTOR_ID_COLUMN
+from aidb.utils.logger import logger
 
 PROXY_SCORE = 'proxy_score'
 MASS = 'mass'
@@ -33,62 +34,6 @@ class ApproxSelectEngine(TastiEngine):
         min_score = min(min_score, max_score)
       proxy_score_all_blobs[idx] = min_score
     return pd.Series(proxy_score_all_blobs, index=score_for_all_df.index)
-
-
-  async def execute_approx_select_query(self, query: Query):
-    query.is_valid_approx_select_query()
-    # generate proxy score for each blob
-    score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
-
-    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
-
-    dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
-
-    # This is used for parallel test
-    seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
-    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT, random_state=seed)
-
-
-    async with self._sql_engine.begin() as conn:
-      satisfied_sampled_results, all_sampled_results = await self.get_inference_results(
-          query,
-          list(sampled_df.index),
-          conn
-      )
-
-      satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
-      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
-
-      no_result_length = BUDGET - len(sampled_df.loc[list(set(all_sampled_results.index))])
-
-      all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
-
-      total_length = no_result_length + len(all_sampled_results)
-
-      recall_target = query.recall_target
-      confidence = query.confidence / 100
-      tau_modified = self.tau_modified(
-          sorted_satisfied_sampled_results,
-          recall_target,
-          confidence,
-          total_length
-      )
-
-      R1 = sorted_satisfied_sampled_results.index
-      R2 = dataset[dataset[PROXY_SCORE] >= tau_modified].index
-
-      additional_samples = list(set(R1).union(set(R2)))
-
-      print('num_samples', len(additional_samples))
-      logging.info(f'num_samples: {len(additional_samples)}')
-
-      additional_satisfied_sampled_results,  additional_all_sampled_results = await self.get_inference_results(
-          query,
-          additional_samples,
-          conn
-      )
-
-    return additional_satisfied_sampled_results
 
 
   async def get_inference_results(self, query:Query, sampled_index: List[int], conn):
@@ -220,5 +165,61 @@ class ApproxSelectEngine(TastiEngine):
       satisfied_sampled_results
     )
 
-    logging.info(f'modified_tau: {modified_tau}')
+    logger.info(f'modified_tau: {modified_tau}')
     return modified_tau
+
+
+  async def execute_approx_select_query(self, query: Query):
+    if not query.is_valid_approx_select_query:
+      raise Exception('Approx select query should contain Confidence and should not contain Budget.')
+
+    # generate proxy score for each blob
+    score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
+
+    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
+
+    dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
+
+    # This is used for parallel test
+    seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
+    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT, random_state=seed)
+
+    async with self._sql_engine.begin() as conn:
+      satisfied_sampled_results, all_sampled_results = await self.get_inference_results(
+          query,
+          list(sampled_df.index),
+          conn
+      )
+
+      satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
+      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
+
+      no_result_length = BUDGET - len(sampled_df.loc[list(set(all_sampled_results.index))])
+
+      all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
+
+      total_length = no_result_length + len(all_sampled_results)
+
+      recall_target = query.recall_target
+      confidence = query.confidence / 100
+      tau_modified = self.tau_modified(
+          sorted_satisfied_sampled_results,
+          recall_target,
+          confidence,
+          total_length
+      )
+
+      R1 = sorted_satisfied_sampled_results.index
+      R2 = dataset[dataset[PROXY_SCORE] >= tau_modified].index
+
+      additional_samples = list(set(R1).union(set(R2)))
+
+      logger.info(f'num_samples: {len(additional_samples)}')
+
+      additional_satisfied_sampled_results,  additional_all_sampled_results = await self.get_inference_results(
+          query,
+          additional_samples,
+          conn
+      )
+
+    return additional_satisfied_sampled_results
