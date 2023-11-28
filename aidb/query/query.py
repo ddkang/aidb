@@ -504,14 +504,13 @@ class Query(object):
 
   @cached_property
   def is_approx_select_query(self):
-    return self.recall_target or self.precision_target
+    if self.precision_target is not None:
+      raise Exception("We haven't support approx select query with precision target.")
+    return self.recall_target is not None
 
 
   def is_valid_approx_select_query(self):
-    if self.recall_target and self.precision_target:
-      raise Exception('Both recall_target and precision_target found')
-
-    if self.recall_target and self.oracle_bughet:
+    if self.oracle_bughet:
       raise Exception('Apporx select recall query should not contain budget')
 
     if not self.confidence:
@@ -593,7 +592,6 @@ class Query(object):
     this query will return the expression of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
     '''
 
-    # FIXME: decide if we need in-place modification
     expression = self._expression.copy()
     for node, _, _ in expression.walk():
       if isinstance(node, exp.Column):

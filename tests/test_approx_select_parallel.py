@@ -64,7 +64,7 @@ async def test_jackson_number_objects(i):
   ]
 
   for aidb_query, exact_query in queries:
-    print(f'Running query {aidb_query} in limit engine')
+    print(f'Running query {aidb_query} in approx select engine')
     aidb_res = aidb_engine.execute(aidb_query)
 
     print(f'Running query {exact_query} in ground truth database')

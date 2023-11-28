@@ -1,18 +1,19 @@
 import logging
-from multiprocessing import Process
 import multiprocessing as mp
 import numpy as np
 import os
 import pandas as pd
-from sqlalchemy.sql import text
 import time
 import unittest
+
+from sqlalchemy.sql import text
 from unittest import IsolatedAsyncioTestCase
 
-from aidb.vector_database.tasti import Tasti
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from tests.inference_service_utils.inference_service_setup import register_inference_services
+from aidb.vector_database.tasti import Tasti
+
 from tests.inference_service_utils.http_inference_service_setup import run_server
+from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.utils import setup_gt_and_aidb_engine
 
 logger = logging.getLogger()
@@ -37,7 +38,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, f'data/{DATA_SET}')
-    p = Process(target=run_server, args=[str(data_dir)])
+    p = mp.Process(target=run_server, args=[str(data_dir)])
     p.start()
     time.sleep(1)
 
@@ -68,7 +69,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
       ]
 
       for aidb_query, exact_query in queries:
-        print(f'Running query {aidb_query} in limit engine')
+        print(f'Running query {aidb_query} in approx select engine')
         aidb_res = aidb_engine.execute(aidb_query)
 
         print(f'Running query {exact_query} in ground truth database')
