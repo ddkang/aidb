@@ -1,4 +1,3 @@
-import logging
 import math
 import multiprocessing as mp
 import numpy as np
@@ -11,10 +10,11 @@ from aidb.query.query import Query
 from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.logger import logger
 
-PROXY_SCORE = 'proxy_score'
-MASS = 'mass'
-WEIGHT = 'weight'
 BUDGET = 10000
+MASS = 'mass'
+PROXY_SCORE = 'proxy_score'
+SEED = 'seed'
+WEIGHT = 'weight'
 
 class ApproxSelectEngine(TastiEngine):
   # TODO: design a better algorithm, this function is same as the function in Limit Engine
@@ -95,7 +95,8 @@ class ApproxSelectEngine(TastiEngine):
     )
 
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_query_exp.sql()), conn))
-    # drop duplicated columns, this will happen when 'select *'
+    # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
+    # So we need to drop duplicated columns
     res_df = res_df.loc[:, ~res_df.columns.duplicated()]
     res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
@@ -169,7 +170,7 @@ class ApproxSelectEngine(TastiEngine):
     return modified_tau
 
 
-  async def execute_approx_select_query(self, query: Query):
+  async def execute_approx_select_query(self, query: Query, **kwargs):
     if not query.is_valid_approx_select_query:
       raise Exception('Approx select query should contain Confidence and should not contain Budget.')
 
@@ -180,8 +181,10 @@ class ApproxSelectEngine(TastiEngine):
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
 
-    # This is used for parallel test
-    seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
+    if SEED in kwargs:
+      seed = kwargs[SEED]
+    else:
+      seed = None
     sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT, random_state=seed)
 
     async with self._sql_engine.begin() as conn:
@@ -209,17 +212,17 @@ class ApproxSelectEngine(TastiEngine):
           total_length
       )
 
-      R1 = sorted_satisfied_sampled_results.index
-      R2 = dataset[dataset[PROXY_SCORE] >= tau_modified].index
+      pilot_sample_index = sorted_satisfied_sampled_results.index
+      additional_sample_index = dataset[dataset[PROXY_SCORE] >= tau_modified].index
 
-      additional_samples = list(set(R1).union(set(R2)))
+      all_selected_blob = list(set(pilot_sample_index).union(set(additional_sample_index)))
 
-      logger.info(f'num_samples: {len(additional_samples)}')
+      logger.info(f'num_samples: {len(all_selected_blob)}')
 
-      additional_satisfied_sampled_results,  additional_all_sampled_results = await self.get_inference_results(
+      all_satisfied_sampled_results, _ = await self.get_inference_results(
           query,
-          additional_samples,
+          all_selected_blob,
           conn
       )
 
-    return additional_satisfied_sampled_results
+    return all_satisfied_sampled_results
