@@ -10,10 +10,10 @@ from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.logger import logger
 
 BUDGET = 10000
-MASS = 'mass'
-PROXY_SCORE = 'proxy_score'
-SEED = 'seed'
-WEIGHT = 'weight'
+MASS_COL_NAME = 'mass'
+PROXY_SCORE_COL_NAME = 'proxy_score'
+SEED_PARAMETER = 'seed'
+WEIGHT_COL_NAME = 'weight'
 
 class ApproxSelectEngine(TastiEngine):
   # TODO: design a better algorithm, this function is same as the function in Limit Engine
@@ -108,9 +108,9 @@ class ApproxSelectEngine(TastiEngine):
     mass = 1 / len(weights) / normalized_weights
 
     dataset = pd.DataFrame({
-        PROXY_SCORE: proxy_score_for_all_blobs.values,
-        WEIGHT: normalized_weights,
-        MASS: mass},
+        PROXY_SCORE_COL_NAME: proxy_score_for_all_blobs.values,
+        WEIGHT_COL_NAME: normalized_weights,
+        MASS_COL_NAME: mass},
         index=proxy_score_for_all_blobs.index
     )
 
@@ -122,9 +122,9 @@ class ApproxSelectEngine(TastiEngine):
     recall_score = 0
 
     for index, blob in satisfied_sampled_results.iterrows():
-      recall_score += blob[MASS]
+      recall_score += blob[MASS_COL_NAME]
       if recall_score >= recall_target:
-        estimated_tau = blob[PROXY_SCORE]
+        estimated_tau = blob[PROXY_SCORE_COL_NAME]
         break
     return estimated_tau
 
@@ -137,12 +137,12 @@ class ApproxSelectEngine(TastiEngine):
 
 
   def tau_modified(self, satisfied_sampled_results, recall_target, confidence, total_length):
-    z = satisfied_sampled_results[MASS]
+    z = satisfied_sampled_results[MASS_COL_NAME]
     estimated_tau = self.tau_estimate(
       recall_target * sum(z),
       satisfied_sampled_results
     )
-    positive_length = len(satisfied_sampled_results[satisfied_sampled_results[PROXY_SCORE] >= estimated_tau])
+    positive_length = len(satisfied_sampled_results[satisfied_sampled_results[PROXY_SCORE_COL_NAME] >= estimated_tau])
 
     estimated_z1 = list(z[:positive_length]) + [0] * (total_length - len(z[:positive_length]))
     estimated_z2 = list(z[positive_length:]) + [0] * (total_length - len(z[positive_length:]))
@@ -180,11 +180,11 @@ class ApproxSelectEngine(TastiEngine):
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
 
-    if SEED in kwargs:
-      seed = kwargs[SEED]
+    if SEED_PARAMETER in kwargs:
+      seed = kwargs[SEED_PARAMETER]
     else:
       seed = None
-    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT, random_state=seed)
+    sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT_COL_NAME, random_state=seed)
 
     async with self._sql_engine.begin() as conn:
       satisfied_sampled_results, all_sampled_results = await self.get_inference_results(
@@ -194,7 +194,7 @@ class ApproxSelectEngine(TastiEngine):
       )
 
       satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
-      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE, ascending=False)
+      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE_COL_NAME, ascending=False)
 
       no_result_length = BUDGET - len(sampled_df.loc[list(set(all_sampled_results.index))])
 
@@ -212,7 +212,7 @@ class ApproxSelectEngine(TastiEngine):
       )
 
       pilot_sample_index = sorted_satisfied_sampled_results.index
-      additional_sample_index = dataset[dataset[PROXY_SCORE] >= tau_modified].index
+      additional_sample_index = dataset[dataset[PROXY_SCORE_COL_NAME] >= tau_modified].index
 
       all_selected_blob = list(set(pilot_sample_index).union(set(additional_sample_index)))
 
