@@ -333,42 +333,48 @@ class Query(object):
     return tables_required_predicates
 
 
-  def _get_columns_in_expression_tree(self, exp_tree):
-    '''
-    Return column_set of columns in query and
-    ordered list of columns, expression wise
-    eg: SELECT AVG(col1), COUNT(*) FROM table1;
-        column_set = {col1, col2, col3, col4}
-        exp_wise_columns = [[col1], [col1, col2, col3, col4]]
-    '''
-    column_set = set()
-    exp_wise_columns = []
-    for node, _, _ in exp_tree.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          normalized_col = self._get_normalized_col_name_from_col_exp(node)
-          column_set.add(normalized_col)
-          exp_wise_columns.append([normalized_col])
-        elif isinstance(node.args['this'], exp.Star):
-          for table in self.tables_in_query:
-            all_cols = []
-            for col, _ in self._tables[table].items():
-              table_column = f"{table}.{col}"
-              column_set.add(table_column)
-              all_cols.append(table_column)
-            exp_wise_columns.append(all_cols)
-        else:
-          raise Exception('Unsupported column type')
-    return column_set, exp_wise_columns
-
-
   @cached_property
   def columns_in_query(self):
     """
     nested queries are not supported for the time being
     * is supported
     """
-    return self._get_columns_in_expression_tree(self._expression)[0]
+    column_set = set()
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          column_set.add(self._get_normalized_col_name_from_col_exp(node))
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            for col, _ in self._tables[table].items():
+              column_set.add(f"{table}.{col}")
+        else:
+          raise Exception('Unsupported column type')
+    return column_set
+
+
+  def _get_columns_in_expression_tree(self, exp_tree):
+    '''
+    Return ordered list of columns, expression wise
+    eg: SELECT AVG(col1), COUNT(*) FROM table1;
+        exp_wise_columns = [[col1], [col1, col2, col3, col4]]
+    '''
+    exp_wise_columns = []
+    for node, _, _ in exp_tree.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          normalized_col = self._get_normalized_col_name_from_col_exp(node)
+          exp_wise_columns.append([normalized_col])
+        elif isinstance(node.args['this'], exp.Star):
+          for table in self.tables_in_query:
+            all_cols = []
+            for col, _ in self._tables[table].items():
+              table_column = f"{table}.{col}"
+              all_cols.append(table_column)
+            exp_wise_columns.append(all_cols)
+        else:
+          raise Exception('Unsupported column type')
+    return exp_wise_columns
 
 
   # Get aggregation types with columns corresponding
@@ -380,13 +386,16 @@ class Query(object):
     eg: SELECT avg(column1) from table1;
     agg_type_with_cols = [(exp.Avg, [[column1]])]
     SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
-    agg_type_with_cols = [(exp.Avg, [[col1], [col2]])
-            (exp.Count, [[col1, col2, col3, col4]])]
+    agg_type_with_cols = [
+            (exp.Avg, [[col1]])
+            (exp.Count, [[col1, col2, col3, col4]]),
+            (exp.Avg, [col2])
+          ]
     '''
     select_exp = self.base_sql_no_aqp.args['expressions']
     agg_type_with_cols = []
     for expression in select_exp:
-      columns_in_expression = self._get_columns_in_expression_tree(expression)[1]
+      columns_in_expression = self._get_columns_in_expression_tree(expression)
       if isinstance(expression, exp.Avg):
         agg_type_with_cols.append((exp.Avg, columns_in_expression))
       elif isinstance(expression, exp.Count):

@@ -59,7 +59,7 @@ class Estimator(abc.ABC):
 
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
     pass
 
 
