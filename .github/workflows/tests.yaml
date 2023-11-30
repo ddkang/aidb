@@ -1,8 +1,10 @@
 name: Run Tests
 
 on:
-  push: {}  # Remove the branch restriction to trigger the workflow for any branch
-
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -21,7 +23,7 @@ jobs:
 
     - name: Download test data
       run: |
-        gdown https://drive.google.com/uc?id=1SyHRaJNvVa7V08mw-4_Vqj7tCynRRA3x
+        gdown https://drive.google.com/uc?id=1VbPyTdHFAjoS6gNkwEjx1DHk_vAIN3ju
         unzip data.zip -d tests/
 
     - name: Run db setup tests
@@ -54,8 +56,14 @@ jobs:
     - name: Run exact aggregation query tests
       run: python3 -m tests.test_exact_aggregation
 
-    # - name: Run aggregation query Avg tests
+    - name: Run Twitter Full Scan Tests
+      run: python3 -m tests.tests_full_scan_engine_twitter
+
+    # - name: Run aggregation query tests
     #   run: python3 -m tests.test_aggregation
 
-    # - name: Run aggregation query Avg Gaussian tests
+    # - name: Run aggregation query Gaussian tests
     #   run: python3 -m tests.test_aggregation_gaussian
+
+    # - name: Run aggregation query Gaussian multiple keys tests
+    #   run: python3 -m tests.test_aggregation_gaussian_mk

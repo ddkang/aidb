@@ -7,7 +7,7 @@ from aidb.engine import Engine
 from aidb.inference.http_inference_service import HTTPInferenceService
 
 
-def register_inference_services(engine: Engine, data_dir: str):
+def register_inference_services(engine: Engine, data_dir: str, port=8000):
   csv_fnames = glob.glob(f'{data_dir}/inference/*.csv')
   csv_fnames.sort()  # TODO: sort by number
   for csv_fname in csv_fnames:
@@ -32,7 +32,7 @@ def register_inference_services(engine: Engine, data_dir: str):
     service = HTTPInferenceService(
       service_name,
       False,
-      url=f'http://127.0.0.1:8000/{service_name}',
+      url=f'http://127.0.0.1:{port}/{service_name}',
       headers={'Content-Type': 'application/json'},
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns

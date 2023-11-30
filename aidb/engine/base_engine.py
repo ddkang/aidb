@@ -11,6 +11,7 @@ from aidb.inference.inference_service import InferenceService
 from aidb.query.query import FilteringClause, Query
 from aidb.query.utils import predicate_to_str
 from aidb.utils.asyncio import asyncio_run
+from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.db import infer_dialect, create_sql_engine
 
 
@@ -219,7 +220,7 @@ class BaseEngine():
 
     # used to select inp rows based on blob ids
     if vector_id_table:
-      root_inp_cols.append(f'{vector_id_table}.vector_id')
+      root_inp_cols.append(f'{vector_id_table}.{VECTOR_ID_COLUMN}')
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
@@ -294,21 +295,24 @@ class BaseEngine():
     param query_expression: sqlglot parsed query expression
     '''
     selected_column = []
-    col_name_set = set()
+    col_name_list = []
 
     if len(sample_df) == 0:
       return query_expression, selected_column
 
-
     for col in table_columns:
       col_name = col.split('.')[1]
-      if col_name in sample_df.columns and col_name not in col_name_set:
-        # FIXME: for different database, the IN grammar maybe different
-        # FIXME: this logic is wrong for multiple blob keys input
-        filtered_key_str = f'{col_name} IN ({", ".join(str(value) for value in sample_df[col_name].tolist())})'
-        query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
+      if col_name in sample_df.columns and col_name not in col_name_list:
         selected_column.append(col)
-        col_name_set.add(col.split('.')[1])
+        col_name_list.append(col_name)
+
+    col_tuple = ', '.join(selected_column)
+    value_list = []
+    for index, row in sample_df[col_name_list].iterrows():
+      value_list.append(f'({", ".join([str(value) for value in row])})')
+
+    filtered_key_str = f'({col_tuple}) IN ({", ".join(value_list)})'
+    query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
 
     return query_expression, selected_column
 
@@ -334,8 +338,8 @@ class BaseEngine():
 
     new_query = Query(select_join_str, self._config)
     # FIXME: avoid hard strings
-    sample_df = pd.DataFrame({'vector_id': filtered_id_list})
-    filter_column = [f'{vector_id_table}.vector_id']
+    sample_df = pd.DataFrame({VECTOR_ID_COLUMN: filtered_id_list})
+    filter_column = [f'{vector_id_table}.{VECTOR_ID_COLUMN}']
     query_expression, _ = self.add_filter_key_into_query(filter_column,
                                                          sample_df,
                                                          new_query,

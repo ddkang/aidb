@@ -8,7 +8,7 @@ from aidb.config.config_types import Table
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.query.query import Query
 from aidb.query.utils import predicate_to_str
-from aidb.utils.constants import table_name_for_rep_and_topk_and_blob_mapping
+from aidb.utils.constants import table_name_for_rep_and_topk_and_blob_mapping, VECTOR_ID_COLUMN
 from aidb.vector_database.tasti import Tasti
 
 
@@ -51,13 +51,13 @@ class TastiEngine(FullScanEngine):
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service, self.rep_table_name)
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
-      inp_df.set_index('vector_id', inplace=True, drop=True)
+      inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
     score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql(text(score_query_str), conn))
-    score_df.set_index('vector_id', inplace=True, drop=True)
+    score_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
     # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
     # FIXME: fix it if there is a better design
@@ -97,7 +97,7 @@ class TastiEngine(FullScanEngine):
     # FIXME: for different database, the IN grammar maybe different
     for fp in filering_predicate_score_map:
       score_list.append(f'IIF({fp}, 1, 0) AS {filering_predicate_score_map[fp]}')
-    score_list.append(f'{rep_table_name}.vector_id')
+    score_list.append(f'{rep_table_name}.{VECTOR_ID_COLUMN}')
     select_str = ', '.join(score_list)
     cols = list(filering_predicate_score_map.keys())
     tables = self._get_tables(cols)
@@ -114,7 +114,7 @@ class TastiEngine(FullScanEngine):
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
       topk_df = await conn.run_sync(lambda conn: pd.read_sql(text(topk_query_str), conn))
-    topk_df.set_index('vector_id', inplace=True, drop=True)
+    topk_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
     topk = len(topk_df.columns) // 2
     topk_indices = np.arange(topk)
@@ -171,7 +171,7 @@ class TastiEngine(FullScanEngine):
                                         )
 
     columns = []
-    columns.append(sqlalchemy.Column(f'vector_id', sqlalchemy.Integer, primary_key=True, autoincrement=False))
+    columns.append(sqlalchemy.Column(VECTOR_ID_COLUMN, sqlalchemy.Integer, primary_key=True, autoincrement=False))
     for i in range(topk):
       columns.append(sqlalchemy.Column(f'topk_reps_{str(i)}', sqlalchemy.Integer))
       columns.append(sqlalchemy.Column(f'topk_dists_{str(i)}', sqlalchemy.Float))
@@ -197,7 +197,7 @@ class TastiEngine(FullScanEngine):
       for i in range(topk)
     })
     new_topk_for_all.update({
-      'vector_id': [vector_id for vector_id in topk_for_all.index]
+      VECTOR_ID_COLUMN: [vector_id for vector_id in topk_for_all.index]
     })
     return pd.DataFrame(new_topk_for_all, index=topk_for_all.index)
 
@@ -218,13 +218,12 @@ class TastiEngine(FullScanEngine):
       vector_ids = self.user_specified_vector_ids
     else:
       vector_id_select_query_str = f'''
-                                    SELECT {self.blob_mapping_table_name}.vector_id
+                                    SELECT {self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}
                                     FROM {self.blob_mapping_table_name};
                                     '''
 
       async with self._sql_engine.begin() as conn:
         vector_ids = await conn.run_sync(lambda conn: pd.read_sql(text(vector_id_select_query_str), conn))
-
     self.tasti_index.set_vector_ids(vector_ids)
 
     rep_ids = self.tasti_index.get_representative_vector_ids()
@@ -235,7 +234,7 @@ class TastiEngine(FullScanEngine):
     rep_blob_query_str = f'''
                           SELECT *
                           FROM {self.blob_mapping_table_name}
-                          WHERE {self.blob_mapping_table_name}.vector_id IN {format(tuple(rep_ids.index))};
+                          WHERE {self.blob_mapping_table_name}.{VECTOR_ID_COLUMN} IN {format(tuple(rep_ids.index))};
                           '''
 
     async with self._sql_engine.begin() as conn:
