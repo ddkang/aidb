@@ -37,7 +37,7 @@ six==1.16.0
 sniffio==1.3.0
 SQLAlchemy==1.4.39
 SQLAlchemy-Utils==0.41.1
-sqlglot-aidb==0.0.6
+sqlglot-aidb==0.0.7
 starlette==0.27.0
 statsmodels==0.14.0
 sympy==1.11.1
