@@ -285,7 +285,6 @@ class BaseEngine():
     table_columns: List[str],
     sample_df: pd.DataFrame,
     query: Query,
-    query_expression
   ):
     '''
     Add filter condition, like where keyA in (1,2,3)
@@ -298,7 +297,7 @@ class BaseEngine():
     col_name_list = []
 
     if len(sample_df) == 0:
-      return query_expression, selected_column
+      return query, selected_column
 
     for col in table_columns:
       col_name = col.split('.')[1]
@@ -312,9 +311,9 @@ class BaseEngine():
       value_list.append(f'({", ".join([str(value) for value in row])})')
 
     filtered_key_str = f'({col_tuple}) IN ({", ".join(value_list)})'
-    query_expression = query.add_where_condition(query_expression, 'and', filtered_key_str)
+    new_query = query.add_where_condition('and', filtered_key_str)
 
-    return query_expression, selected_column
+    return new_query, selected_column
 
 
   def get_input_query_for_inference_service_filtered_index(
@@ -337,15 +336,13 @@ class BaseEngine():
       return select_join_str
 
     new_query = Query(select_join_str, self._config)
-    # FIXME: avoid hard strings
     sample_df = pd.DataFrame({VECTOR_ID_COLUMN: filtered_id_list})
     filter_column = [f'{vector_id_table}.{VECTOR_ID_COLUMN}']
-    query_expression, _ = self.add_filter_key_into_query(filter_column,
+    query_add_filter_key, _ = self.add_filter_key_into_query(filter_column,
                                                          sample_df,
-                                                         new_query,
-                                                         new_query._expression)
+                                                         new_query)
 
-    return query_expression.sql()
+    return query_add_filter_key.sql_str
 
 
   def _get_left_join_str(self, rep_table_name: str, tables: List[str]) -> str:
