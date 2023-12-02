@@ -1,4 +1,3 @@
-import logging
 from multiprocessing import Process
 import os
 from sqlalchemy.sql import text
@@ -10,14 +9,9 @@ from aidb.query.query import Query
 from aidb.utils.logger import logger
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-
-file_handler = logging.FileHandler('exact_aggregation.log')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
+setup_test_logger('exact_aggregation')
 
 DB_URL = "sqlite+aiosqlite://"
 
