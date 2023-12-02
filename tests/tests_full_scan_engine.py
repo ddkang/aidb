@@ -5,11 +5,14 @@ import unittest
 from unittest import IsolatedAsyncioTestCase
 from sqlalchemy.sql import text
 
+from aidb.utils.logger import logger
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 from multiprocessing import Process
+
+setup_test_logger('full_scan_engine')
 
 DB_URL = "sqlite+aiosqlite://"
 
@@ -66,13 +69,13 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     ]
 
     for query_type, aidb_query, exact_query in queries:
-      print(f'Running query {exact_query} in ground truth database')
+      logger.info(f'Running query {exact_query} in ground truth database')
       # Run the query on the ground truth database
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(exact_query))
         gt_res = gt_res.fetchall()
       # Run the query on the aidb database
-      print(f'Running query {aidb_query} in aidb database')
+      logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: equality check should be implemented
       assert len(gt_res) == len(aidb_res)
@@ -99,13 +102,13 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     register_inference_services(aidb_engine, data_dir)
 
     for query_type, aidb_query, exact_query in queries:
-      print(f'Running query {exact_query} in ground truth database')
+      logger.info(f'Running query {exact_query} in ground truth database')
       # Run the query on the ground truth database
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(exact_query))
         gt_res = gt_res.fetchall()
       # Run the query on the aidb database
-      print(f'Running query {aidb_query} in aidb database')
+      logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: equality check should be implemented
       assert len(gt_res) == len(aidb_res)
