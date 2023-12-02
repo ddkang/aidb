@@ -58,7 +58,6 @@ class ApproximateAggregateEngine(FullScanEngine):
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
-      print('num_samples', num_samples)
       logger.info(f'num_samples: {num_samples}')
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
