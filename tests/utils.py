@@ -1,5 +1,5 @@
 import logging
-from db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
+from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
 from aidb.engine import Engine
 from aidb.utils.logger import logger
 

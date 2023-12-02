@@ -9,7 +9,10 @@ from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
 from aidb.utils.constants import VECTOR_ID_COLUMN
+from aidb.utils.logger import logger
+from tests.utils import setup_test_logger
 
+setup_test_logger('tasti')
 
 class VectorDatabaseType(Enum):
   FAISS = 'FAISS'
@@ -89,12 +92,12 @@ class TastiTests():
   def test(self):
     self.tasti.set_vector_ids(self.vector_ids)
     representative_vector_ids = self.tasti.get_representative_vector_ids()
-    print('The shape of cluster representative ids', representative_vector_ids.shape)
+    logger.info(f'The shape of cluster representative ids: {representative_vector_ids.shape}')
     # get culster representatives ids
-    print(representative_vector_ids)
+    logger.info(representative_vector_ids)
     topk_representatives = self.tasti.get_topk_representatives_for_all()
     # get topk representatives and dists for all data
-    print(topk_representatives)
+    logger.info(topk_representatives)
 
 
     # Chroma uses HNSW, which will not return exact search result
@@ -104,11 +107,11 @@ class TastiTests():
 
     new_data, new_vector_ids = self.simulate_user_inserting_new_data(self.data_size)
     # get topk representatives and dists for new data based on stale representatives
-    print(self.tasti.get_topk_representatives_for_new_embeddings(new_vector_ids))
+    logger.info(self.tasti.get_topk_representatives_for_new_embeddings(new_vector_ids))
     # reselect cluster representatives, recompute topk representatives and dists for all data
-    print(self.tasti.update_topk_representatives_for_all(new_vector_ids))
+    logger.info(self.tasti.update_topk_representatives_for_all(new_vector_ids))
     # We can see the old cluster representative is kept
-    print('The total number of cluster representatives is:', len(self.tasti.reps))
+    logger.info(f'The total number of cluster representatives is: {len(self.tasti.reps)}')
 
 
 def test(
@@ -126,16 +129,16 @@ def test(
 
 
 if __name__ == '__main__':
-    print(f'Running FAISS vector database')
+    logger.info(f'Running FAISS vector database')
     test('faiss', VectorDatabaseType.FAISS.value, data_size=10000,
          embedding_dim=128, nb_buckets=1000, index_path='./')
 
-    print(f'Running Chroma vector database')
+    logger.info(f'Running Chroma vector database')
     test('chroma', VectorDatabaseType.CHROMA.value, data_size=10000,
          embedding_dim=128, nb_buckets=1000, index_path='./')
 
     # too slow
-    print(f'Running Weaviate vector database')
+    logger.info(f'Running Weaviate vector database')
     url = ''
     api_key = os.environ.get('WEAVIATE_API_KEY')
     weaviate_auth = WeaviateAuth(url, api_key=api_key)

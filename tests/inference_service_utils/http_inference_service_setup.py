@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 
 from multiprocessing import Process
+from aidb.utils.logger import logger
 
 def run_server(data_dir: str, port=8000):
   app = FastAPI()
@@ -39,7 +40,7 @@ def run_server(data_dir: str, port=8000):
     name_to_df[service_name] = df
     name_to_input_cols[service_name] = input_cols
     name_to_output_cols[service_name] = output_cols
-    print('Creating service', service_name)
+    logger.info(f'Creating service {service_name}')
 
     @app.post(f'/{service_name}')
     async def inference(inp: Request):
@@ -54,7 +55,7 @@ def run_server(data_dir: str, port=8000):
         res = tmp[name_to_output_cols[service_name]].to_dict(orient='list')
         return res
       except Exception as e:
-        print('Error', e)
+        logger.error(e)
         return []
 
   # config = Config(app=app, host="127.0.0.1", port=8000)

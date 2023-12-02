@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 from aidb.config.config_types import python_type_to_sqlalchemy_type
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping
+from aidb.utils.logger import logger
 from sqlalchemy.sql import text
 from dataclasses import dataclass
 from typing import Optional
@@ -43,7 +44,7 @@ async def create_db(db_url: str, db_name: str):
       async with engine.begin() as conn:
         await conn.execute(text(f"CREATE DATABASE {db_name}"))
     except sqlalchemy.exc.ProgrammingError:
-      print("Database Already exists")
+      logger.error("Database Already exists")
   elif dialect == "sqlite":
     # sqlite auto creates, do nothing
     pass
