@@ -1,4 +1,3 @@
-import copy
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
@@ -11,9 +10,6 @@ from sympy import sympify
 from sympy.logic.boolalg import to_cnf
 
 from aidb.config.config import Config
-from aidb.query.utils import (Expression, FilteringClause, FilteringPredicate,
-                              change_literal_type_to_col_type,
-                              extract_column_or_value)
 
 
 def is_aqp_exp(node):
@@ -79,6 +75,35 @@ class Query(object):
 
 
   @cached_property
+  def column_name_to_aliases(self):
+    """
+    finds the mapping of column names and aliases present in the query.
+    for e.g. for the query:
+    SELECT t2.id as id, t2.frame as frame, t2.column5
+    FROM table_2 t2 JOIN blob_ids b
+    ON t2.frame = b.frame
+    WHERE b.frame > 102 and column1 > 950
+    it will return {t2.id: id, t2.frame: frame}
+    :return: mapping of column names and alias
+    """
+    column_alias = {}
+    for alias_exp in self._expression.find_all(exp.Alias):
+      for node, _, _ in alias_exp.walk():
+        if isinstance(node, exp.Alias) and "alias" in node.args and "this" in node.args:
+          if isinstance(node.args["this"], exp.Column):
+            col_name = node.args["this"].args["this"].args["this"]
+            col_alias = node.args["alias"].args["this"]
+            column_alias[str.lower(col_name)] = str.lower(col_alias)
+    return column_alias
+
+
+  @cached_property
+  def column_aliases_to_name(self):
+    column_name_to_alias = self.column_name_to_aliases
+    return {v: k for k, v in column_name_to_alias.items()}
+
+
+  @cached_property
   def table_name_to_aliases(self):
     """
     finds the mapping of table names and aliases present in the query.
@@ -130,13 +155,6 @@ class Query(object):
     elif isinstance(node, exp.Paren) or isinstance(node, exp.Where):
       assert "this" in node.args
       return self._get_sympify_form(node.args["this"], predicate_count, predicate_mappings)
-    elif isinstance(node, exp.Column):
-      predicate_name = self._get_predicate_name(predicate_count)
-      predicate_mappings[predicate_name] = node
-      return predicate_name, predicate_count + 1
-    elif isinstance(node, exp.Not):
-      e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
-      return f"~({e1})", p1
     elif isinstance(node, exp.And):
       assert "this" in node.args and "expression" in node.args
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
@@ -153,9 +171,10 @@ class Query(object):
             isinstance(node, exp.LTE) or \
             isinstance(node, exp.EQ) or \
             isinstance(node, exp.Like) or \
-            isinstance(node, exp.NEQ):
-      # TODO: chained comparison operators not supported
-      assert "this" in node.args and "expression" in node.args
+            isinstance(node, exp.NEQ) or \
+            isinstance(node, exp.In) or \
+            isinstance(node, exp.Not) or \
+            isinstance(node, exp.Column):
       predicate_name = self._get_predicate_name(predicate_count)
       predicate_mappings[predicate_name] = node
       return predicate_name, predicate_count + 1
@@ -163,26 +182,18 @@ class Query(object):
       raise NotImplementedError
 
 
-  def _get_original_predicate(self, predicate_name, predicate_mappings) -> FilteringPredicate:
-    if predicate_name[0] == "~":
-      return FilteringPredicate(True, predicate_mappings[predicate_name[1:]])
-    else:
-      return FilteringPredicate(False, predicate_mappings[predicate_name])
-
-
-  def _get_or_clause_representation(self, or_expression, predicate_mappings) -> List[FilteringPredicate]:
+  def _get_or_clause_representation(self, or_expression, predicate_mappings):
     connected_by_ors = list(or_expression.args)
     predicates_in_ors = []
     if len(connected_by_ors) <= 1:
-      predicates_in_ors.append(self._get_original_predicate(str(or_expression), predicate_mappings))
+      predicates_in_ors.append(predicate_mappings[str(or_expression)])
     else:
       for s in connected_by_ors:
-        predicates_in_ors.append(self._get_original_predicate(str(s), predicate_mappings))
+        predicates_in_ors.append(predicate_mappings[str(s)])
     return predicates_in_ors
 
 
-  def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings) -> List[
-    List[FilteringPredicate]]:
+  def _get_filtering_predicate_cnf_representation(self, cnf_expression, predicate_mappings):
     if '&' not in str(cnf_expression):
       return [self._get_or_clause_representation(cnf_expression, predicate_mappings)]
 
@@ -195,7 +206,7 @@ class Query(object):
 
 
   @cached_property
-  def filtering_predicates(self) -> List[List[FilteringClause]]:
+  def filtering_predicates(self):
     """
     this class contains the functionality to convert filtering predicate in SQL query to
     conjunctive normal form.
@@ -225,37 +236,7 @@ class Query(object):
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
         for fp in or_connected_filtering_predicate:
-          if isinstance(fp.predicate, exp.Column):
-            # in case of boolean type columns
-            column_name = self._get_normalized_col_name_from_col_exp(fp.predicate)
-            or_connected_clauses.append(
-              FilteringClause(fp.is_negation, exp.Column, Expression("column", column_name), None))
-          else:
-            t1, v1 = extract_column_or_value(fp.predicate.args["this"])
-            t2, v2 = extract_column_or_value(fp.predicate.args["expression"])
-            if t1 == "column":
-              left_value = self._get_normalized_col_name_from_col_exp(v1)
-            else:
-              left_value = v1
-            if t2 == "column":
-              right_value = self._get_normalized_col_name_from_col_exp(v2)
-            else:
-              right_value = v2
-
-            if t1 == "literal" and t2 == "column":
-              t_name, c_name = right_value.split('.')
-              left_value = change_literal_type_to_col_type(self._tables[t_name][c_name], left_value)
-              # change compare_value_2 to float or int
-            elif t2 == "literal" and t1 == "column":
-              t_name, c_name = left_value.split('.')
-              right_value = change_literal_type_to_col_type(self._tables[t_name][c_name], right_value)
-            elif t1 == "literal" and t2 == "literal":
-              # both left and right cannot be literals
-              raise Exception("Comparisons among literals not supported in filtering predicate")
-
-            or_connected_clauses.append(
-              FilteringClause(fp.is_negation, type(fp.predicate), Expression(t1, left_value),
-                              Expression(t2, right_value)))
+          or_connected_clauses.append(fp)
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
@@ -282,13 +263,16 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
     for 'frame' column, it will return 'blobs.frame' and for 'timestamp' it will return 'blobs.timestamp'
     """
+    col = node.args["this"].args["this"]
+    if col in self.column_aliases_to_name:
+      col = self.column_aliases_to_name[col]
     if "table" in node.args and node.args["table"] is not None:
       table_name = str.lower(node.args["table"].args["this"])
       if table_name in self.table_aliases_to_name:
         table_name = self.table_aliases_to_name[table_name]
     else:
-      table_name = self._get_table_of_column(node.args["this"].args["this"])
-    return f"{table_name}.{node.args['this'].args['this']}"
+      table_name = self._get_table_of_column(col)
+    return f"{table_name}.{col}"
 
 
   @cached_property
@@ -302,16 +286,20 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       inference_engines_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
-                                                                   or_connected_predicate.left_exp.value)
-          if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
-        if or_connected_predicate.right_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
-                                                                   or_connected_predicate.right_exp.value)
-          if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+        for node, _, _ in or_connected_predicate.walk():
+          if isinstance(node, exp.Column):
+            if isinstance(node.args['this'], exp.Identifier):
+              normal_col_name = self._get_normalized_col_name_from_col_exp(node)
+              originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
+              if originated_from in self.config.column_by_service:
+                inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+            elif isinstance(node.args['this'], exp.Star):
+              for table in self.tables_in_query:
+                for col, _ in self._tables[table].items():
+                  normal_col_name = f"{table}.{col}"
+                  originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
+                  if originated_from in self.config.column_by_service:
+                    inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
 
@@ -327,14 +315,18 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       tables_required = set()
       for or_connected_predicate in filtering_predicate:
-        if or_connected_predicate.left_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.left_exp.value,
-                                                                   or_connected_predicate.left_exp.value)
-          tables_required.add(originated_from.split('.')[0])
-        if or_connected_predicate.right_exp.type == "column":
-          originated_from = self.config.columns_to_root_column.get(or_connected_predicate.right_exp.value,
-                                                                   or_connected_predicate.right_exp.value)
-          tables_required.add(originated_from.split('.')[0])
+        for node, _, _ in or_connected_predicate.walk():
+          if isinstance(node, exp.Column):
+            if isinstance(node.args['this'], exp.Identifier):
+              normal_col_name = self._get_normalized_col_name_from_col_exp(node)
+              originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
+              if originated_from in self.config.column_by_service:
+                tables_required.add(originated_from.split('.')[0])
+            elif isinstance(node.args['this'], exp.Star):
+              for table in self.tables_in_query:
+                tables_required.add(table)
+          elif isinstance(node, exp.Table):
+            tables_required.add(node.args['this'].args['this'])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 

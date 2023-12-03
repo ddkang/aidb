@@ -8,8 +8,7 @@ from aidb.config.config_types import InferenceBinding
 from aidb.inference.bound_inference_service import (
     BoundInferenceService, CachedBoundInferenceService)
 from aidb.inference.inference_service import InferenceService
-from aidb.query.query import FilteringClause, Query
-from aidb.query.utils import predicate_to_str
+from aidb.query.query import Query
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.db import infer_dialect, create_sql_engine
@@ -234,11 +233,11 @@ class BaseEngine():
     return inp_tables, select_join_str
 
 
-  def _get_where_str(self, filtering_predicates: List[List[FilteringClause]]):
+  def _get_where_str(self, filtering_predicates):
     and_connected = []
     for fp in filtering_predicates:
       and_connected.append(' OR '.join(
-        [predicate_to_str(p) for p in fp]))
+        [p.sql() for p in fp]))
     return ' AND '.join(and_connected)
 
 
