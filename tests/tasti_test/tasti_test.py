@@ -99,7 +99,6 @@ class TastiTests():
     # get topk representatives and dists for all data
     logger.info(topk_representatives)
 
-
     # Chroma uses HNSW, which will not return exact search result
     if self.vd_type == VectorDatabaseType.FAISS.value:
       for representative_id in list(representative_vector_ids):
