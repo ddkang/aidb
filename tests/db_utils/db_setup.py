@@ -14,7 +14,9 @@ from aidb.utils.logger import logger
 from sqlalchemy.sql import text
 from dataclasses import dataclass
 from typing import Optional
+from tests.utils import setup_test_logger
 
+setup_test_logger('db_setup')
 
 @dataclass
 class ColumnInfo:
