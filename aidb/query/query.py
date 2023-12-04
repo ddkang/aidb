@@ -291,15 +291,13 @@ class Query(object):
             node.args['table'] = exp.Identifier(this=table_name, quoted=False)
           normalized_column_set.add(f'{table_name}.{col}')
         elif isinstance(node.args['this'], exp.Star):
-          # for subquery, there exists other tables, so the table affiliated to * should be extracted from 'FROM' clause
-          tables_in_expression = self.tables_in_expression(dirs.args['from'])
-          dirs.args['expressions'] = []
+          # for subquery, there exists other tables, so the table should be extracted from filtering predicated
+          # rather than the entire query
+          # FIXME: there is an extracting issue where there exists two subquery comparison, such as
+          #  WHERE (SELECT Count(*) FROM table1) >  (SELECT AVG(col1) FROM table2)
+          tables_in_expression = self.tables_in_expression(copied_expression)
           for table_name in tables_in_expression:
             for col_name, _ in self._tables[table_name].items():
-              normal_col_identifier = exp.Identifier(this=col_name, quoted=False)
-              normal_table_identifier = exp.Identifier(this=table_name, quoted=False)
-              normal_col = exp.Column(this=normal_col_identifier, table=normal_table_identifier)
-              dirs.args['expressions'].append(normal_col)
               normalized_column_set.add(f'{table_name}.{col_name}')
         else:
           raise Exception('Unsupported column types')
