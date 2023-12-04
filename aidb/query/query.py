@@ -304,10 +304,16 @@ class Query(object):
         else:
           raise Exception('Unsupported column types')
       elif isinstance(node, exp.Alias):
-        alias_list = dirs.args['expressions'].copy()
-        dirs.args['expressions'] = []
-        for alias in alias_list:
-          dirs.args['expressions'].append(alias.args['this'])
+        if 'expressions' in dirs.args:
+          alias_list = dirs.args['expressions'].copy()
+          dirs.args['expressions'] = []
+          for alias in alias_list:
+            dirs.args['expressions'].append(alias.args['this'])
+        elif 'this' in dirs.args:
+          alias = dirs.args['this'].copy()
+          dirs.args['this'] = alias.args['this']
+        else:
+          raise Exception('Unsupported attribute in the parent of Alias type')
     return normalized_column_set, copied_expression
 
 
