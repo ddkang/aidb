@@ -273,17 +273,19 @@ class Query(object):
     """
     copied_expression = expression.copy()
     normalized_column_set = set()
+
     for node, dirs, _ in copied_expression.walk():
       if isinstance(node, exp.Column):
         if isinstance(node.args['this'], exp.Identifier):
           col = node.args['this'].args['this']
           if col in self.column_aliases_to_name:
             col = self.column_aliases_to_name[col]
-
+            node.args['this'].args['this'] = col
           if 'table' in node.args and node.args['table'] is not None:
             table_name = str.lower(node.args['table'].args['this'])
             if table_name in self.table_aliases_to_name:
               table_name = self.table_aliases_to_name[table_name]
+              node.args['table'].args['this'] = table_name
           else:
             table_name = self._get_table_of_column(col)
             node.args['table'] = exp.Identifier(this=table_name, quoted=False)
@@ -293,17 +295,19 @@ class Query(object):
           tables_in_expression = self.tables_in_expression(dirs.args['from'])
           dirs.args['expressions'] = []
           for table_name in tables_in_expression:
-            for col, _ in self._tables[table_name].items():
-              normal_col_identifier = exp.Identifier(this=col, quoted=False)
-              if table_name in self.table_name_to_aliases:
-                table_name = self.table_name_to_aliases[table_name]
+            for col_name, _ in self._tables[table_name].items():
+              normal_col_identifier = exp.Identifier(this=col_name, quoted=False)
               normal_table_identifier = exp.Identifier(this=table_name, quoted=False)
               normal_col = exp.Column(this=normal_col_identifier, table=normal_table_identifier)
               dirs.args['expressions'].append(normal_col)
-              normalized_column_set.add(f'{table_name}.{col}')
+              normalized_column_set.add(f'{table_name}.{col_name}')
         else:
           raise Exception('Unsupported column types')
-
+      elif isinstance(node, exp.Alias):
+        alias_list = dirs.args['expressions'].copy()
+        dirs.args['expressions'] = []
+        for alias in alias_list:
+          dirs.args['expressions'].append(alias.args['this'])
     return normalized_column_set, copied_expression
 
 
@@ -340,10 +344,12 @@ class Query(object):
       for or_connected_predicate in filtering_predicate:
         normalized_col_set, _ = self._get_normalized_col_set_and_exp(or_connected_predicate)
         for normalized_col_name in normalized_col_set:
-          tables_required.add(normalized_col_name.split('.')[0])
           originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
           if originated_from in self.config.column_by_service:
             tables_required.add(originated_from.split('.')[0])
+        for node, _, _ in or_connected_predicate.walk():
+          if isinstance(node, exp.Table):
+            tables_required.add(node.args['this'].args['this'])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 

@@ -29,14 +29,30 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
     register_inference_services(aidb_engine, data_dir)
 
     queries = [
-      # subquery is on meta table. always satisfied
+      # test column alias
       (
         'full_scan',
-        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00) 
+        '''SELECT colors02.color as alias_color FROM colors02 WHERE alias_color IN (SELECT table2.color as alias_color2 
+            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);''',
+        '''SELECT colors02.color as alias_color FROM colors02 WHERE alias_color IN (SELECT table2.color as alias_color2 
+            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);'''
+      ),
+      # test table alias
+      (
+        'full_scan',
+        '''SELECT * FROM colors02 WHERE colors02.frame IN (SELECT * FROM blobs_00)
+              OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);''',
+        '''SELECT * FROM colors02 WHERE colors02.frame IN (SELECT * FROM blobs_00)
+              OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);''',
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00)
               OR cl.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
-        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00) 
+        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00)
               OR cl.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
       ),
+      # subquery is on meta table. always satisfied
       (
         'full_scan',
         '''SELECT * FROM objects00 WHERE object_name='car' AND objects00.frame <
