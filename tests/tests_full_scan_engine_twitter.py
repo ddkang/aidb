@@ -36,8 +36,8 @@ class FullScanEngineTwitterTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM sentiment02 WHERE sentiment=-1 and tweet_id < 1000;''',
-        '''SELECT * FROM sentiment02 WHERE sentiment=-1 and tweet_id < 1000;'''
+        '''SELECT * FROM sentiment02 WHERE sentiment < 0 and tweet_id < 1000;''',
+        '''SELECT * FROM sentiment02 WHERE sentiment < 0 and tweet_id < 1000;'''
       ),
       (
         'full_scan',
