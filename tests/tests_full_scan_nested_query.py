@@ -32,18 +32,25 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
       # subquery is on meta table. always satisfied
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND objects00.frame < 
+        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00) 
+              OR cl.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
+        '''SELECT * FROM colors02 AS cl WHERE cl.frame IN (SELECT * FROM blobs_00) 
+              OR cl.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
+      ),
+      (
+        'full_scan',
+        '''SELECT * FROM objects00 WHERE object_name='car' AND objects00.frame <
               (SELECT AVG(blobs_00.frame) FROM blobs_00) OR objects00.frame NOT IN (1, 2, 3);''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND objects00.frame < 
+        '''SELECT * FROM objects00 WHERE object_name='car' AND objects00.frame <
               (SELECT AVG(blobs_00.frame) FROM blobs_00) OR objects00.frame NOT IN (1, 2, 3);'''
       ),
 
       # 2-place predicates. subquery is not satisfied until objects00 is filled
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.frame >= 10000 AND colors02.object_id > 
+        '''SELECT * FROM colors02 WHERE colors02.frame >= 10000 AND colors02.object_id >
               (SELECT AVG(objects00.object_id) FROM objects00);''',
-        '''SELECT * FROM colors02 WHERE colors02.frame >= 10000 AND colors02.object_id > 
+        '''SELECT * FROM colors02 WHERE colors02.frame >= 10000 AND colors02.object_id >
               (SELECT AVG(objects00.object_id) FROM objects00);'''
       ),
       (
@@ -54,45 +61,45 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
       # multiple sub-queries
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00) 
+        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00)
               OR colors02.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
-        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00) 
+        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00)
               OR colors02.object_id > (SELECT AVG(colors02.object_id) FROM colors02);''',
       ),
 
       # nested sub-queries. predicate clause is not satisfied until all inference is complete
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00
               WHERE objects00.y_max < (SELECT AVG(colors02.object_id) FROM colors02));''',
-        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id > (SELECT AVG(objects00.object_id) FROM objects00
               WHERE objects00.y_max < (SELECT AVG(colors02.object_id) FROM colors02));''',
       ),
 
       # where-in predicate. frame is not satisfied until objects00 is filled
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00
               WHERE objects00.frame < 1000);''',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00
               WHERE objects00.frame < 1000);'''
       ),
 
       # where-in predicate. x_min is not satisfied until objects00 is filled
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00
               WHERE objects00.x_min < 364);''',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT objects00.object_id FROM objects00
               WHERE objects00.x_min < 364);'''
       ),
 
       # where-in predicate. color is not satisfied until colors02 is filled
       (
         'full_scan',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT colors02.object_id FROM colors02 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT colors02.object_id FROM colors02
               WHERE colors02.color = 'grayish_blue');''',
-        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT colors02.object_id FROM colors02 
+        '''SELECT * FROM colors02 WHERE colors02.object_id IN (SELECT colors02.object_id FROM colors02
               WHERE colors02.color = 'grayish_blue');'''
       ),
 

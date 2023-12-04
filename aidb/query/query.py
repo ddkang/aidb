@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, List
+from typing import Dict
 
 import sqlglot.expressions as exp
 from sqlglot.rewriter import Rewriter
@@ -135,12 +135,17 @@ class Query(object):
     return {v: k for k, v in table_name_to_alias.items()}
 
 
-  @cached_property
-  def tables_in_query(self):
+  def tables_in_expression(self, expression):
     table_list = set()
-    for node, _, _ in self._expression.walk():
+    for node, _, _ in expression.walk():
       if isinstance(node, exp.Table):
         table_list.add(node.args["this"].args["this"])
+    return table_list
+
+
+  @cached_property
+  def tables_in_query(self):
+    table_list = self.tables_in_expression(self._expression)
     return table_list
 
 
@@ -236,7 +241,9 @@ class Query(object):
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
         for fp in or_connected_filtering_predicate:
-          or_connected_clauses.append(fp)
+          # normalized columns' name in filter predicate expression
+          _, normalized_fp = self._get_normalized_col_set_and_exp(fp)
+          or_connected_clauses.append(normalized_fp)
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
@@ -256,23 +263,48 @@ class Query(object):
       return tables_of_column[0]
 
 
-  def _get_normalized_col_name_from_col_exp(self, node):
+  def _get_normalized_col_set_and_exp(self, expression):
     """
-    this function uses tables (and their alias) and the columns present in them.
-    to return the column name in the form {table_name}.{col_name}
+    this function traverse expression and return the list of normalized column names and a copied normalized expression.
+    Notice: for normalized expression, if the table has alias, the expression will keep the alias
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
-    for 'frame' column, it will return 'blobs.frame' and for 'timestamp' it will return 'blobs.timestamp'
+    it will return [blobs.frame, blobs.timestamp],
+    the expression will be converted into SELECT b.frame FROM blobs b WHERE b.timestamp > 100
     """
-    col = node.args["this"].args["this"]
-    if col in self.column_aliases_to_name:
-      col = self.column_aliases_to_name[col]
-    if "table" in node.args and node.args["table"] is not None:
-      table_name = str.lower(node.args["table"].args["this"])
-      if table_name in self.table_aliases_to_name:
-        table_name = self.table_aliases_to_name[table_name]
-    else:
-      table_name = self._get_table_of_column(col)
-    return f"{table_name}.{col}"
+    copied_expression = expression.copy()
+    normalized_column_set = set()
+    for node, dirs, _ in copied_expression.walk():
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          col = node.args['this'].args['this']
+          if col in self.column_aliases_to_name:
+            col = self.column_aliases_to_name[col]
+
+          if 'table' in node.args and node.args['table'] is not None:
+            table_name = str.lower(node.args['table'].args['this'])
+            if table_name in self.table_aliases_to_name:
+              table_name = self.table_aliases_to_name[table_name]
+          else:
+            table_name = self._get_table_of_column(col)
+            node.args['table'] = exp.Identifier(this=table_name, quoted=False)
+          normalized_column_set.add(f'{table_name}.{col}')
+        elif isinstance(node.args['this'], exp.Star):
+          # for subquery, there exists other tables, so the table affiliated to * should be extracted from 'FROM' clause
+          tables_in_expression = self.tables_in_expression(dirs.args['from'])
+          dirs.args['expressions'] = []
+          for table_name in tables_in_expression:
+            for col, _ in self._tables[table_name].items():
+              normal_col_identifier = exp.Identifier(this=col, quoted=False)
+              if table_name in self.table_name_to_aliases:
+                table_name = self.table_name_to_aliases[table_name]
+              normal_table_identifier = exp.Identifier(this=table_name, quoted=False)
+              normal_col = exp.Column(this=normal_col_identifier, table=normal_table_identifier)
+              dirs.args['expressions'].append(normal_col)
+              normalized_column_set.add(f'{table_name}.{col}')
+        else:
+          raise Exception('Unsupported column types')
+
+    return normalized_column_set, copied_expression
 
 
   @cached_property
@@ -286,20 +318,11 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       inference_engines_required = set()
       for or_connected_predicate in filtering_predicate:
-        for node, _, _ in or_connected_predicate.walk():
-          if isinstance(node, exp.Column):
-            if isinstance(node.args['this'], exp.Identifier):
-              normal_col_name = self._get_normalized_col_name_from_col_exp(node)
-              originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
-              if originated_from in self.config.column_by_service:
-                inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
-            elif isinstance(node.args['this'], exp.Star):
-              for table in self.tables_in_query:
-                for col, _ in self._tables[table].items():
-                  normal_col_name = f"{table}.{col}"
-                  originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
-                  if originated_from in self.config.column_by_service:
-                    inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+        normalized_col_set, _ = self._get_normalized_col_set_and_exp(or_connected_predicate)
+        for normalized_col_name in normalized_col_set:
+          originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
+          if originated_from in self.config.column_by_service:
+            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
 
@@ -315,18 +338,12 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       tables_required = set()
       for or_connected_predicate in filtering_predicate:
-        for node, _, _ in or_connected_predicate.walk():
-          if isinstance(node, exp.Column):
-            if isinstance(node.args['this'], exp.Identifier):
-              normal_col_name = self._get_normalized_col_name_from_col_exp(node)
-              originated_from = self.config.columns_to_root_column.get(normal_col_name, normal_col_name)
-              if originated_from in self.config.column_by_service:
-                tables_required.add(originated_from.split('.')[0])
-            elif isinstance(node.args['this'], exp.Star):
-              for table in self.tables_in_query:
-                tables_required.add(table)
-          elif isinstance(node, exp.Table):
-            tables_required.add(node.args['this'].args['this'])
+        normalized_col_set, _ = self._get_normalized_col_set_and_exp(or_connected_predicate)
+        for normalized_col_name in normalized_col_set:
+          tables_required.add(normalized_col_name.split('.')[0])
+          originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
+          if originated_from in self.config.column_by_service:
+            tables_required.add(originated_from.split('.')[0])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
 
@@ -337,17 +354,7 @@ class Query(object):
     nested queries are not supported for the time being
     * is supported
     """
-    column_set = set()
-    for node, _, _ in self._expression.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          column_set.add(self._get_normalized_col_name_from_col_exp(node))
-        elif isinstance(node.args['this'], exp.Star):
-          for table in self.tables_in_query:
-            for col, _ in self._tables[table].items():
-              column_set.add(f"{table}.{col}")
-        else:
-          raise Exception('Unsupported column type')
+    column_set, _ = self._get_normalized_col_set_and_exp(self._expression)
     return column_set
 
 
@@ -572,14 +579,7 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE timestamp > 100
     this query will return the query of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
     '''
-
     expression = self._expression.copy()
-    for node, _, _ in expression.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          affiliate_table_name = self._get_table_of_column(node.args['this'].args['this'])
-          if affiliate_table_name in self.table_name_to_aliases:
-            affiliate_table_name = self.table_name_to_aliases[affiliate_table_name]
-          node.args['table'] = exp.Identifier(this=affiliate_table_name, quoted=False)
+    _, normalized_expression = self._get_normalized_col_set_and_exp(expression)
 
-    return Query(expression.sql(), self.config)
+    return Query(normalized_expression.sql(), self.config)
