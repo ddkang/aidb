@@ -89,7 +89,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
 
   async def test_agg_query(self):
-    num_iter = os.environ['NUMBER_OF_RUNS'] if os.environ['NUMBER_OF_RUNS'] else 100
+    num_iter = int(os.environ['NUMBER_OF_RUNS']) if os.environ['NUMBER_OF_RUNS'] else 100
     count_list = [0] * len(queries)
     for i in range(num_iter):
       dirname = os.path.dirname(__file__)
