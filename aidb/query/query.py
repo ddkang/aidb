@@ -398,7 +398,7 @@ class Query(object):
             (exp.Avg, [col2])
           ]
     '''
-    select_exp = self.base_sql_no_aqp.args['expressions']
+    select_exp = self.base_sql_no_aqp.get_expression().args['expressions']
     agg_type_with_cols = []
     for expression in select_exp:
       columns_in_expression = self._get_columns_in_expression_tree(expression)
