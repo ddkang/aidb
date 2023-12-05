@@ -74,8 +74,8 @@ class ApproximateAggregateEngine(FullScanEngine):
       print('num_samples', num_samples)
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
-        query_no_aqp_sql = Query(query.base_sql_no_aqp.sql(), self._config)
-        res = await self.execute_full_scan(query_no_aqp_sql)
+        query_no_aqp = query.base_sql_no_aqp
+        res = await self.execute_full_scan(query_no_aqp)
         return res
 
       new_sample_results = await self.get_results_on_sampled_data(
@@ -166,15 +166,13 @@ class ApproximateAggregateEngine(FullScanEngine):
           inference_services_executed
       )
       new_query = Query(inp_query_str, self._config)
-      expression = new_query.get_expression()
-      query_str, _ = self.add_filter_key_into_query(
+      query_add_filter_key, _ = self.add_filter_key_into_query(
           list(bound_service.binding.input_columns),
           sample_df,
-          new_query,
-          expression
+          new_query
       )
 
-      input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str.sql()), conn))
+      input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_add_filter_key.sql_str), conn))
       await bound_service.infer(input_df)
       inference_services_executed.add(bound_service.service.name)
 
@@ -187,20 +185,17 @@ class ApproximateAggregateEngine(FullScanEngine):
     mass is default value 1, weight is same for each blob in uniform sampling
     '''
     tables_in_query = query.tables_in_query
-    query_no_aqp_sql = query.base_sql_no_aqp
-    query_no_aqp_sql = Query(query_no_aqp_sql.sql(), self._config)
-    query_expression = query_no_aqp_sql.get_expression()
+    query_no_aqp = query.base_sql_no_aqp
 
     table_columns = [f'{table}.{col.name}' for table in tables_in_query for col in self._config.tables[table].columns]
-    query_expression, selected_column = self.add_filter_key_into_query(
+    query_add_filter_key, selected_column = self.add_filter_key_into_query(
         table_columns,
         sample_df,
-        query_no_aqp_sql,
-        query_expression
+        query_no_aqp
     )
-    query_expression = query_no_aqp_sql.add_select(query_expression, 'COUNT(*) AS num_items')
+    query_add_count = query_add_filter_key.add_select('COUNT(*) AS num_items')
     query_str = f'''
-                  {query_expression.sql()}
+                  {query_add_count.sql_str}
                   GROUP BY {', '.join(selected_column)}
                  '''
 

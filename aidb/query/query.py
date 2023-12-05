@@ -509,7 +509,8 @@ class Query(object):
   # Validate AQP
   def is_valid_aqp_query(self):
     # Only accept select statements
-    if not isinstance(self.base_sql_no_aqp, exp.Select):
+    query_no_aqp_expression = self.base_sql_no_aqp.get_expression()
+    if not isinstance(query_no_aqp_expression, exp.Select):
       raise Exception('Not a select statement')
 
     if self._expression.find(exp.Group) is not None:
@@ -526,7 +527,7 @@ class Query(object):
 
     # Count the number of distinct aggregates
     expression_counts = defaultdict(int)
-    for expression in self.base_sql_no_aqp.args['expressions']:
+    for expression in query_no_aqp_expression.args['expressions']:
       expression_counts[type(expression)] += 1
 
     if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
@@ -576,7 +577,7 @@ class Query(object):
     _exp_no_aqp = self._expression.transform(_remove_aqp)
     if _exp_no_aqp is None:
       raise Exception('SQL contains no non-AQP statements')
-    return _exp_no_aqp
+    return Query(_exp_no_aqp.sql(), self.config)
 
 
   @cached_property
@@ -584,47 +585,36 @@ class Query(object):
     _exp_no_where = self._expression.transform(_remove_where)
     if _exp_no_where is None:
       raise Exception('SQL contains no non-AQP statements')
-    return _exp_no_where
+    return Query(_exp_no_where.sql(), self.config)
 
 
   # FIXME: move it to sqlglot.rewriter
-  def add_where_condition(self, expression, operator:str , where_condition):
-    expression = copy.deepcopy(expression)
-    where = expression.find(exp.Where)
-    new_condition = parse_one(where_condition)
-    if where:
-      if operator.upper() == 'AND':
-        where.args['this'] = exp.And(this=new_condition, expression=where.args['this'])
-      elif operator.upper() == 'OR':
-        where.args['this'] = exp.Or(this=new_condition, expression=where.args['this'])
-      return expression
-    else:
-      where_expr = exp.Where(this=new_condition)
-      expression.args['where'] = where_expr
-      return expression
-
-
-  def add_select(self, expression, selects):
+  def add_where_condition(self, operator:str , where_condition):
+    expression = self._expression.copy()
     re = Rewriter(expression)
-    e = re.add_selects(selects)
-    return e.expression
+    new_sql = re.add_where(operator, where_condition)
+    return Query(new_sql.expression.sql(), self.config)
 
 
-  def add_join(self, expression, new_join):
-    # parse_one can't parse join directly
-    join_condition = 'select fake from fake ' + new_join
-    new_condition = parse_one(join_condition)
-
-    expression.args['joins'].append(new_condition.args['joins'][0])
-    return expression
+  def add_select(self, selects):
+    expression = self._expression.copy()
+    re = Rewriter(expression)
+    new_sql = re.add_selects(selects)
+    return Query(new_sql.expression.sql(), self.config)
 
 
-  @cached_property
-  def expression_after_normalize_columns(self):
+  def add_join(self, new_join):
+    expression = self._expression.copy()
+    re = Rewriter(expression)
+    new_sql = re.add_join(new_join)
+    return Query(new_sql.expression.sql(), self.config)
+
+
+  def query_after_normalize_columns(self):
     '''
     this function is used to normalize columns name in expression
     e.g. for this query: SELECT frame FROM blobs b WHERE timestamp > 100
-    this query will return the expression of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
+    this query will return the query of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
     '''
 
     expression = self._expression.copy()
@@ -636,4 +626,4 @@ class Query(object):
             affiliate_table_name = self.table_name_to_aliases[affiliate_table_name]
           node.args['table'] = exp.Identifier(this=affiliate_table_name, quoted=False)
 
-    return expression
+    return Query(expression.sql(), self.config)
