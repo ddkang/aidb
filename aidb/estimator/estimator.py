@@ -67,7 +67,7 @@ class Estimator(abc.ABC):
 class WeightedMeanSetEstimator(Estimator):
   def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
-    statistics = np.array([sample.statistic[agg_index] for sample in samples])
+    statistics = np.array([sample.statistics[agg_index] for sample in samples])
     counts = np.array([sample.num_items for sample in samples])
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
@@ -88,7 +88,7 @@ class WeightedCountSetEstimator(Estimator):
 
     # Statistics are already counts
 
-    statistics = np.array([sample.statistic[agg_index] for sample in samples] + [0] * (num_samples - len(samples)))
+    statistics = np.array([sample.statistics[agg_index] for sample in samples] + [0] * (num_samples - len(samples)))
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
     mean_est = _get_estimate_bennett(
       wstats.mean,

@@ -181,7 +181,7 @@ class ApproximateAggregateEngine(FullScanEngine):
 
   async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
     '''
-    Return aggregation results of each sample blob, contains weight, mass, statistic, num_items
+    Return aggregation results of each sample blob, contains weight, mass, statistics, num_items
     For example, if there is 1000 blobs, blob A has two detected objects with x_min = 500 and x_min = 1000,
     the query is Avg(x_min), the result of blob A is SampledBlob(1/1000, 1, 750, 2)
     mass is default value 1, weight is same for each blob in uniform sampling
@@ -211,7 +211,7 @@ class ApproximateAggregateEngine(FullScanEngine):
       results_for_each_blob.append(SampledBlob(
           weight=1. / self.blob_count,
           mass=1,
-          statistic=row[:-1],
+          statistics=row[:-1],
           num_items=int(row[-1])
       ))
 

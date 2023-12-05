@@ -1,7 +1,6 @@
 import abc
-import pandas as pd
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import List
 
 
 @dataclass
@@ -11,7 +10,7 @@ class SampledBlobId:
 
 @dataclass
 class SampledBlob(SampledBlobId):
-  statistic: List[float]
+  statistics: List[float]
   num_items: int
 
 
