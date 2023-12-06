@@ -256,7 +256,6 @@ class BaseEngine():
     inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
     tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
 
-    column_to_root_column = self._config.columns_to_root_column
     inp_tables, select_join_str = self._get_select_join_str(bound_service)
 
     # filtering predicates that can be satisfied by the currently executed inference engines
@@ -268,8 +267,6 @@ class BaseEngine():
         filtering_predicates_satisfied.append(p)
 
     where_str = self._get_where_str(filtering_predicates_satisfied)
-    for k, v in column_to_root_column.items():
-      where_str = where_str.replace(k, v)
 
     if len(filtering_predicates_satisfied) > 0:
       inp_query_str = select_join_str + f'WHERE {where_str};'

@@ -29,9 +29,6 @@ class ApproximateAggregateEngine(FullScanEngine):
       if len(engine_required) == 0:
         blob_key_filtering_predicates.append(filtering_predicate)
     blob_key_filtering_predicates_str = self._get_where_str(blob_key_filtering_predicates)
-    column_to_root_column = self._config.columns_to_root_column
-    for k, v in column_to_root_column.items():
-      blob_key_filtering_predicates_str = blob_key_filtering_predicates_str.replace(k, v)
     blob_key_filtering_predicates_str = f'WHERE {blob_key_filtering_predicates_str}' \
                                          if blob_key_filtering_predicates_str else ''
 

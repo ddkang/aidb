@@ -75,78 +75,96 @@ class Query(object):
 
 
   @cached_property
-  def column_name_to_aliases(self):
-    """
-    finds the mapping of column names and aliases present in the query.
-    for e.g. for the query:
-    SELECT t2.id as id, t2.frame as frame, t2.column5
-    FROM table_2 t2 JOIN blob_ids b
-    ON t2.frame = b.frame
-    WHERE b.frame > 102 and column1 > 950
-    it will return {t2.id: id, t2.frame: frame}
-    :return: mapping of column names and alias
-    """
-    column_alias = {}
-    for alias_exp in self._expression.find_all(exp.Alias):
-      for node, _, _ in alias_exp.walk():
-        if isinstance(node, exp.Alias) and "alias" in node.args and "this" in node.args:
-          if isinstance(node.args["this"], exp.Column):
-            col_name = node.args["this"].args["this"].args["this"]
-            col_alias = node.args["alias"].args["this"]
-            column_alias[str.lower(col_name)] = str.lower(col_alias)
-    return column_alias
+  def all_queries_in_expressions(self):
+    '''
+    This function is used to extract all queries in the expression, including the entire query and subqueries
+    '''
+    all_queries = []
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Select):
+        depth = 0
+        parent = node.parent
+        while parent:
+          depth += 1
+          parent = parent.parent
+        all_queries.append((Query(node.sql(), self.config), depth))
+
+    all_queries = sorted(all_queries, key=lambda x:x[1], reverse=True)
+    return all_queries
+
+
+  def _check_in_subquery(self, node):
+    '''
+    this function check if current node is within a subquery
+    '''
+    node_parent = node
+    while node_parent and not isinstance(node_parent, exp.Select):
+      node_parent = node_parent.parent
+    if node_parent is None or node_parent.parent is None:
+      return False
+    else:
+      return True
 
 
   @cached_property
-  def column_aliases_to_name(self):
-    column_name_to_alias = self.column_name_to_aliases
-    return {v: k for k, v in column_name_to_alias.items()}
-
-
-  @cached_property
-  def table_name_to_aliases(self):
+  def table_and_column_aliases_in_query(self):
     """
-    finds the mapping of table names and aliases present in the query.
+    finds the mapping of alias and original name presenting in the query, excluding subquery part.
 
     for e.g. for the query:
-    SELECT t2.id, t2.frame, t2.column5
+    SELECT t2.id AS col1, t2.frame AS col2, t2.column5
     FROM table_2 t2 JOIN blob_ids b
     ON t2.frame = b.frame
     WHERE b.frame > 102 and column1 > 950
 
-    it will return {blob_ids: b, table_2: t2}
+    table_alias_to_name will be {b: blob_ids, t2: table_2}
+    column_alias_to_name will be {col1: id, col2: frame}
 
     :return: mapping of table names and alias
     """
-    table_alias = {}
-    for alias_exp in self._expression.find_all(exp.Alias):
-      for node, _, _ in alias_exp.walk():
-        if isinstance(node, exp.Alias) and "alias" in node.args and "this" in node.args:
-          if isinstance(node.args["this"], exp.Table):
-            tbl_name = node.args["this"].args["this"].args["this"]
-            tbl_alias = node.args["alias"].args["this"]
-            table_alias[str.lower(tbl_name)] = str.lower(tbl_alias)
-    return table_alias
+    table_alias_to_name = {}
+    column_alias_to_name = {}
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Alias) and 'alias' in node.args and 'this' in node.args:
+        if isinstance(node.args['this'], exp.Table):
+          tbl_alias = node.args['alias'].args['this']
+          if str.lower(tbl_alias) in table_alias_to_name:
+            raise Exception('Duplicated alias found in query, please use another alias')
+          tbl_name = node.args['this'].args['this'].args['this']
+          table_alias_to_name[str.lower(tbl_alias)] = str.lower(tbl_name)
+
+        elif isinstance(node.args['this'], exp.Column):
+          col_alias = node.args['alias'].args['this']
+          if str.lower(col_alias) in column_alias_to_name:
+            raise Exception('Duplicated alias found in query, please use another alias')
+          col_name = node.args['this'].args['this'].args['this']
+          column_alias_to_name[str.lower(col_alias)] = str.lower(col_name)
+
+
+    return table_alias_to_name, column_alias_to_name
 
 
   @cached_property
-  def table_aliases_to_name(self):
-    table_name_to_alias = self.table_name_to_aliases
-    return {v: k for k, v in table_name_to_alias.items()}
-
-
-  def tables_in_expression(self, expression):
-    table_list = set()
-    for node, _, _ in expression.walk():
-      if isinstance(node, exp.Table):
-        table_list.add(node.args["this"].args["this"])
-    return table_list
+  def columns_in_query(self):
+    """
+    return the normalized column names in query, excluding subquery part
+    """
+    column_set = self._get_normalized_column_set(self.query_after_normalizing.get_expression())
+    return column_set
 
 
   @cached_property
   def tables_in_query(self):
-    table_list = self.tables_in_expression(self._expression)
-    return table_list
+    table_set = set()
+    for node, _, _ in self._expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Table):
+        table_set.add(node.args['this'].args['this'])
+
+    return list(table_set)
 
 
   def _get_predicate_name(self, predicate_count):
@@ -210,6 +228,27 @@ class Query(object):
     return or_expressions_connected_by_ands_repr
 
 
+  def _replace_col_in_filter_predicate_with_root_col(self, expression):
+    '''
+    This function replace column with root columns,
+    for e.g. in the filtering predicate 'colors.frame > 10000'
+    the root column of 'colors.frame' is 'blob.frame'
+    so filtering predicate will be converted into 'blob.frame > 10000'
+    '''
+    copied_expression = expression.copy()
+    for node, _, _ in copied_expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Column):
+        table_name = str.lower(node.args['table'].args['this'])
+        col_name = str.lower(node.args['this'].args['this'])
+        normalized_col_name = f'{table_name}.{col_name}'
+        originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
+        table_name = originated_from.split('.')[0]
+        node.args['table'].set('this', table_name)
+    return copied_expression
+
+
   @cached_property
   def filtering_predicates(self):
     """
@@ -225,15 +264,16 @@ class Query(object):
 
     the filtering predicate will be converted to
 
-    (b.timestamp > 10 or c.color = red) and (b.timestamp < 12 or c.color = red)
+    (blobs.timestamp > 10 or colors.color = red) and (blobs.timestamp < 12 or colors.color = red)
     """
-    if self._expression.find(exp.Where) is not None:
+    normalized_exp = self.query_after_normalizing.get_expression()
+    if normalized_exp.find(exp.Where) is not None:
       if self._tables is None:
         raise Exception("Need table and column information to support alias")
       # predicate name (used for sympy package) to expression
       predicate_mappings = {}
       # predicate mapping will be filled by this function
-      sympy_representation, _ = self._get_sympify_form(self._expression.find(exp.Where), 0, predicate_mappings)
+      sympy_representation, _ = self._get_sympify_form(normalized_exp.find(exp.Where), 0, predicate_mappings)
       sympy_expression = sympify(sympy_representation)
       cnf_expression = to_cnf(sympy_expression)
       filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
@@ -241,9 +281,8 @@ class Query(object):
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
         for fp in or_connected_filtering_predicate:
-          # normalized columns' name in filter predicate expression
-          _, normalized_fp = self._get_normalized_col_set_and_exp(fp)
-          or_connected_clauses.append(normalized_fp)
+          new_fp = self._replace_col_in_filter_predicate_with_root_col(fp)
+          or_connected_clauses.append(new_fp)
         filtering_clauses.append(or_connected_clauses)
       return filtering_clauses
     else:
@@ -263,56 +302,76 @@ class Query(object):
       return tables_of_column[0]
 
 
-  def _get_normalized_col_set_and_exp(self, expression):
+  @cached_property
+  def query_after_normalizing(self):
     """
-    this function traverse expression and return the list of normalized column names and a copied normalized expression.
-    Notice: for normalized expression, if the table has alias, the expression will keep the alias
+    this function traverse expression and return the normalized query excluding subquery part.
+    Specifically, normalizing expression includes removing alias, adding affiliate table name for columns, replacing
+    alias with original name
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
-    it will return [blobs.frame, blobs.timestamp],
-    the expression will be converted into SELECT b.frame FROM blobs b WHERE b.timestamp > 100
+    the expression will be converted into SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
     """
-    copied_expression = expression.copy()
-    normalized_column_set = set()
 
-    for node, dirs, _ in copied_expression.walk():
+    copied_expression = self._expression.copy()
+    table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
+    for node, _, _ in copied_expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
       if isinstance(node, exp.Column):
         if isinstance(node.args['this'], exp.Identifier):
-          col = node.args['this'].args['this']
-          if col in self.column_aliases_to_name:
-            col = self.column_aliases_to_name[col]
-            node.args['this'].args['this'] = col
+          col_name = str.lower(node.args['this'].args['this'])
+          if col_name in column_alias_to_name:
+            col_name = column_alias_to_name[col_name]
+            node.args['this'].set('this', col_name)
           if 'table' in node.args and node.args['table'] is not None:
             table_name = str.lower(node.args['table'].args['this'])
-            if table_name in self.table_aliases_to_name:
-              table_name = self.table_aliases_to_name[table_name]
-              node.args['table'].args['this'] = table_name
+            if table_name in table_alias_to_name:
+              table_name = table_alias_to_name[table_name]
           else:
-            table_name = self._get_table_of_column(col)
-            node.args['table'] = exp.Identifier(this=table_name, quoted=False)
-          normalized_column_set.add(f'{table_name}.{col}')
-        elif isinstance(node.args['this'], exp.Star):
-          # for subquery, there exists other tables, so the table should be extracted from filtering predicated
-          # rather than the entire query
-          # FIXME: there is an extracting issue where there exists two subquery comparison, such as
-          #  WHERE (SELECT Count(*) FROM table1) >  (SELECT AVG(col1) FROM table2)
-          tables_in_expression = self.tables_in_expression(copied_expression)
-          for table_name in tables_in_expression:
-            for col_name, _ in self._tables[table_name].items():
-              normalized_column_set.add(f'{table_name}.{col_name}')
-        else:
-          raise Exception('Unsupported column types')
-      elif isinstance(node, exp.Alias):
+            table_name = self._get_table_of_column(col_name)
+
+          node.set('table', exp.Identifier(this=table_name, quoted=False))
+
+    # remove alias
+    for node, dirs, _ in copied_expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Alias):
         if 'expressions' in dirs.args:
           alias_list = dirs.args['expressions'].copy()
-          dirs.args['expressions'] = []
+          original_name_list = []
           for alias in alias_list:
-            dirs.args['expressions'].append(alias.args['this'])
+            original_name_list.append(alias.args['this'])
+          dirs.set('expressions', original_name_list)
         elif 'this' in dirs.args:
           alias = dirs.args['this'].copy()
-          dirs.args['this'] = alias.args['this']
+          dirs.set('this', alias.args['this'])
         else:
           raise Exception('Unsupported attribute in the parent of Alias type')
-    return normalized_column_set, copied_expression
+    return Query(copied_expression.sql(), self.config)
+
+
+  def _get_normalized_column_set(self, normalized_expression):
+    """
+      this function assume the input expression has been normalized, the function traverses normalized expression
+      and return the list of normalized column names excluding subquery part
+      e.g. for this query: SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
+      it will return [blobs.frame, blobs.timestamp],
+      """
+    normalized_column_set = set()
+    for node, _, _ in normalized_expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Column):
+        if isinstance(node.args['this'], exp.Identifier):
+          col_name = node.args['this'].args['this']
+          table_name = node.args['table'].args['this']
+          normalized_column_set.add(f'{table_name}.{col_name}')
+        elif isinstance(node.args['this'], exp.Star):
+          for table_name in self.tables_in_query:
+            for col_name, _ in self._tables[table_name].items():
+              normalized_column_set.add(f'{table_name}.{col_name}')
+    return normalized_column_set
 
 
   @cached_property
@@ -326,11 +385,10 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       inference_engines_required = set()
       for or_connected_predicate in filtering_predicate:
-        normalized_col_set, _ = self._get_normalized_col_set_and_exp(or_connected_predicate)
+        normalized_col_set = self._get_normalized_column_set(or_connected_predicate)
         for normalized_col_name in normalized_col_set:
-          originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
-          if originated_from in self.config.column_by_service:
-            inference_engines_required.add(self.config.column_by_service[originated_from].service.name)
+          if normalized_col_name in self.config.column_by_service:
+            inference_engines_required.add(self.config.column_by_service[normalized_col_name].service.name)
       inference_engines_required_predicates.append(inference_engines_required)
     return inference_engines_required_predicates
 
@@ -346,26 +404,12 @@ class Query(object):
     for filtering_predicate in self.filtering_predicates:
       tables_required = set()
       for or_connected_predicate in filtering_predicate:
-        normalized_col_set, _ = self._get_normalized_col_set_and_exp(or_connected_predicate)
+        normalized_col_set = self._get_normalized_column_set(or_connected_predicate)
         for normalized_col_name in normalized_col_set:
-          originated_from = self.config.columns_to_root_column.get(normalized_col_name, normalized_col_name)
-          if originated_from in self.config.column_by_service:
-            tables_required.add(originated_from.split('.')[0])
-        for node, _, _ in or_connected_predicate.walk():
-          if isinstance(node, exp.Table):
-            tables_required.add(node.args['this'].args['this'])
+          if normalized_col_name in self.config.column_by_service:
+            tables_required.add(normalized_col_name.split('.')[0])
       tables_required_predicates.append(tables_required)
     return tables_required_predicates
-
-
-  @cached_property
-  def columns_in_query(self):
-    """
-    nested queries are not supported for the time being
-    * is supported
-    """
-    column_set, _ = self._get_normalized_col_set_and_exp(self._expression)
-    return column_set
 
 
   @cached_property
@@ -581,15 +625,3 @@ class Query(object):
     re = Rewriter(expression)
     new_sql = re.add_join(new_join)
     return Query(new_sql.expression.sql(), self.config)
-
-
-  def query_after_normalize_columns(self):
-    '''
-    this function is used to normalize columns name in expression
-    e.g. for this query: SELECT frame FROM blobs b WHERE timestamp > 100
-    this query will return the query of SELECT b.frame FROM blobs b WHERE b.timestamp > 100
-    '''
-    expression = self._expression.copy()
-    _, normalized_expression = self._get_normalized_col_set_and_exp(expression)
-
-    return Query(normalized_expression.sql(), self.config)
