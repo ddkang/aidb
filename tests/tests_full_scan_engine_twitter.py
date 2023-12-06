@@ -34,13 +34,13 @@ class FullScanEngineTwitterTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM hate01 WHERE ishate='HATE' and tweet_id < 500;''',
-        '''SELECT * FROM hate01 WHERE ishate='HATE' and tweet_id < 500;'''
+        '''SELECT * FROM hate01 WHERE ishate=1 and tweet_id < 500;''',
+        '''SELECT * FROM hate01 WHERE ishate=1 and tweet_id < 500;'''
       ),
       (
         'full_scan',
-        '''SELECT * FROM sentiment02 WHERE sentiment='negative' and tweet_id < 1000;''',
-        '''SELECT * FROM sentiment02 WHERE sentiment='negative' and tweet_id < 1000;'''
+        '''SELECT * FROM sentiment02 WHERE sentiment < 0 and tweet_id < 1000;''',
+        '''SELECT * FROM sentiment02 WHERE sentiment < 0 and tweet_id < 1000;'''
       ),
       (
         'full_scan',

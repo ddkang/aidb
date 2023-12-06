@@ -80,10 +80,10 @@ tables = {
     {"name": "type", "dtype": str}],
   "hate01": [
     {"name": "tweet_id", "is_primary_key": True, "refers_to": ("blobs00", "tweet_id"), "dtype": int},
-    {"name": "ishate", "dtype": str}],
+    {"name": "ishate", "dtype": int}],
   "sentiment02": [
     {"name": "tweet_id", "is_primary_key": True, "refers_to": ("blobs00", "tweet_id"), "dtype": int},
-    {"name": "sentiment", "dtype": str}],
+    {"name": "sentiment", "dtype": int}],
   "topic03": [
     {"name": "tweet_id", "is_primary_key": True, "refers_to": ("blobs00", "tweet_id"), "dtype": int},
     {"name": "topic", "dtype": str}],

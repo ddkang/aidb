@@ -47,17 +47,17 @@ class ApproxSelectEngine(TastiEngine):
       await bound_service.infer(inp_df)
 
 
-    no_aqp_query = Query(query.base_sql_no_aqp.sql(), self._config)
-    new_exp = no_aqp_query.add_select(
-        no_aqp_query.expression_after_normalize_columns,
+    query_no_aqp = query.base_sql_no_aqp
+    query_after_normalize_columns = query_no_aqp.query_after_normalize_columns()
+    query_after_adding_vector_id_column = query_after_normalize_columns.add_select(
         f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}'
     )
 
     blob_keys = [col.name for col in self._config.tables[self.blob_mapping_table_name].columns]
     added_cols = set()
     join_conditions = []
-    tables_in_query = no_aqp_query.tables_in_query
-    table_alias = no_aqp_query.table_name_to_aliases
+    tables_in_query = query_no_aqp.tables_in_query
+    table_alias = query_no_aqp.table_name_to_aliases
     for table_name in tables_in_query:
       for col in self._config.tables[table_name].columns:
         col_name = col.name
@@ -68,32 +68,32 @@ class ApproxSelectEngine(TastiEngine):
           added_cols.add(col_name)
     join_conditions_str = ' AND '.join(join_conditions)
 
-    new_exp = no_aqp_query.add_join(new_exp, f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}')
-    new_query = Query(new_exp.sql(), self._config)
+    query_after_adding_join = query_after_adding_vector_id_column.add_join(
+        f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}'
+    )
 
     table_columns = [f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}']
     sampled_df = pd.DataFrame({VECTOR_ID_COLUMN: sampled_index})
 
-    all_query_exp, _ = self.add_filter_key_into_query(
+    query_no_where = query_after_adding_join.base_sql_no_where
+    all_query_add_filter_key, _ = self.add_filter_key_into_query(
         table_columns,
         sampled_df,
-        new_query,
-        new_query.base_sql_no_where
+        query_no_where
     )
 
-    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(all_query_exp.sql()), conn))
+    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(all_query_add_filter_key.sql_str), conn))
     # drop duplicated columns, this will happen when 'select *'
     all_df = all_df.loc[:, ~all_df.columns.duplicated()]
     all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
-    sample_query_exp, _ = self.add_filter_key_into_query(
+    sample_query_add_filter_key, _ = self.add_filter_key_into_query(
         table_columns,
         sampled_df,
-        new_query,
-        new_query.get_expression()
+        query_after_adding_join
     )
 
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_query_exp.sql()), conn))
+    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_query_add_filter_key.sql_str), conn))
     # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
     # So we need to drop duplicated columns
     res_df = res_df.loc[:, ~res_df.columns.duplicated()]
