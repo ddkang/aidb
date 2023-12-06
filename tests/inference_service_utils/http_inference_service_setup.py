@@ -55,8 +55,7 @@ def run_server(data_dir: str, port=8000):
         res = tmp[name_to_output_cols[service_name]].to_dict(orient='list')
         return res
       except Exception as e:
-        logger.error(e)
-        return []
+        raise Exception(e)
 
   # config = Config(app=app, host="127.0.0.1", port=8000)
   # server = Server(config=config)

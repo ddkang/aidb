@@ -44,7 +44,7 @@ async def create_db(db_url: str, db_name: str):
       async with engine.begin() as conn:
         await conn.execute(text(f"CREATE DATABASE {db_name}"))
     except sqlalchemy.exc.ProgrammingError:
-      logger.error("Database Already exists")
+      logger.warning('Database Already exists')
   elif dialect == "sqlite":
     # sqlite auto creates, do nothing
     pass
