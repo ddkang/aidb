@@ -359,29 +359,6 @@ class Query(object):
     return column_set
 
 
-  # Get aggregation types with columns corresponding
-  @cached_property
-  def get_aggregation_type_list(self):
-    '''
-    Return list of aggregation types
-    eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
-    the function will return [exp.AVG, exp.AVG, exp.COUNT]
-    '''
-    select_exp = self._expression.args['expressions']
-    agg_type_with_cols = []
-    for expression in select_exp:
-      aggregate_expression = expression.find(exp.AggFunc)
-      if isinstance(aggregate_expression, exp.Avg):
-        agg_type_with_cols.append(exp.Avg)
-      elif isinstance(aggregate_expression, exp.Count):
-        agg_type_with_cols.append(exp.Count)
-      elif isinstance(aggregate_expression, exp.Sum):
-        agg_type_with_cols.append(exp.Sum)
-      else:
-        raise Exception('Unsupported aggregation')
-    return agg_type_with_cols
-
-
   @cached_property
   def inference_engines_required_for_query(self):
     """
@@ -466,6 +443,29 @@ class Query(object):
   @cached_property
   def is_approx_agg_query(self):
     return self.error_target is not None and self.confidence is not None
+
+    
+  # Get aggregation types with columns corresponding
+  @cached_property
+  def get_aggregation_type_list(self):
+    '''
+    Return list of aggregation types
+    eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    the function will return [exp.AVG, exp.AVG, exp.COUNT]
+    '''
+    select_exp = self._expression.args['expressions']
+    agg_type_with_cols = []
+    for expression in select_exp:
+      aggregate_expression = expression.find(exp.AggFunc)
+      if isinstance(aggregate_expression, exp.Avg):
+        agg_type_with_cols.append(exp.Avg)
+      elif isinstance(aggregate_expression, exp.Count):
+        agg_type_with_cols.append(exp.Count)
+      elif isinstance(aggregate_expression, exp.Sum):
+        agg_type_with_cols.append(exp.Sum)
+      else:
+        raise Exception('Unsupported aggregation')
+    return agg_type_with_cols
 
 
   def is_select_query(self):
