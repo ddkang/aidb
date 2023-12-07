@@ -359,61 +359,27 @@ class Query(object):
     return column_set
 
 
-  def _get_columns_in_expression_tree(self, exp_tree):
-    '''
-    Return ordered list of columns, expression wise
-    eg: SELECT AVG(col1), COUNT(*) FROM table1;
-        exp_wise_columns = [[col1], [col1, col2, col3, col4]]
-    '''
-    exp_wise_columns = []
-    for node, _, _ in exp_tree.walk():
-      if isinstance(node, exp.Column):
-        if isinstance(node.args['this'], exp.Identifier):
-          normalized_col = self._get_normalized_col_name_from_col_exp(node)
-          exp_wise_columns.append([normalized_col])
-        elif isinstance(node.args['this'], exp.Star):
-          for table in self.tables_in_query:
-            all_cols = []
-            for col, _ in self._tables[table].items():
-              table_column = f"{table}.{col}"
-              all_cols.append(table_column)
-            exp_wise_columns.append(all_cols)
-        else:
-          raise Exception('Unsupported column type')
-    return exp_wise_columns
-
-
   # Get aggregation types with columns corresponding
   @cached_property
-  def aggregated_columns_and_types(self):
+  def get_aggregation_type_list(self):
     '''
-    Return aggregation types and corresponding columns,
-    even with multi aggregations
-    eg: SELECT avg(column1) from table1;
-    agg_type_with_cols = [(exp.Avg, [[column1]])]
-    SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
-    agg_type_with_cols = [
-            (exp.Avg, [[col1]])
-            (exp.Count, [[col1, col2, col3, col4]]),
-            (exp.Avg, [col2])
-          ]
+    Return list of aggregation types
+    eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    the function will return [exp.AVG, exp.AVG, exp.COUNT]
     '''
-    select_exp = self.base_sql_no_aqp.get_expression().args['expressions']
+    select_exp = self._expression.args['expressions']
     agg_type_with_cols = []
     for expression in select_exp:
-      columns_in_expression = self._get_columns_in_expression_tree(expression)
-      if isinstance(expression, exp.Avg):
-        agg_type_with_cols.append((exp.Avg, columns_in_expression))
-      elif isinstance(expression, exp.Count):
-        agg_type_with_cols.append((exp.Count, columns_in_expression))
-      elif isinstance(expression, exp.Sum):
-        agg_type_with_cols.append((exp.Sum, columns_in_expression))
+      aggregate_expression = expression.find(exp.AggFunc)
+      if isinstance(aggregate_expression, exp.Avg):
+        agg_type_with_cols.append(exp.Avg)
+      elif isinstance(aggregate_expression, exp.Count):
+        agg_type_with_cols.append(exp.Count)
+      elif isinstance(aggregate_expression, exp.Sum):
+        agg_type_with_cols.append(exp.Sum)
+      else:
+        raise Exception('Unsupported aggregation')
     return agg_type_with_cols
-
-
-  @cached_property
-  def num_aggregations(self):
-    return sum([len(columns) for _, columns in self.aggregated_columns_and_types])
 
 
   @cached_property

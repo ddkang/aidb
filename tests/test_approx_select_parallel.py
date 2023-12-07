@@ -1,4 +1,3 @@
-import logging
 import multiprocessing as mp
 import numpy as np
 import os
@@ -12,18 +11,9 @@ from aidb.vector_database.tasti import Tasti
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
-
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-
-file_handler = logging.FileHandler('approx_select_parallel.log')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-
+setup_test_logger('approx_select_parallel')
 
 DB_URL = 'sqlite+aiosqlite://'
 DATA_SET = 'law'

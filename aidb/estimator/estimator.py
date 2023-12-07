@@ -33,7 +33,6 @@ def _get_estimate_bennett(
   b = scipy.stats.chi2.ppf(delta_inp / 2, num_samples - 1)  # lower critical value
   std_ub = std * np.sqrt(num_samples - 1) / np.sqrt(b)
   var_ub = std_ub ** 2 * num_samples
-  logger.info(f'estimate: {estimate}, std: {std}, max_statistic: {max_statistic},num_samples: {num_samples}, conf: {conf}')
 
   delta = delta_inp / 4.0
   a = max_statistic

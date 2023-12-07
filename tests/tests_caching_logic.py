@@ -5,9 +5,12 @@ import time
 import unittest
 from unittest import IsolatedAsyncioTestCase
 
+from aidb.utils.logger import logger
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
+
+setup_test_logger('caching_logic')
 
 DB_URL = 'sqlite+aiosqlite://'
 
@@ -43,13 +46,13 @@ class CachingLogic(IsolatedAsyncioTestCase):
 
     calls = [20, 27]
     for index, (query_type, aidb_query, exact_query) in enumerate(queries):
-      print(f'Running query {exact_query} in ground truth database')
+      logger.info(f'Running query {exact_query} in ground truth database')
       # Run the query on the ground truth database
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(exact_query))
         gt_res = gt_res.fetchall()
       # Run the query on the aidb database
-      print(f'Running query {aidb_query} in aidb database')
+      logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       assert len(gt_res) == len(aidb_res)
       # running the same query, so number of inference calls should remain same
