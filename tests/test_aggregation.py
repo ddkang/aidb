@@ -95,7 +95,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
   async def test_agg_query(self):
     count_list = [0] * len(queries)
-    for i in range(10):
+    for i in range(100):
       dirname = os.path.dirname(__file__)
       data_dir = os.path.join(dirname, 'data/jackson_all')
 
