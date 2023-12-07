@@ -379,7 +379,7 @@ class Query(object):
     """
     Inference services required to run to satisfy the columns present in each filtering predicate
     for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-    it returns [[color], [], [object]]
+    it returns [{colors02}, [], {objects00}]
     """
     inference_engines_required_predicates = []
     for filtering_predicate in self.filtering_predicates:
@@ -398,7 +398,7 @@ class Query(object):
     """
     Tables needed to satisfy the columns present in each filtering predicate
     for e.g. if predicates are [[color=red],[frame>20],[object_class=car]]
-    it returns [[color], [blob], [object]]
+    it returns [{color}, {blob}, {object}]
     """
     tables_required_predicates = []
     for filtering_predicate in self.filtering_predicates:

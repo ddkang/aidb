@@ -36,9 +36,9 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
       (
         'full_scan',
         '''SELECT colors02.color as alias_color FROM colors02 WHERE alias_color IN (SELECT table2.color as alias_color2 
-            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);''',
+            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) as alias_color2 FROM objects00 AS ob);''',
         '''SELECT colors02.color as alias_color FROM colors02 WHERE alias_color IN (SELECT table2.color as alias_color2 
-            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob);'''
+            FROM colors02 AS table2) OR colors02.object_id > (SELECT AVG(ob.object_id) as alias_color2 FROM objects00 AS ob);'''
       ),
       # test table alias
       (
@@ -133,6 +133,18 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
         'full_scan',
         '''SELECT * FROM colors02 WHERE 500 < object_id < 1000;''',
         '''SELECT * FROM colors02 WHERE 500 < object_id < 1000;'''
+      ),
+      # test sub-subquery
+      (
+        'full_scan',
+        '''SELECT frame, object_id FROM colors02 AS cl 
+            WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00 
+             WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))
+        ''',
+        '''SELECT frame, object_id FROM colors02 AS cl 
+                    WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00 
+                     WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))
+                ''',
       )
     ]
 
@@ -145,7 +157,6 @@ class NestedQueryTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-
       assert len(gt_res) == len(aidb_res)
 
       # Sort results
