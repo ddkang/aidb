@@ -1,5 +1,7 @@
+import logging
 from tests.db_utils.db_setup import create_db, setup_db, setup_config_tables, insert_data_in_tables, clear_all_tables
 from aidb.engine import Engine
+from aidb.utils.logger import logger
 
 async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, port = 8000):
   # Set up the ground truth database
@@ -24,3 +26,14 @@ async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, port = 
   )
 
   return gt_engine, engine
+
+
+def setup_test_logger(log_fname):
+  logger.setLevel(logging.INFO)
+  formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+  
+  file_handler = logging.FileHandler(f'{log_fname}.log')
+  file_handler.setLevel(logging.INFO)
+  file_handler.setFormatter(formatter)
+  
+  logger.addHandler(file_handler)

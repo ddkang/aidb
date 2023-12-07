@@ -5,11 +5,13 @@ import time
 import unittest
 from unittest import IsolatedAsyncioTestCase
 
-
+from aidb.utils.logger import logger
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
 from tests.tasti_test.tasti_test import TastiTests, VectorDatabaseType
-from tests.utils import setup_gt_and_aidb_engine
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
+
+setup_test_logger('limit_engine')
 
 DB_URL = 'sqlite+aiosqlite://'
 
@@ -54,15 +56,15 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     ]
 
     for aidb_query, exact_query in queries:
-      print(f'Running query {aidb_query} in limit engine')
+      logger.info(f'Running query {aidb_query} in limit engine')
       aidb_res = aidb_engine.execute(aidb_query)
 
-      print(f'Running query {exact_query} in ground truth database')
+      logger.info(f'Running query {exact_query} in ground truth database')
       async with gt_engine.begin() as conn:
         gt_res = await conn.execute(text(exact_query))
         gt_res = gt_res.fetchall()
 
-      print(f'There are {len(aidb_res)} elements in limit engine results '
+      logger.info(f'There are {len(aidb_res)} elements in limit engine results '
             f'and {len(gt_res)} elements in ground truth results')
       assert len(set(aidb_res) - set(gt_res)) == 0
 
