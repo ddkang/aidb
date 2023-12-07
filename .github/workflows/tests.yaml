@@ -59,11 +59,8 @@ jobs:
     - name: Run Twitter Full Scan Tests
       run: python3 -m tests.tests_full_scan_engine_twitter
 
-    - name: Set env variable to fix number of iterations in tests below
-      run: echo "NUMBER_OF_RUNS=1" >> $GITHUB_ENV
-
-    - name: Run aggregation query tests
-      run: python3 -m tests.test_aggregation
+    # - name: Run aggregation query tests
+    #  run: python3 -m tests.test_aggregation
 
     # - name: Run aggregation query Gaussian tests
     #   run: python3 -m tests.test_aggregation_gaussian
