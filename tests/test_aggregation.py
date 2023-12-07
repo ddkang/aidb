@@ -18,8 +18,8 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
-    '''SELECT (SUM(x_min)), COUNT(frame) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT (SUM(x_min)), COUNT(frame) FROM objects00 WHERE x_min > 1000;'''
+    '''SELECT SUM(x_min), COUNT(frame) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min), COUNT(frame) FROM objects00 WHERE x_min > 1000;'''
   ),
   (
     'approx_aggregate',

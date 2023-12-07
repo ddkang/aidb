@@ -444,7 +444,7 @@ class Query(object):
   def is_approx_agg_query(self):
     return self.error_target is not None and self.confidence is not None
 
-    
+
   # Get aggregation types with columns corresponding
   @cached_property
   def get_aggregation_type_list(self):
@@ -464,12 +464,8 @@ class Query(object):
       elif isinstance(aggregate_expression, exp.Sum):
         agg_type_with_cols.append(exp.Sum)
       else:
-        raise Exception('Unsupported aggregation')
+        raise Exception('We only support approximation for Avg, Sum and Count query currently.')
     return agg_type_with_cols
-
-
-  def is_select_query(self):
-    return isinstance(self._expression, exp.Select)
 
 
   # Validate AQP
@@ -491,13 +487,8 @@ class Query(object):
           Try running without the error target and confidence.'''
       )
 
-    # Count the number of distinct aggregates
-    expression_counts = defaultdict(int)
-    for expression in query_no_aqp_expression.args['expressions']:
-      expression_counts[type(expression)] += 1
-
-    if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
-      raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+    # check aggregation function in SELECT clause
+    _ = self.get_aggregation_type_list
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
@@ -536,6 +527,10 @@ class Query(object):
       return False
     else:
       return True
+
+
+  def is_select_query(self):
+    return isinstance(self._expression, exp.Select)
 
 
   @cached_property
