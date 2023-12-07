@@ -10,6 +10,7 @@ from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator,
                                       WeightedCountSetEstimator, WeightedSumSetEstimator)
 from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
+from aidb.utils.logger import logger
 
 _NUM_PILOT_SAMPLES = 1000
 
@@ -54,7 +55,7 @@ class ApproximateAggregateEngine(FullScanEngine):
       agg_type = query.get_agg_type
       estimator = self._get_estimator(agg_type)
       num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
-      print('num_samples', num_samples)
+      logger.info(f'num_samples: {num_samples}')
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
         query_no_aqp = query.base_sql_no_aqp
