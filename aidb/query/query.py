@@ -87,6 +87,12 @@ class Query(object):
         while parent:
           depth += 1
           parent = parent.parent
+
+        extracted_query = Query(node.sql(), self.config)
+        if depth != 0 :
+          if extracted_query.is_approx_agg_query or extracted_query.is_approx_select_query:
+            raise Exception("We don't support using approx query as a subquery")
+
         all_queries.append((Query(node.sql(), self.config), depth))
 
     all_queries = sorted(all_queries, key=lambda x:x[1], reverse=True)

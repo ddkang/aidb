@@ -144,5 +144,86 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     self._test_query(query_str5, config, normalized_query_str5, correct_fp, correct_service, correct_tables, 3)
 
 
+  # We don't support using approximate query as a subquery
+  async def test_approximate_query_as_subquery(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+
+    config = aidb_engine._config
+
+    # approx aggregation as a subquery
+    query_str1 = '''
+                 SELECT x_min FROM  objects00
+                 WHERE x_min > (SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%) 
+                 AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
+                 '''
+
+    parsed_query = Query(query_str1, config)
+    with self.assertRaises(Exception):
+      _ = parsed_query.all_queries_in_expressions
+
+    # approx select as a subquery
+    query_str2 = '''
+                 SELECT x_min FROM  objects00
+                 WHERE frame IN (SELECT frame FROM colors02 where color LIKE 'blue' 
+                    RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;) 
+                 AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
+                 '''
+
+    parsed_query = Query(query_str2, config)
+    with self.assertRaises(Exception):
+      _ = parsed_query.all_queries_in_expressions
+
+
+  async def test_correct_approximate_query(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+
+    config = aidb_engine._config
+
+    # approx aggregation
+    query_str1 = '''
+                 SELECT AVG(x_min) FROM  objects00
+                 WHERE frame > (SELECT AVG(frame) FROM blobs_00) 
+                 ERROR_TARGET 10% CONFIDENCE 95%;
+                 '''
+
+    normalized_query_str1 = ("SELECT AVG(objects00.x_min) "
+                             "FROM objects00 "
+                             "WHERE objects00.frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%")
+
+    correct_fp = [["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]]
+
+    correct_service = [{}]
+    correct_tables = [{}]
+    self._test_query(query_str1, config, normalized_query_str1, correct_fp, correct_service, correct_tables, 2)
+
+
+    # approx select as a subquery
+    query_str2 = '''
+                 SELECT frame FROM colors02 
+                 WHERE color IN (SELECT color FROM colors02 WHERE frame > 10000)
+                 RECALL_TARGET 80% 
+                 CONFIDENCE 95%;
+                 '''
+
+    normalized_query_str2 = ("SELECT colors02.frame FROM colors02 "
+                             "WHERE colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000) "
+                             "RECALL_TARGET 80% "
+                             "CONFIDENCE 95%")
+
+    correct_fp = [["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]]
+
+    correct_service = [{'colors02'}]
+    correct_tables = [{'colors02'}]
+    self._test_query(query_str2, config, normalized_query_str2, correct_fp, correct_service, correct_tables, 2)
+
+
 if __name__ == '__main__':
   unittest.main()

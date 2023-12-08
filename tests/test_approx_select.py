@@ -57,6 +57,11 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
               RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
           '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
         ),
+        (
+          f'''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5)
+            RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
+          '''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5);'''
+        ),
       ]
 
       for aidb_query, exact_query in queries:
