@@ -55,7 +55,7 @@ class ApproximateAggregateEngine(FullScanEngine):
             error target. Try running without the error target if you are certain you want to run this query.'''
         )
 
-      aggregation_type_list = query.get_aggregation_type_list
+      aggregation_type_list = query.aggregation_type_list_in_query
       num_aggregations = len(aggregation_type_list)
       alpha = (1. - (query.confidence / 100.)) / num_aggregations
       conf = 1. - alpha
@@ -81,20 +81,23 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     estimates = []
 
-    agg_index = 0
-    for agg_type in aggregation_type_list:
+    for index, agg_type in enumerate(aggregation_type_list):
+      extracted_sample_results = [sample_result.get_specific_data_by_index(index)
+                                      for sample_result in sample_results]
+
       estimator = self._get_estimator(agg_type)
       estimates.append(
           estimator.estimate(
-              sample_results,
+              extracted_sample_results,
               _NUM_PILOT_SAMPLES + num_samples,
-              conf,
-              agg_index
+              conf
           ).estimate
       )
-      agg_index += 1
 
+    # For approximate aggregation, we currently do not support the GROUP BY clause, so there is only one row result.
+    # We still return the result a list of tuple to maintain the format
     return [tuple(estimates)]
+
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
     '''Function that returns a query, to get total number of blob ids'''
@@ -195,7 +198,7 @@ class ApproximateAggregateEngine(FullScanEngine):
       results_for_each_blob.append(SampledBlob(
           weight=1. / self.blob_count,
           mass=1,
-          statistics=row[:-1],
+          statistics=list(row[:-1]),
           num_items=int(row[-1])
       ))
 
@@ -233,10 +236,11 @@ class ApproximateAggregateEngine(FullScanEngine):
     conf = 1. - alpha
     num_samples = []
 
-    agg_index = 0
-    for agg_type in query.get_aggregation_type_list:
+    for index, agg_type in enumerate(query.aggregation_type_list_in_query):
       estimator = self._get_estimator(agg_type)
-      pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES, conf, agg_index)
+      extracted_sample_results = [sample_result.get_specific_data_by_index(index)
+                                      for sample_result in sample_results]
+      pilot_estimate = estimator.estimate(extracted_sample_results, _NUM_PILOT_SAMPLES, conf)
 
       if agg_type == exp.Avg:
         p_lb = statsmodels.stats.proportion.proportion_confint(
@@ -252,5 +256,4 @@ class ApproximateAggregateEngine(FullScanEngine):
         (1. / p_lb)
       ))
 
-      agg_index += 1
     return max(max(num_samples), 100)

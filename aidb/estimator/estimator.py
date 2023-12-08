@@ -34,6 +34,10 @@ def _get_estimate_bennett(
   std_ub = std * np.sqrt(num_samples - 1) / np.sqrt(b)
   var_ub = std_ub ** 2 * num_samples
 
+  logger.debug(
+      f'estimate: {estimate}, std: {std}, max_statistic: {max_statistic},num_samples: {num_samples}, conf: {conf}'
+  )
+
   delta = delta_inp / 4.0
   a = max_statistic
   t = var_ub / a * \
@@ -58,15 +62,15 @@ class Estimator(abc.ABC):
 
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
     pass
 
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
     weights = np.array([sample.weight for sample in samples])
-    statistics = np.array([sample.statistics[agg_index] for sample in samples])
+    statistics = np.array([sample.statistics[0] for sample in samples])
     counts = np.array([sample.num_items for sample in samples])
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
@@ -81,13 +85,13 @@ class WeightedMeanSetEstimator(Estimator):
 
 
 class WeightedCountSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, agg_index: int, **kwargs) -> Estimate:
+  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
     weight = samples[0].weight
     weights = np.array([weight] * num_samples)
 
     # Statistics are already counts
 
-    statistics = np.array([sample.statistics[agg_index] for sample in samples] + [0] * (num_samples - len(samples)))
+    statistics = np.array([sample.statistics[0] for sample in samples] + [0] * (num_samples - len(samples)))
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
     mean_est = _get_estimate_bennett(
       wstats.mean,

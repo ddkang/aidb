@@ -447,7 +447,7 @@ class Query(object):
 
   # Get aggregation types with columns corresponding
   @cached_property
-  def get_aggregation_type_list(self):
+  def aggregation_type_list_in_query(self):
     '''
     Return list of aggregation types
     eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
@@ -488,7 +488,7 @@ class Query(object):
       )
 
     # check aggregation function in SELECT clause
-    _ = self.get_aggregation_type_list
+    _ = self.aggregation_type_list_in_query
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
