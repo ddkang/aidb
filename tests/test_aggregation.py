@@ -66,6 +66,21 @@ queries = [
     '''SELECT AVG(x_min) FROM objects00 WHERE x_min < 700 ERROR_TARGET 5% CONFIDENCE 95%;''',
     '''SELECT AVG(x_min) FROM objects00 WHERE x_min < 700;'''
   ),
+  (
+    'approx_aggregate',
+    '''SELECT SUM(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00);'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT AVG(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00);'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT COUNT(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT COUNT(x_min) FROM objects00 WHERE frame > (SELECT AVG(frame) FROM blobs_00);'''
+  ),
 ]
 
 
