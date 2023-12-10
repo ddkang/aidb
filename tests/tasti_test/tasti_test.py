@@ -4,9 +4,6 @@ import os
 import pandas as pd
 from typing import Optional
 
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
 from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.logger import logger
@@ -63,17 +60,20 @@ class TastiTests():
     '''
     user_database = None
     if self.vd_type == VectorDatabaseType.FAISS.value:
+      from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
       user_database = FaissVectorDatabase(index_path)
       user_database.create_index(self.index_name, self.embedding_dim, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
       user_database.save_index(self.index_name)
 
     elif self.vd_type == VectorDatabaseType.CHROMA.value:
+      from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
       user_database = ChromaVectorDatabase(index_path)
       user_database.create_index(self.index_name, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
 
     elif self.vd_type == VectorDatabaseType.WEAVIATE.value:
+      from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
       user_database = WeaviateVectorDatabase(weaviate_auth)
       user_database.create_index(self.index_name, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)

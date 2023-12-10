@@ -1,0 +1,3 @@
+gdown
+uvicorn
+pytest>=7.4.2

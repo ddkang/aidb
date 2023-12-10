@@ -3,22 +3,15 @@ import pandas as pd
 
 from aidb.config.config_types import InferenceBinding
 from aidb.engine import Engine
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
-from aidb.vector_database.tasti import Tasti
 
 
 def get_tasti_config(tasti_config):
-  vector_database = {
-    'FAISS': FaissVectorDatabase,
-    'CHROMA': ChromaVectorDatabase,
-    'WEAVIATE': WeaviateVectorDatabase
-  }
+  from aidb_utilities.vector_database_setup.vector_database_setup import VectorDatabaseSetup
+  from aidb.vector_database.tasti import Tasti
   vector_database_config = tasti_config.vector_database
   vector_database_type = vector_database_config['vector_database_type'].upper()
   try:
-    user_vector_database = vector_database[vector_database_type](**vector_database_config['auth'])
+    user_vector_database = VectorDatabaseSetup.from_type(vector_database_type)(**vector_database_config['auth'])
   except KeyError:
     raise ValueError(f'{vector_database_type} is not a supported type. We support FAISS, Chroma and Weaviate.')
   tasti_index = Tasti(vector_database=user_vector_database, **tasti_config.tasti_engine)
