@@ -37,6 +37,7 @@ class MarqoVectorDatabase(VectorDatabase):
     
     self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
     
+
   @staticmethod
   def _get_auth_secret(username: Optional[str] = None, password: Optional[str] = None, api_key: Optional[str] = None):
     '''
@@ -86,11 +87,13 @@ class MarqoVectorDatabase(VectorDatabase):
       )
     self.index_list.append(index_name)
 
+
   def load_index(self):
     '''
     Reload index from Marqo
     '''
     self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
+
 
   def delete_index(self, index_name: str):
     '''
@@ -102,20 +105,24 @@ class MarqoVectorDatabase(VectorDatabase):
       self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
       logger.info("Index '%s' deleted.", index_name)
 
+
   def _sanitize_index_name(self, index_name: str) -> str:
     '''
     index should start with a capital
     '''
     return index_name[0].upper() + index_name[1:]
   
+
   def _check_index_validity(self, index_name: str):
     if index_name not in self.index_list:
       raise Exception(f'Couldn\'t find index {index_name}, please create it first')
     return index_name
   
+
   def generate_uuid5(self, x): 
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(x)))
   
+
   def insert_data(self, index_name: str, data: pd.DataFrame):
     '''
     insert data into an index
@@ -152,6 +159,7 @@ class MarqoVectorDatabase(VectorDatabase):
           auto_refresh=True
         )
     
+
   def get_embeddings_by_id(self, index_name: str, ids: np.ndarray, reload = False) -> np.ndarray:
     '''
     Get data by id and return results
@@ -166,6 +174,7 @@ class MarqoVectorDatabase(VectorDatabase):
       result.append(fetch_response['_tensor_facets'][0]['_embedding'])
     return np.array(result)
   
+
   def query_by_embedding(
       self,
       index_name: str,
@@ -195,6 +204,7 @@ class MarqoVectorDatabase(VectorDatabase):
       all_topk_dists.append(dists)
 
     return np.array(all_topk_reps), np.array(all_topk_dists)
+  
   
   def execute(
       self,
