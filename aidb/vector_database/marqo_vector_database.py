@@ -22,7 +22,7 @@ class MarqoAuth:
   api_key: Optional[str] = field(default=None)
 
 class MarqoVectorDatabase(VectorDatabase):
-  def __init__(self, marqo_auth: MarqoAuth) -> None:
+  def __init__(self, marqo_auth: MarqoAuth, embedding_dim: int) -> None:
     '''
     Authentication
     '''
@@ -36,6 +36,7 @@ class MarqoVectorDatabase(VectorDatabase):
       raise Exception('Initial connection to Marqo failed')
     
     self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
+    self.embedding_dim = embedding_dim
     
 
   @staticmethod
@@ -74,10 +75,16 @@ class MarqoVectorDatabase(VectorDatabase):
     if index_name in self.index_list:
       raise Exception(f'Index {index_name} already exists, please use another name')
 
+    # Not using any model, providing own vectors
+    # https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model
     self.marqo_client.create_index(
       index_name=index_name,
       settings_dict={
                 'index_defaults': {
+                    'model': 'no_model',
+                    'model_properties': {
+                        'dimensions': self.embedding_dim
+                    },
                     'ann_parameters':{
                         'space_type': similarity
                     }
@@ -177,7 +184,8 @@ class MarqoVectorDatabase(VectorDatabase):
     all_topk_reps, all_topk_dists = [], []
     for query_emb in query_emb_list:
       response = self.marqo_client.index(index_name).search(
-        q={'dummy': 0},
+        # No query needs to be provided when no_model and custom vectors,
+        # only context - https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model
         context={
         'tensor':[{'vector': list(query_emb), 'weight' : 1}],
         }, limit=top_k

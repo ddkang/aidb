@@ -81,7 +81,7 @@ class TastiTests():
       user_database.insert_data(self.index_name, self.data)
 
     elif self.vd_type == VectorDatabaseType.MARQO.value:
-      user_database = MarqoVectorDatabase(marqo_auth)
+      user_database = MarqoVectorDatabase(marqo_auth, self.embedding_dim)
       user_database.create_index(self.index_name, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
 
