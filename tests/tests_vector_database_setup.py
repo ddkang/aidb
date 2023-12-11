@@ -5,6 +5,7 @@ import unittest
 from aidb_utilities.vector_database_setup.vector_database_setup import VectorDatabaseSetup
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.marqo_vector_database import MarqoAuth, MarqoVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 from tests.tests_data_store import AidbDataStoreTests
 
@@ -74,6 +75,21 @@ class AidbVectorDatabaseSetupTests(IsolatedAsyncioTestCase):
     value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(3)), reload=True)
     test_equality(value)
 
+  
+  @unittest.skip("Skip in case of absence of Marqo credentials")
+  async def test_marqo_set_up(self):
+    clean_vector_database()
+    vd_type = 'marqo'
+    url = ''
+    api_key = os.environ.get('MARQO_API_KEY')
+    auth = MarqoAuth(url=url, api_key=api_key)
+
+    vector_database = VectorDatabaseSetup(DB_URL, blob_table_name, vd_type, index_name, auth)
+    await vector_database.setup()
+
+    existing_vector_database = MarqoVectorDatabase(auth)
+    value = existing_vector_database.get_embeddings_by_id(index_name, ids=np.array(range(3)), reload=True)
+    test_equality(value)
 
 if __name__ == '__main__':
   unittest.main()
