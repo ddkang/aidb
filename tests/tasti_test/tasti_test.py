@@ -8,6 +8,7 @@ from aidb.vector_database.tasti import Tasti
 from aidb.utils.constants import VECTOR_ID_COLUMN
 from aidb.utils.logger import logger
 from tests.utils import setup_test_logger
+from aidb.vector_database.weaviate_utils import WeaviateAuth
 
 setup_test_logger('tasti')
 
