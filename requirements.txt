@@ -48,3 +48,4 @@ tzdata==2023.3
 urllib3==1.26.17
 uvicorn==0.23.2
 weaviate-client==3.24.1
+marqo==2.1.0
