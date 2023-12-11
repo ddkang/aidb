@@ -77,9 +77,9 @@ class MarqoVectorDatabase(VectorDatabase):
     self.marqo_client.create_index(
       index_name=index_name,
       settings_dict={
-                "index_defaults": {
-                    "ann_parameters":{
-                        "space_type": similarity
+                'index_defaults': {
+                    'ann_parameters':{
+                        'space_type': similarity
                     }
                 }
             }
@@ -133,9 +133,9 @@ class MarqoVectorDatabase(VectorDatabase):
       _vec = d['values']
       mod_data.append(
         {
-          "_id": _id,
-          "aidb_data":{
-            "vector": _vec
+          '_id': _id,
+          'aidb_data':{
+            'vector': _vec
           }
         }
       )
@@ -144,11 +144,11 @@ class MarqoVectorDatabase(VectorDatabase):
         ).add_documents(
           documents=mod_data,
           mappings={
-            "aidb_data":{
-              "type": "custom_vector"
+            'aidb_data':{
+              'type': 'custom_vector'
             }
           },
-          tensor_fields=["aidb_data"],
+          tensor_fields=['aidb_data'],
           auto_refresh=True
         )
     
@@ -180,9 +180,9 @@ class MarqoVectorDatabase(VectorDatabase):
     all_topk_reps, all_topk_dists = [], []
     for query_emb in query_emb_list:
       response = self.marqo_client.index(index_name).search(
-        q={"dummy": 0},
+        q={'dummy': 0},
         context={
-        'tensor':[{"vector": list(query_emb), "weight" : 1}],
+        'tensor':[{'vector': list(query_emb), 'weight' : 1}],
         }, limit=top_k
       )
       ids = []
