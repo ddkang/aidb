@@ -61,7 +61,6 @@ class MarqoVectorDatabase(VectorDatabase):
     Create a new index
     :similarity: similarity function, it should be one of l1, l2, linf and cosinesiml
     '''
-    # index_name = self._sanitize_index_name(index_name)
     if recreate_index:
       if index_name in self.index_list:
         self.delete_index(index_name)
@@ -104,23 +103,12 @@ class MarqoVectorDatabase(VectorDatabase):
       # self.index_list.remove(index_name)
       self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
       logger.info("Index '%s' deleted.", index_name)
-
-
-  def _sanitize_index_name(self, index_name: str) -> str:
-    '''
-    index should start with a capital
-    '''
-    return index_name[0].upper() + index_name[1:]
   
 
   def _check_index_validity(self, index_name: str):
     if index_name not in self.index_list:
       raise Exception(f'Couldn\'t find index {index_name}, please create it first')
     return index_name
-  
-
-  def generate_uuid5(self, x): 
-    return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(x)))
   
 
   def insert_data(self, index_name: str, data: pd.DataFrame):
@@ -205,7 +193,7 @@ class MarqoVectorDatabase(VectorDatabase):
 
     return np.array(all_topk_reps), np.array(all_topk_dists)
   
-  
+
   def execute(
       self,
       index_name: str,
