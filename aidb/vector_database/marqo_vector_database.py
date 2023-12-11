@@ -163,10 +163,11 @@ class MarqoVectorDatabase(VectorDatabase):
       self.load_index()
     index_name = self._check_index_validity(index_name)
     result = []
-    for id in ids:
-      fetch_response = self.marqo_client.index(
-        index_name).get_document(document_id=str(id), expose_facets=True)
-      result.append(fetch_response['_tensor_facets'][0]['_embedding'])
+    resp = self.marqo_client.index(
+        index_name).get_documents(
+          document_ids=[str(i) for i in ids], expose_facets=True
+        )
+    result = [ii['_tensor_facets'][0]['_embedding'] for ii in resp['results']]
     return np.array(result)
   
 
