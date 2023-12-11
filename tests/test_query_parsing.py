@@ -144,6 +144,38 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     self._test_query(query_str5, config, normalized_query_str5, correct_fp, correct_service, correct_tables, 3)
 
 
+    query_str6 = '''
+                 SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;
+                 '''
+
+    normalized_query_str6 = ("SELECT colors02.color, objects00.x_min, objects00.y_min "
+                             "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame")
+
+    correct_fp = [[]]
+
+    correct_service = [{}]
+    correct_tables = [{}]
+    self._test_query(query_str6, config, normalized_query_str6, correct_fp, correct_service, correct_tables, 1)
+
+
+    query_str7 = '''
+                 SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+                 JOIN blobs_00 table3 ON table2.frame = table3.frame;
+                 '''
+
+    normalized_query_str7 = ("SELECT colors02.color, objects00.x_min, blobs_00.frame "
+                             "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
+                             "JOIN blobs_00 ON objects00.frame = blobs_00.frame")
+
+    correct_fp = [[]]
+
+    correct_service = [{}]
+    correct_tables = [{}]
+    self._test_query(query_str7, config, normalized_query_str7, correct_fp, correct_service, correct_tables, 1)
+
+
   # We don't support using approximate query as a subquery
   async def test_approximate_query_as_subquery(self):
     dirname = os.path.dirname(__file__)
