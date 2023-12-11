@@ -9,3 +9,4 @@ statsmodels>=0.14.0
 flatten-json
 tqdm>=4.66.1
 Pillow>=10.1.0
+boto3
