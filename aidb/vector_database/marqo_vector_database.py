@@ -54,7 +54,7 @@ class MarqoVectorDatabase(VectorDatabase):
   def create_index(
     self,
     index_name: str,
-    similarity: str = 'cosinesimil',
+    similarity: str = 'l2',
     recreate_index: bool = False
   ):
     '''
