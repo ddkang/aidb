@@ -317,6 +317,7 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
     the expression will be converted into SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
     """
+
     def _remove_alias_in_expression(original_list):
       removed_alias_list = []
       for element in original_list:
@@ -325,6 +326,7 @@ class Query(object):
         else:
           removed_alias_list.append(element)
       return removed_alias_list
+
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
@@ -350,18 +352,9 @@ class Query(object):
 
     copied_expression.set('expressions', _remove_alias_in_expression(copied_expression.args['expressions']))
     copied_expression.args['from'].set(
-        'expressions',
-        _remove_alias_in_expression(copied_expression.args['from'].args['expressions'])
+      'expressions',
+      _remove_alias_in_expression(copied_expression.args['from'].args['expressions'])
     )
-
-    table_element_removed_alias = []
-    for table_element in copied_expression.args['from'].args['expressions']:
-      if isinstance(table_element, exp.Alias):
-        table_element_removed_alias.append(table_element.args['this'])
-      else:
-        table_element_removed_alias.append(table_element)
-
-    copied_expression.args['from'].set('expressions', table_element_removed_alias)
 
     for join_element in copied_expression.args['joins']:
       if isinstance(join_element.args['this'], exp.Alias):
