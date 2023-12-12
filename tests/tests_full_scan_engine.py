@@ -32,6 +32,16 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
 
+    def sum_function(a, b, c, d):
+      return a + b + c + d
+
+    def multiply(a, b, c, d):
+      return a * b * c * d
+
+
+    aidb_engine._config.add_user_defined_function('sum_function', sum_function)
+    aidb_engine._config.add_user_defined_function('multiply', multiply)
+
     queries = [
       (
         'full_scan',
@@ -60,11 +70,18 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;''',
 
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;'''
+      ),
+      (
+        'full_scan',
+        '''SELECT x_min, sum_function(x_min, x_max, y_min, y_max), x_max, 
+           multiply(x_min, x_max, y_min, y_max) FROM objects00 ;''',
+
+        '''SELECT x_min, x_max, y_min, y_max FROM objects00;'''
       ),
     ]
 
@@ -81,6 +98,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       assert len(gt_res) == len(aidb_res)
     del gt_engine
     p.terminate()
+
 
   async def test_multi_table_input(self):
     dirname = os.path.dirname(__file__)

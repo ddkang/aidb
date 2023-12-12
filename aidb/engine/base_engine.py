@@ -358,3 +358,38 @@ class BaseEngine():
       else:
         raise Exception(f'Can\'t join table {rep_table_name} and {table_name}')
     return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
+
+
+  def _call_user_function(self, function_name, args):
+    return self._config.user_defined_function[function_name](*args)
+
+
+  def execute_user_defined_function(
+      self,
+      query_results: List[tuple],
+      function_to_index_mapping: Dict[str, List[int]]
+  ):
+    new_query_results = []
+    index_to_function_mapping = {}
+    for key, value_list in function_to_index_mapping.items():
+      for value in value_list:
+        index_to_function_mapping[value] = key
+    for row in query_results:
+      new_row = []
+      index = 0
+      while index < len(row):
+        if index in index_to_function_mapping:
+          function_name = index_to_function_mapping[index]
+          parameter_list = []
+
+          while index < len(row) and index_to_function_mapping.get(index) == function_name:
+            parameter_list.append(row[index])
+            index += 1
+
+          new_row.append(self._call_user_function(function_name, parameter_list))
+        else:
+          new_row.append(row[index])
+          index += 1
+
+      new_query_results.append(tuple(new_row))
+    return new_query_results

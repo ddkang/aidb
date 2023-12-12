@@ -44,9 +44,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     # test column alias, subquery
     query_str1 = '''
-                 SELECT color as alias_color 
-                 FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame 
-                 WHERE alias_color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2) 
+                 SELECT color as alias_color
+                 FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame
+                 WHERE alias_color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)
                   OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100);
                  '''
 
@@ -87,8 +87,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
 
     # test sub-subquery
-    query_str3 = '''SELECT frame, object_id FROM colors02 AS cl 
-                    WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00 
+    query_str3 = '''SELECT frame, object_id FROM colors02 AS cl
+                    WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00
                                           WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))
                  '''
     normalized_query_str3 = ("SELECT colors02.frame, colors02.object_id FROM colors02 "
@@ -105,8 +105,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # test multiple aliases
     query_str4 = '''
                  SELECT color, table2.x_min
-                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame 
-                 WHERE color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3) 
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+                 WHERE color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)
                   AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                  '''
 
@@ -126,8 +126,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # comparison between subquery
     query_str5 = '''
                  SELECT color, table2.x_min
-                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame 
-                 WHERE (SELECT table3.color AS alias_color2 FROM colors02 AS table3) 
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+                 WHERE (SELECT table3.color AS alias_color2 FROM colors02 AS table3)
                     > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                  '''
 
@@ -157,7 +157,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # approx aggregation as a subquery
     query_str1 = '''
                  SELECT x_min FROM  objects00
-                 WHERE x_min > (SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%) 
+                 WHERE x_min > (SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%)
                  AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                  '''
 
@@ -168,8 +168,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # approx select as a subquery
     query_str2 = '''
                  SELECT x_min FROM  objects00
-                 WHERE frame IN (SELECT frame FROM colors02 where color LIKE 'blue' 
-                    RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;) 
+                 WHERE frame IN (SELECT frame FROM colors02 where color LIKE 'blue'
+                    RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;)
                  AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                  '''
 
@@ -190,7 +190,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # approx aggregation
     query_str1 = '''
                  SELECT AVG(x_min) FROM  objects00
-                 WHERE frame > (SELECT AVG(frame) FROM blobs_00) 
+                 WHERE frame > (SELECT AVG(frame) FROM blobs_00)
                  ERROR_TARGET 10% CONFIDENCE 95%;
                  '''
 
@@ -207,9 +207,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     # approx select as a subquery
     query_str2 = '''
-                 SELECT frame FROM colors02 
+                 SELECT frame FROM colors02
                  WHERE color IN (SELECT color FROM colors02 WHERE frame > 10000)
-                 RECALL_TARGET 80% 
+                 RECALL_TARGET 80%
                  CONFIDENCE 95%;
                  '''
 

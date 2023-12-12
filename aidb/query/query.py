@@ -317,6 +317,14 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
     the expression will be converted into SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
     """
+    def _remove_alias_in_expression(original_list):
+      removed_alias_list = []
+      for element in original_list:
+        if isinstance(element, exp.Alias):
+          removed_alias_list.append(element.args['this'])
+        else:
+          removed_alias_list.append(element)
+      return removed_alias_list
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
@@ -339,21 +347,26 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
     # remove alias
-    for node, dirs, _ in copied_expression.walk():
-      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
-        continue
-      if isinstance(node, exp.Alias):
-        if 'expressions' in dirs.args:
-          alias_list = dirs.args['expressions'].copy()
-          original_name_list = []
-          for alias in alias_list:
-            original_name_list.append(alias.args['this'])
-          dirs.set('expressions', original_name_list)
-        elif 'this' in dirs.args:
-          alias = dirs.args['this'].copy()
-          dirs.set('this', alias.args['this'])
-        else:
-          raise Exception('Unsupported attribute in the parent of Alias type')
+
+    copied_expression.set('expressions', _remove_alias_in_expression(copied_expression.args['expressions']))
+    copied_expression.args['from'].set(
+        'expressions',
+        _remove_alias_in_expression(copied_expression.args['from'].args['expressions'])
+    )
+
+    table_element_removed_alias = []
+    for table_element in copied_expression.args['from'].args['expressions']:
+      if isinstance(table_element, exp.Alias):
+        table_element_removed_alias.append(table_element.args['this'])
+      else:
+        table_element_removed_alias.append(table_element)
+
+    copied_expression.args['from'].set('expressions', table_element_removed_alias)
+
+    for join_element in copied_expression.args['joins']:
+      if isinstance(join_element.args['this'], exp.Alias):
+        join_element.set('this', join_element.args['this'].args['this'])
+
     return Query(copied_expression.sql(), self.config)
 
 
@@ -631,3 +644,53 @@ class Query(object):
     re = Rewriter(expression)
     new_sql = re.add_join(new_join)
     return Query(new_sql.expression.sql(), self.config)
+
+
+  @cached_property
+  def is_udf_query(self):
+    all_udf_in_query = [e for e in self._expression.find_all(exp.UserFunction)]
+    udf_in_select_clause = []
+    for select_exp in self._expression.args['expressions']:
+      if select_exp.find(exp.UserFunction) is not None:
+        all_user_function = [user_function for user_function in select_exp.find_all(exp.UserFunction)]
+        if len(all_user_function) > 1:
+          raise Exception("We don't support recursive user defined function currently, "
+                          "please register a new function to do that. ")
+        udf_in_select_clause += all_user_function
+
+    if len(all_udf_in_query) != len(udf_in_select_clause):
+      raise Exception('We only support user defined function in SELECT clause currently.')
+
+    if len(udf_in_select_clause) > 0:
+      return True
+    else:
+      return False
+
+
+  @cached_property
+  def udf_query_extraction(self):
+    '''
+    This function is used to parse the query that includes user defined functions.
+    e.g. 'SELECT x_min, function1(x_max, y_max) from objects00'
+    the parsed query will be 'SELECT x_min, x_max, y_max from objects00
+    function_to_index_mapping = {function1: [1, 2]}
+    new_query_str = '
+    '''
+    expression = self._expression.copy()
+    new_select_exp_list = []
+    function_to_index_mapping = defaultdict(list)
+    parameter_index = 0
+    for select_exp in expression.args['expressions']:
+      user_function = select_exp.find(exp.UserFunction)
+      if user_function is not None:
+        function_name = user_function.args['this']
+        for col in user_function.args['expressions']:
+          new_select_exp_list.append(col)
+          function_to_index_mapping[function_name].append(parameter_index)
+          parameter_index += 1
+      else:
+        new_select_exp_list.append(select_exp)
+        parameter_index += 1
+    expression.set('expressions', new_select_exp_list)
+
+    return function_to_index_mapping, Query(expression.sql(), self.config)
