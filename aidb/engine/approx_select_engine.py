@@ -45,8 +45,8 @@ class ApproxSelectEngine(TastiEngine):
 
 
     query_no_aqp = query.base_sql_no_aqp
-    query_after_normalize_columns = query_no_aqp.query_after_normalize_columns()
-    query_after_adding_vector_id_column = query_after_normalize_columns.add_select(
+    query_after_normalize = query_no_aqp.query_after_normalizing
+    query_after_adding_vector_id_column = query_after_normalize.add_select(
         f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}'
     )
 
@@ -54,13 +54,10 @@ class ApproxSelectEngine(TastiEngine):
     added_cols = set()
     join_conditions = []
     tables_in_query = query_no_aqp.tables_in_query
-    table_alias = query_no_aqp.table_name_to_aliases
     for table_name in tables_in_query:
       for col in self._config.tables[table_name].columns:
         col_name = col.name
         if col_name in blob_keys and col_name not in added_cols:
-          if table_name in table_alias:
-            table_name = table_alias[table_name]
           join_conditions.append(f'{self.blob_mapping_table_name}.{col_name} = {table_name}.{col_name}')
           added_cols.add(col_name)
     join_conditions_str = ' AND '.join(join_conditions)

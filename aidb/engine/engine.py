@@ -13,15 +13,19 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
     '''
     try:
       parsed_query = Query(query, self._config)
-      if parsed_query.is_approx_agg_query:
-        return asyncio_run(self.execute_aggregate_query(parsed_query, **kwargs))
-      elif parsed_query.is_approx_select_query:
-        return asyncio_run(self.execute_approx_select_query(parsed_query, **kwargs))
-      elif parsed_query.is_limit_query():
-        return asyncio_run(self._execute_limit_query(parsed_query, **kwargs))
-      elif parsed_query.is_select_query():
-        return asyncio_run(self.execute_full_scan(parsed_query, **kwargs))
-      else:
-        return asyncio_run(self.execute_non_select(parsed_query))
+      all_queries = parsed_query.all_queries_in_expressions
+      result = None
+      for parsed_single_query, _ in all_queries:
+        if parsed_single_query.is_approx_agg_query:
+          result = asyncio_run(self.execute_aggregate_query(parsed_single_query, **kwargs))
+        elif parsed_single_query.is_approx_select_query:
+          result = asyncio_run(self.execute_approx_select_query(parsed_single_query, **kwargs))
+        elif parsed_single_query.is_limit_query():
+          result = asyncio_run(self._execute_limit_query(parsed_single_query, **kwargs))
+        elif parsed_single_query.is_select_query():
+          result = asyncio_run(self.execute_full_scan(parsed_single_query, **kwargs))
+        else:
+          result = asyncio_run(self.execute_non_select(parsed_single_query))
+      return result
     except Exception as e:
       raise e

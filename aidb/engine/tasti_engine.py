@@ -7,7 +7,6 @@ from typing import Dict, List, Optional
 from aidb.config.config_types import Table
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.query.query import Query
-from aidb.query.utils import predicate_to_str
 from aidb.utils.constants import table_name_for_rep_and_topk_and_blob_mapping, VECTOR_ID_COLUMN
 from aidb.vector_database.tasti import Tasti
 
@@ -78,7 +77,7 @@ class TastiEngine(FullScanEngine):
     for fp in query.filtering_predicates:
       or_connected = []
       for p in fp:
-        predicate_str = predicate_to_str(p)
+        predicate_str = p.sql()
         if predicate_str not in filering_predicate_score_map:
           filering_predicate_score_map[predicate_str] = f'score_{score_count}'
           score_count += 1
