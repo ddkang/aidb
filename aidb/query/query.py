@@ -307,7 +307,6 @@ class Query(object):
     else:
       return tables_of_column[0]
 
-
   @cached_property
   def query_after_normalizing(self):
     """
@@ -317,6 +316,16 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
     the expression will be converted into SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
     """
+
+    def _remove_alias_in_expression(original_list):
+      removed_alias_list = []
+      for element in original_list:
+        if isinstance(element, exp.Alias):
+          removed_alias_list.append(element.args['this'])
+        else:
+          removed_alias_list.append(element)
+      return removed_alias_list
+
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
@@ -339,21 +348,17 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
     # remove alias
-    for node, dirs, _ in copied_expression.walk():
-      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
-        continue
-      if isinstance(node, exp.Alias):
-        if 'expressions' in dirs.args:
-          alias_list = dirs.args['expressions'].copy()
-          original_name_list = []
-          for alias in alias_list:
-            original_name_list.append(alias.args['this'])
-          dirs.set('expressions', original_name_list)
-        elif 'this' in dirs.args:
-          alias = dirs.args['this'].copy()
-          dirs.set('this', alias.args['this'])
-        else:
-          raise Exception('Unsupported attribute in the parent of Alias type')
+
+    copied_expression.set('expressions', _remove_alias_in_expression(copied_expression.args['expressions']))
+    copied_expression.args['from'].set(
+      'expressions',
+      _remove_alias_in_expression(copied_expression.args['from'].args['expressions'])
+    )
+
+    for join_element in copied_expression.args['joins']:
+      if isinstance(join_element.args['this'], exp.Alias):
+        join_element.set('this', join_element.args['this'].args['this'])
+
     return Query(copied_expression.sql(), self.config)
 
 
