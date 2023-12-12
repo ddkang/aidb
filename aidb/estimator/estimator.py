@@ -1,16 +1,15 @@
 import abc
 import math
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
+import pandas as pd
 import scipy
 import scipy.stats
 from statsmodels.stats.weightstats import DescrStatsW
 
-from aidb.samplers.sampler import SampledBlob
 from aidb.utils.logger import logger
-
+from aidb.utils.constants import NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME
 
 
 @dataclass
@@ -62,16 +61,16 @@ class Estimator(abc.ABC):
 
 
   @abc.abstractmethod
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
+  def estimate(self, samples: pd.DataFrame, num_samples: int, conf: float, **kwargs) -> Estimate:
     pass
 
 
 # Set estimators
 class WeightedMeanSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
-    weights = np.array([sample.weight for sample in samples])
-    statistics = np.array([sample.statistics[0] for sample in samples])
-    counts = np.array([sample.num_items for sample in samples])
+  def estimate(self, samples: pd.DataFrame, num_samples: int, conf: float, **kwargs) -> Estimate:
+    weights = samples[WEIGHT_COL_NAME].to_numpy()
+    statistics = samples.iloc[:, 0].to_numpy()
+    counts = samples[NUM_ITEMS_COL_NAME].to_numpy()
     cstats = np.repeat(statistics, counts)
     weights = np.repeat(weights, counts)
     wstats = DescrStatsW(cstats, weights=weights, ddof=0)
@@ -85,13 +84,13 @@ class WeightedMeanSetEstimator(Estimator):
 
 
 class WeightedCountSetEstimator(Estimator):
-  def estimate(self, samples: List[SampledBlob], num_samples: int, conf: float, **kwargs) -> Estimate:
-    weight = samples[0].weight
-    weights = np.array([weight] * num_samples)
+  def estimate(self, samples: pd.DataFrame, num_samples: int, conf: float, **kwargs) -> Estimate:
+
+    # all weights are same, add weights for blobs that don't have outputs
+    weights = np.array([samples[WEIGHT_COL_NAME][0]] * num_samples)
 
     # Statistics are already counts
-
-    statistics = np.array([sample.statistics[0] for sample in samples] + [0] * (num_samples - len(samples)))
+    statistics = np.array(samples.iloc[:, 0].tolist() + [0.0] * (num_samples - len(samples)))
     wstats = DescrStatsW(statistics, weights=weights, ddof=0)
     mean_est = _get_estimate_bennett(
       wstats.mean,

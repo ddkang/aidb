@@ -6,14 +6,11 @@ from typing import List
 
 from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
-from aidb.utils.constants import VECTOR_ID_COLUMN
+from aidb.utils.constants import MASS_COL_NAME, PROXY_SCORE_COL_NAME, SEED_PARAMETER, VECTOR_ID_COLUMN, WEIGHT_COL_NAME
 from aidb.utils.logger import logger
 
 BUDGET = 10000
-MASS_COL_NAME = 'mass'
-PROXY_SCORE_COL_NAME = 'proxy_score'
-SEED_PARAMETER = 'seed'
-WEIGHT_COL_NAME = 'weight'
+
 
 class ApproxSelectEngine(TastiEngine):
   # TODO: design a better algorithm, this function is same as the function in Limit Engine

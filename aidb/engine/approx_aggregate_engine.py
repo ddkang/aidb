@@ -8,8 +8,8 @@ from typing import List
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator,
                                       WeightedCountSetEstimator, WeightedSumSetEstimator)
-from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
+from aidb.utils.constants import MASS_COL_NAME, NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME
 from aidb.utils.logger import logger
 
 _NUM_PILOT_SAMPLES = 1000
@@ -76,14 +76,14 @@ class ApproximateAggregateEngine(FullScanEngine):
           conn
       )
 
-    sample_results.extend(new_sample_results)
+    concatenated_results = pd.concat([sample_results, new_sample_results], ignore_index=True)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
 
     estimates = []
-
+    fixed_cols = concatenated_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
     for index, agg_type in enumerate(aggregation_type_list):
-      extracted_sample_results = [sample_result.get_specific_data_by_index(index)
-                                      for sample_result in sample_results]
+      selected_index_col = concatenated_results.iloc[:, [index]]
+      extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
 
       estimator = self._get_estimator(agg_type)
       estimates.append(
@@ -169,11 +169,11 @@ class ApproximateAggregateEngine(FullScanEngine):
       inference_services_executed.add(bound_service.service.name)
 
 
-  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
+  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> pd.DataFrame:
     '''
     Return aggregation results of each sample blob, contains weight, mass, statistics, num_items
     For example, if there is 1000 blobs, blob A has two detected objects with x_min = 500 and x_min = 1000,
-    the query is Avg(x_min), the result of blob A is SampledBlob(1/1000, 1, 750, 2)
+    the query is Avg(x_min), the result row of blob A is (750, 2, 1/1000, 1)
     mass is default value 1, weight is same for each blob in uniform sampling
     '''
     tables_in_query = query.tables_in_query
@@ -185,24 +185,17 @@ class ApproximateAggregateEngine(FullScanEngine):
         sample_df,
         query_no_aqp
     )
-    query_add_count = query_add_filter_key.add_select('COUNT(*) AS num_items')
+    query_add_count = query_add_filter_key.add_select(f'COUNT(*) AS {NUM_ITEMS_COL_NAME}')
     query_str = f'''
                   {query_add_count.sql_str}
                   GROUP BY {', '.join(selected_column)}
                  '''
 
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
+    res_df[WEIGHT_COL_NAME] = 1. / self.blob_count
+    res_df[MASS_COL_NAME] = 1
 
-    results_for_each_blob = []
-    for _, row in res_df.iterrows():
-      results_for_each_blob.append(SampledBlob(
-          weight=1. / self.blob_count,
-          mass=1,
-          statistics=list(row[:-1]),
-          num_items=int(row[-1])
-      ))
-
-    return results_for_each_blob
+    return res_df
 
 
   async def get_results_on_sampled_data(
@@ -229,17 +222,18 @@ class ApproximateAggregateEngine(FullScanEngine):
   def get_additional_required_num_samples(
       self,
       query: Query,
-      sample_results: List[SampledBlob],
+      sample_results: pd.DataFrame,
       alpha
   ) -> int:
     error_target = query.error_target
     conf = 1. - alpha
     num_samples = []
 
+    fixed_cols = sample_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
     for index, agg_type in enumerate(query.aggregation_type_list_in_query):
       estimator = self._get_estimator(agg_type)
-      extracted_sample_results = [sample_result.get_specific_data_by_index(index)
-                                      for sample_result in sample_results]
+      selected_index_col = sample_results.iloc[:, [index]]
+      extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
       pilot_estimate = estimator.estimate(extracted_sample_results, _NUM_PILOT_SAMPLES, conf)
 
       if agg_type == exp.Avg:
