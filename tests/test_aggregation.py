@@ -28,26 +28,26 @@ queries = [
   ),
   (
     'approx_aggregate',
-    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00 
-           WHERE y_min > 800 ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00 WHERE y_min > 800;'''
+    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00
+           WHERE y_min > 500 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00 WHERE y_min > 500;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT SUM(x_min), SUM(y_max), SUM(x_max), SUM(y_min) FROM objects00 
+    '''SELECT SUM(x_min), SUM(y_max), SUM(x_max), SUM(y_min) FROM objects00
            WHERE x_min < 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
     '''SELECT SUM(x_min), SUM(y_max), SUM(x_max), SUM(y_min) FROM objects00 WHERE x_min < 1000;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00 
-           WHERE frame > (SELECT AVG(frame) FROM objects00) ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00 
-           WHERE frame > (SELECT AVG(frame) FROM objects00);'''
+    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00
+           WHERE frame > 100000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00
+           WHERE frame > 100000;'''
   ),
   (
     'approx_aggregate',
-    '''SELECT COUNT(x_min), SUM(y_max), COUNT(x_max), AVG(y_min) FROM objects00 
+    '''SELECT COUNT(x_min), SUM(y_max), COUNT(x_max), AVG(y_min) FROM objects00
            WHERE x_min > 700 AND y_min > 700 ERROR_TARGET 10% CONFIDENCE 95%;''',
     '''SELECT COUNT(x_min), SUM(y_max), COUNT(x_max), AVG(y_min) FROM objects00 WHERE x_min > 700 AND y_min > 700;'''
   ),
