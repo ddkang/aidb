@@ -151,7 +151,8 @@ class MarqoVectorDatabase(VectorDatabase):
             }
           },
           tensor_fields=['aidb_data'],
-          auto_refresh=True
+          auto_refresh=True,
+          client_batch_size=64
         )
     
 
