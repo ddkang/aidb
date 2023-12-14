@@ -9,7 +9,8 @@ TOPK_PREFIX = '__topk'
 BLOB_MAPPING_PREFIX = '__blob_mapping'
 VECTOR_ID_COLUMN = '__vector_id'
 
-SEED_PARAMETER = 'seed'
+# use parameter '__seed' in approximate select engine function to pass a fixed seed
+SEED_PARAMETER = '__seed'
 
 # constant parameter for column name in sampling
 MASS_COL_NAME = '__mass'
