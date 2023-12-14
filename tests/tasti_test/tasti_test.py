@@ -127,10 +127,11 @@ def test(
     embedding_dim: int,
     nb_buckets: int,
     index_path: Optional[str] = None,
-    weaviate_auth: Optional[WeaviateAuth] = None
+    weaviate_auth: Optional[WeaviateAuth] = None,
+    marqo_auth: Optional[MarqoAuth] = None
 ):
   tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database_type,
-                          weaviate_auth=weaviate_auth, index_path=index_path)
+                          weaviate_auth=weaviate_auth, marqo_auth=marqo_auth, index_path=index_path)
   tasti_test.test()
 
 
@@ -150,3 +151,9 @@ if __name__ == '__main__':
     weaviate_auth = WeaviateAuth(url, api_key=api_key)
     test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
          embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
+    
+    logger.info(f'Running Marqo vector database')
+    url = 'http://0.0.0.0:8882'
+    marqo_auth = MarqoAuth(url=url)
+    test('marqo', VectorDatabaseType.MARQO.value, data_size=200,
+         embedding_dim=128, nb_buckets=50, marqo_auth=marqo_auth)
