@@ -509,8 +509,27 @@ class Query(object):
     return self.error_target is not None and self.confidence is not None
 
 
-  def is_select_query(self):
-    return isinstance(self._expression, exp.Select)
+  # Get aggregation types with columns corresponding
+  @cached_property
+  def aggregation_type_list_in_query(self):
+    '''
+    Return list of aggregation types
+    eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    the function will return [exp.AVG, exp.AVG, exp.COUNT]
+    '''
+    select_exp = self._expression.args['expressions']
+    agg_type_with_cols = []
+    for expression in select_exp:
+      aggregate_expression = expression.find(exp.AggFunc)
+      if isinstance(aggregate_expression, exp.Avg):
+        agg_type_with_cols.append(exp.Avg)
+      elif isinstance(aggregate_expression, exp.Count):
+        agg_type_with_cols.append(exp.Count)
+      elif isinstance(aggregate_expression, exp.Sum):
+        agg_type_with_cols.append(exp.Sum)
+      else:
+        raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+    return agg_type_with_cols
 
 
   # Validate AQP
@@ -532,16 +551,8 @@ class Query(object):
           Try running without the error target and confidence.'''
       )
 
-    # Count the number of distinct aggregates
-    expression_counts = defaultdict(int)
-    for expression in query_no_aqp_expression.args['expressions']:
-      expression_counts[type(expression)] += 1
-
-    if len(expression_counts) > 1:
-      raise Exception('Multiple expression types found')
-
-    if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
-      raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+    # check aggregation function in SELECT clause
+    _ = self.aggregation_type_list_in_query
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
@@ -582,6 +593,10 @@ class Query(object):
       return True
 
 
+  def is_select_query(self):
+    return isinstance(self._expression, exp.Select)
+
+
   @cached_property
   def base_sql_no_aqp(self):
     _exp_no_aqp = self._expression.transform(_remove_aqp)
@@ -596,24 +611,6 @@ class Query(object):
     if _exp_no_where is None:
       raise Exception('SQL contains no non-AQP statements')
     return Query(_exp_no_where.sql(), self.config)
-
-
-  # Get aggregation type
-  @cached_property
-  def get_agg_type(self):
-    # Only support one aggregation for the time being
-    query_no_aqp_expression = self.base_sql_no_aqp.get_expression()
-    if len(query_no_aqp_expression.args['expressions']) != 1:
-      raise Exception('Multiple expressions found')
-    select_exp = query_no_aqp_expression.args['expressions'][0]
-    if isinstance(select_exp, exp.Avg):
-      return exp.Avg
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    else:
-      raise Exception('Unsupported aggregation')
 
 
   # FIXME: move it to sqlglot.rewriter

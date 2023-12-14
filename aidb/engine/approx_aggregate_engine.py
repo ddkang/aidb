@@ -8,8 +8,8 @@ from typing import List
 from aidb.engine.full_scan_engine import FullScanEngine
 from aidb.estimator.estimator import (Estimator, WeightedMeanSetEstimator,
                                       WeightedCountSetEstimator, WeightedSumSetEstimator)
-from aidb.samplers.sampler import SampledBlob
 from aidb.query.query import Query
+from aidb.utils.constants import MASS_COL_NAME, NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME
 from aidb.utils.logger import logger
 
 _NUM_PILOT_SAMPLES = 1000
@@ -52,9 +52,12 @@ class ApproximateAggregateEngine(FullScanEngine):
             error target. Try running without the error target if you are certain you want to run this query.'''
         )
 
-      agg_type = query.get_agg_type
-      estimator = self._get_estimator(agg_type)
-      num_samples = self.get_additional_required_num_samples(query, sample_results, estimator)
+      aggregation_type_list = query.aggregation_type_list_in_query
+      num_aggregations = len(aggregation_type_list)
+      alpha = (1. - (query.confidence / 100.)) / num_aggregations
+      conf = 1. - alpha
+
+      num_samples = self.get_additional_required_num_samples(query, sample_results, alpha)
       logger.info(f'num_samples: {num_samples}')
       # when there is not enough data samples, directly run full scan engine and get exact result
       if num_samples + _NUM_PILOT_SAMPLES >= self.blob_count:
@@ -70,10 +73,27 @@ class ApproximateAggregateEngine(FullScanEngine):
           conn
       )
 
-    sample_results.extend(new_sample_results)
+    concatenated_results = pd.concat([sample_results, new_sample_results], ignore_index=True)
     # TODO:  figure out what should parameter num_samples be for COUNT/SUM query
 
-    return [(estimator.estimate(sample_results,_NUM_PILOT_SAMPLES + num_samples, query.confidence / 100.).estimate,)]
+    estimates = []
+    fixed_cols = concatenated_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
+    for index, agg_type in enumerate(aggregation_type_list):
+      selected_index_col = concatenated_results.iloc[:, [index]]
+      extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
+
+      estimator = self._get_estimator(agg_type)
+      estimates.append(
+          estimator.estimate(
+              extracted_sample_results,
+              _NUM_PILOT_SAMPLES + num_samples,
+              conf
+          ).estimate
+      )
+
+    # For approximate aggregation, we currently do not support the GROUP BY clause, so there is only one row result.
+    # We still return the result a list of tuple to maintain the format
+    return [tuple(estimates)]
 
 
   def get_blob_count_query(self, table_names: List[str], blob_key_filtering_predicates_str: str):
@@ -146,11 +166,11 @@ class ApproximateAggregateEngine(FullScanEngine):
       inference_services_executed.add(bound_service.service.name)
 
 
-  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> List[SampledBlob]:
+  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> pd.DataFrame:
     '''
-    Return aggregation results of each sample blob, contains weight, mass, statistic, num_items
+    Return aggregation results of each sample blob, contains weight, mass, statistics, num_items
     For example, if there is 1000 blobs, blob A has two detected objects with x_min = 500 and x_min = 1000,
-    the query is Avg(x_min), the result of blob A is SampledBlob(1/1000, 1, 750, 2)
+    the query is Avg(x_min), the result row of blob A is (750, 2, 1/1000, 1)
     mass is default value 1, weight is same for each blob in uniform sampling
     '''
     tables_in_query = query.tables_in_query
@@ -162,24 +182,17 @@ class ApproximateAggregateEngine(FullScanEngine):
         sample_df,
         query_no_aqp
     )
-    query_add_count = query_add_filter_key.add_select('COUNT(*) AS num_items')
+    query_add_count = query_add_filter_key.add_select(f'COUNT(*) AS {NUM_ITEMS_COL_NAME}')
     query_str = f'''
                   {query_add_count.sql_str}
                   GROUP BY {', '.join(selected_column)}
                  '''
 
     res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
+    res_df[WEIGHT_COL_NAME] = 1. / self.blob_count
+    res_df[MASS_COL_NAME] = 1
 
-    results_for_each_blob = []
-    for _, row in res_df.iterrows():
-      results_for_each_blob.append(SampledBlob(
-          weight=1. / self.blob_count,
-          mass=1,
-          statistic=row[0],
-          num_items=int(row[1])
-      ))
-
-    return results_for_each_blob
+    return res_df
 
 
   async def get_results_on_sampled_data(
@@ -206,24 +219,32 @@ class ApproximateAggregateEngine(FullScanEngine):
   def get_additional_required_num_samples(
       self,
       query: Query,
-      sample_results: List[SampledBlob],
-      estimator: Estimator
+      sample_results: pd.DataFrame,
+      alpha
   ) -> int:
-
     error_target = query.error_target
-    conf = query.confidence / 100.
-    alpha = 1. - conf
-    pilot_estimate = estimator.estimate(sample_results, _NUM_PILOT_SAMPLES,  conf)
+    conf = 1. - alpha
+    num_samples = []
 
-    agg_type = query.get_agg_type
-    if agg_type == exp.Avg:
-      p_lb = statsmodels.stats.proportion.proportion_confint(len(sample_results), _NUM_PILOT_SAMPLES, alpha / 2)[0]
-    else:
-      p_lb = 1
+    fixed_cols = sample_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
+    for index, agg_type in enumerate(query.aggregation_type_list_in_query):
+      estimator = self._get_estimator(agg_type)
+      selected_index_col = sample_results.iloc[:, [index]]
+      extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
+      pilot_estimate = estimator.estimate(extracted_sample_results, _NUM_PILOT_SAMPLES, conf)
 
-    num_samples = int(
-      (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
-      (1. / p_lb)
-    )
+      if agg_type == exp.Avg:
+        p_lb = statsmodels.stats.proportion.proportion_confint(
+          len(sample_results),
+          _NUM_PILOT_SAMPLES,
+          alpha
+        )[0]
+      else:
+        p_lb = 1
 
-    return max(num_samples, 100)
+      num_samples.append(int(
+        (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
+        (1. / p_lb)
+      ))
+
+    return max(max(num_samples), 100)
