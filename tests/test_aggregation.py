@@ -18,6 +18,41 @@ DB_URL = "sqlite+aiosqlite://"
 queries = [
   (
     'approx_aggregate',
+    '''SELECT SUM(x_min), COUNT(frame) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min), COUNT(frame) FROM objects00 WHERE x_min > 1000;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min), COUNT(*) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT AVG(x_min), COUNT(*) FROM objects00 WHERE x_min > 1000;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00
+           WHERE y_min > 500 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min), SUM(y_max), AVG(x_max), COUNT(*) FROM objects00 WHERE y_min > 500;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT SUM(x_min), SUM(y_max), SUM(x_max), SUM(y_min) FROM objects00
+           WHERE x_min < 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(x_min), SUM(y_max), SUM(x_max), SUM(y_min) FROM objects00 WHERE x_min < 1000;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00
+           WHERE frame > 100000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT AVG(x_min), SUM(y_max), AVG(x_max), SUM(y_min) FROM objects00
+           WHERE frame > 100000;'''
+  ),
+  (
+    'approx_aggregate',
+    '''SELECT COUNT(x_min), SUM(y_max), COUNT(x_max), AVG(y_min) FROM objects00
+           WHERE x_min > 700 AND y_min > 700 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT COUNT(x_min), SUM(y_max), COUNT(x_max), AVG(y_min) FROM objects00 WHERE x_min > 700 AND y_min > 700;'''
+  ),
+  (
+    'approx_aggregate',
     '''SELECT SUM(x_min) FROM objects00 WHERE x_min > 1000 ERROR_TARGET 10% CONFIDENCE 95%;''',
     '''SELECT SUM(x_min) FROM objects00 WHERE x_min > 1000;'''
   ),
@@ -87,10 +122,15 @@ queries = [
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
   def _equality_check(self, aidb_res, gt_res, error_target):
     assert len(aidb_res) == len(gt_res)
+    error_rate_list = []
+    valid_estimation = True
     for aidb_item, gt_item in zip(aidb_res, gt_res):
-      if abs(aidb_item - gt_item) / (gt_item) <= error_target:
-        return True
-    return False
+      relative_diff = abs(aidb_item - gt_item) / (gt_item)
+      error_rate_list.append(relative_diff * 100)
+      if relative_diff > error_target:
+        valid_estimation = False
+    logger.info(f'Error rate (%) for approximate aggregation query: {error_rate_list}')
+    return valid_estimation
 
 
   async def test_agg_query(self):
@@ -112,14 +152,13 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
           gt_res = gt_res.fetchall()[0]
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)[0]
-        logger.info(
-            f'aidb_res: {aidb_res}, gt_res: {gt_res}, % error: {abs(aidb_res[0] - gt_res[0]) / (gt_res[0]) * 100}')
+        logger.info(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
         error_target = Query(aidb_query, aidb_engine._config).error_target
         if error_target is None: error_target = 0
         if self._equality_check(aidb_res, gt_res, error_target):
           count_list[k] += 1
         k+=1
-      logger.info(f'Time of runs: {i+1}, Count: {count_list}')
+      logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
       del gt_engine
       del aidb_engine
       p.terminate()

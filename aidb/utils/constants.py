@@ -9,6 +9,15 @@ TOPK_PREFIX = '__topk'
 BLOB_MAPPING_PREFIX = '__blob_mapping'
 VECTOR_ID_COLUMN = '__vector_id'
 
+# use parameter '__seed' in approximate select engine function to pass a fixed seed
+SEED_PARAMETER = '__seed'
+
+# constant parameter for column name in sampling
+MASS_COL_NAME = '__mass'
+NUM_ITEMS_COL_NAME = '__num_items'
+PROXY_SCORE_COL_NAME = '__proxy_score'
+WEIGHT_COL_NAME = '__weight'
+
 '''
 The schema of the blob metadata table is as follows:
   table_name: str
