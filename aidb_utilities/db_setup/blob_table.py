@@ -68,6 +68,8 @@ class BaseTablesSetup(object):
     inserts the blob data in the blob table
     '''
     assert len(primary_key_cols) > 0, 'Primary key should be specified'
+    if not isinstance(blob_data, pd.DataFrame):
+      blob_data = pd.DataFrame([b.to_dict() for b in blob_data])
     self.create_input_table(table_name, list(map(lambda x: {"name": x, "dtype": blob_data[x].dtype, "is_primary_key": x in primary_key_cols}, blob_data.columns)))
     self.insert_input_data(table_name, blob_data)
 
@@ -88,11 +90,9 @@ class BaseTablesSetup(object):
     asyncio_run(self._setup_blob_config_table(table_name, table_columns))
 
 
-  def insert_input_data(self, table_name: str, blob_data: Union[pd.DataFrame, List[Blob]]):
+  def insert_input_data(self, table_name: str, blob_data: pd.DataFrame):
     '''
     inserts the blob data in the blob table
     '''
-    if not isinstance(blob_data, pd.DataFrame):
-      blob_data = pd.DataFrame([b.to_dict() for b in blob_data])
     assert blob_data.shape[0] > 0, 'No blobs to insert in the blob table'
     asyncio_run(self._insert_data_in_table(table_name, blob_data))
