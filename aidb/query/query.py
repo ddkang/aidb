@@ -255,6 +255,16 @@ class Query(object):
     return copied_expression
 
 
+  def _convert_logical_condition_to_cnf(self, logic_condition):
+    # predicate name (used for sympy package) to expression
+    predicate_mappings = {}
+    # predicate mapping will be filled by this function
+    sympy_representation, _ = self._get_sympify_form(logic_condition, 0, predicate_mappings)
+    sympy_expression = sympify(sympy_representation)
+    cnf_expression = to_cnf(sympy_expression)
+    converted_logical_expression = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
+    return converted_logical_expression
+
   @cached_property
   def filtering_predicates(self):
     """
@@ -276,13 +286,7 @@ class Query(object):
     if normalized_exp.find(exp.Where) is not None:
       if self._tables is None:
         raise Exception("Need table and column information to support alias")
-      # predicate name (used for sympy package) to expression
-      predicate_mappings = {}
-      # predicate mapping will be filled by this function
-      sympy_representation, _ = self._get_sympify_form(normalized_exp.find(exp.Where), 0, predicate_mappings)
-      sympy_expression = sympify(sympy_representation)
-      cnf_expression = to_cnf(sympy_expression)
-      filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
+      filtering_predicates = self._convert_logical_condition_to_cnf(normalized_exp.find(exp.Where))
       filtering_clauses = []
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
@@ -347,6 +351,15 @@ class Query(object):
             table_name = self._get_table_of_column(col_name)
 
           node.set('table', exp.Identifier(this=table_name, quoted=False))
+
+        elif isinstance(node.args['this'], exp.Star):
+          select_exp_list = []
+          for table_name in self.tables_in_query:
+            for col_name, _ in self._tables[table_name].items():
+              new_table = exp.Identifier(this=table_name, quoted=False)
+              new_column = exp.Identifier(this=col_name, quoted=False)
+              select_exp_list.append(exp.Column(this=new_column, table=new_table))
+          copied_expression.set('expressions', select_exp_list)
 
     # remove alias
 
@@ -639,22 +652,35 @@ class Query(object):
     return Query(new_sql.expression.sql(), self.config)
 
 
+  def convert_and_connected_fp_to_exp(self, and_connected_fp_list):
+    def _build_tree(elements, operator):
+      if len(elements) == 1:
+        return elements[0]
+      else:
+        return operator(this=elements[0], expression=_build_tree(elements[1:], operator))
+
+    and_connected_list = []
+    for or_connected_fp in and_connected_fp_list:
+      and_connected_list.append(exp.Paren(this=_build_tree(or_connected_fp, exp.Or)))
+
+    return _build_tree(and_connected_list, exp.And)
+
+
   @cached_property
   def is_udf_query(self):
     all_udf_in_query = [e for e in self._expression.find_all(exp.UserFunction)]
-    udf_in_select_clause = []
-    for select_exp in self._expression.args['expressions']:
-      if select_exp.find(exp.UserFunction) is not None:
-        all_user_function = [user_function for user_function in select_exp.find_all(exp.UserFunction)]
-        if len(all_user_function) > 1:
-          raise Exception("We don't support recursive user defined function currently, "
-                          "please register a new function to do that. ")
-        udf_in_select_clause += all_user_function
+    # udf_in_select_clause = []
+    # for select_exp in self._expression.args['expressions']:
+    #   if select_exp.find(exp.UserFunction) is not None:
+    #     all_user_function = [user_function for user_function in select_exp.find_all(exp.UserFunction)]
+    #     if len(all_user_function) > 1:
+    #       raise Exception("We don't support recursive user defined function currently, "
+    #                       "please register a new function to do that. ")
+    #     udf_in_select_clause += all_user_function
 
-    if len(all_udf_in_query) != len(udf_in_select_clause):
-      raise Exception('We only support user defined function in SELECT clause currently.')
 
-    if len(udf_in_select_clause) > 0:
+    print(len(all_udf_in_query))
+    if len(all_udf_in_query) > 0:
       return True
     else:
       return False
@@ -666,24 +692,119 @@ class Query(object):
     This function is used to parse the query that includes user defined functions.
     e.g. 'SELECT x_min, function1(x_max, y_max) from objects00'
     the parsed query will be 'SELECT x_min, x_max, y_max from objects00
-    function_to_index_mapping = {function1: [1, 2]}
+    old_to_new_index_mapping = {function1: [1, 2]}
     new_query_str = '
     '''
-    expression = self._expression.copy()
+
+    normalized_query = self.query_after_normalizing
+    expression = normalized_query.get_expression().copy()
     new_select_exp_list = []
-    function_to_index_mapping = defaultdict(list)
-    parameter_index = 0
+    dataframe_select_col_list = []
+    udf_mapping_list = []
+    col_index_mapping = dict()
+    function_index = 0
+    new_select_col_index = 0
+    added_select = set()
     for select_exp in expression.args['expressions']:
+      function_col_dict= {}
+      function_col_dict['col_names'] = []
       user_function = select_exp.find(exp.UserFunction)
       if user_function is not None:
         function_name = user_function.args['this']
+        function_col_dict['function_name'] = function_name
         for col in user_function.args['expressions']:
-          new_select_exp_list.append(col)
-          function_to_index_mapping[function_name].append(parameter_index)
-          parameter_index += 1
+          if col not in added_select:
+            added_select.add(col.copy())
+            # add alias to avoid same column name
+            select_col_with_alias = exp.Alias(this=col, alias=f'col__{new_select_col_index}')
+            new_select_exp_list.append(select_col_with_alias)
+            col_index_mapping[col.copy()] = f'col__{new_select_col_index}'
+            new_select_col_index += 1
+          function_col_dict['col_names'].append(col_index_mapping[col])
+        function_col_dict['result_col_name'] = f'function__{function_index}'
+        udf_mapping_list.append(function_col_dict)
+        dataframe_select_col_list.append(f'function__{function_index}')
+        function_index += 1
       else:
-        new_select_exp_list.append(select_exp)
-        parameter_index += 1
-    expression.set('expressions', new_select_exp_list)
+        if select_exp not in added_select:
+          added_select.add(select_exp.copy())
+          select_col_with_alias = exp.Alias(this=select_exp, alias=f'col__{new_select_col_index}')
+          new_select_exp_list.append(select_col_with_alias)
+          col_index_mapping[select_exp.copy()] = f'col__{new_select_col_index}'
+          new_select_col_index += 1
+        dataframe_select_col_list.append(col_index_mapping[select_exp.copy()])
 
-    return function_to_index_mapping, Query(expression.sql(), self.config)
+    filter_predicates = []
+    # find user defined function in JOIN condition, if exists, add them into filter predicates, 
+    # then remove this join condition
+    
+    if expression.find(exp.Join) is not None:
+      for join_exp in expression.args['joins']:
+        if hasattr(join_exp, 'on'):
+          if join_exp.args['on'].find(exp.UserFunction):
+            filter_predicates.extend(self._convert_logical_condition_to_cnf(join_exp.args['on']).copy())
+            join_exp.set('on', None)
+
+    # we don't need to replace column with root column here, so we don't use query.filtering_predicates directly
+    if expression.find(exp.Where):
+      filter_predicates.extend(self._convert_logical_condition_to_cnf(expression.find(exp.Where)))
+
+    filter_predicates_in_sql = []
+    filter_predicates_in_dataframe = []
+
+    for or_connected in filter_predicates:
+      include_udf = False
+      for fp in or_connected:
+        if fp.find(exp.UserFunction):
+          include_udf = True
+
+      if not include_udf:
+        filter_predicates_in_sql.append(or_connected)
+        continue
+
+      new_or_connected_fp = []
+      for fp in or_connected:
+        for node, _, key in fp.walk():
+          if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+            continue
+          if isinstance(node, exp.UserFunction):
+            function_name = node.args['this']
+            converted_fp = exp.Column(this=exp.Identifier(this=f'function__{function_index}'))
+            function_col_dict = {}
+            function_col_dict['col_names'] = []
+            function_col_dict['function_name'] = function_name
+            function_col_dict['result_col_name'] = f'function__{function_index}'
+            # FIXME: for IN operator'
+            for col in node.args['expressions']:
+              if col not in added_select:
+                # node in WHERE clause will be changed, so using .copy()
+                added_select.add(col.copy())
+                select_col_with_alias = exp.Alias(this=col, alias=f'col__{new_select_col_index}')
+                new_select_exp_list.append(select_col_with_alias.copy())
+                col_index_mapping[col.copy()] = f'col__{new_select_col_index}'
+                new_select_col_index += 1
+              function_col_dict['col_names'].append(col_index_mapping[col])
+            udf_mapping_list.append(function_col_dict)
+            function_index += 1
+            node.parent.set(key, converted_fp)
+
+          elif isinstance(node, exp.Column):
+            if node not in added_select:
+              added_select.add(node.copy())
+              # add alias to avoid same column name
+              select_col_with_alias = exp.Alias(this=node, alias=f'col__{new_select_col_index}')
+              new_select_exp_list.append(select_col_with_alias.copy())
+              col_index_mapping[node.copy()] = f'col__{new_select_col_index}'
+              new_select_col_index += 1
+            node.args['this'].set('this', col_index_mapping[node.copy()])
+            node.set('table', None)
+
+        new_or_connected_fp.append(fp)
+      filter_predicates_in_dataframe.append(new_or_connected_fp)
+
+
+    new_where_clause = exp.Where(this=self.convert_and_connected_fp_to_exp(filter_predicates_in_sql))
+    expression.set('where', new_where_clause)
+
+    expression.set('expressions', new_select_exp_list)
+    return filter_predicates_in_dataframe, dataframe_select_col_list, udf_mapping_list, Query(expression.sql(), self.config)
