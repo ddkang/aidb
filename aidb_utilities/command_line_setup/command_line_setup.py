@@ -3,7 +3,7 @@ import time
 import pandas as pd
 
 
-def command_line_utility(engine)
+def command_line_utility(engine):
   welcome = '''
       _    ___ ____  ____  
      / \  |_ _|  _ \| __ ) 
