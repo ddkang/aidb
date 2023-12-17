@@ -1,7 +1,5 @@
-import asyncio
 from dataclasses import dataclass
 from typing import Dict, List
-import tqdm
 
 import pandas as pd
 import sqlalchemy.ext.asyncio
@@ -40,7 +38,8 @@ class CachedBoundInferenceService(BoundInferenceService):
 
   def optional_tqdm(self, iterable, **kwargs):
     if self._verbose:
-        return tqdm.tqdm(iterable, **kwargs)
+      from tqdm import tqdm
+      return tqdm(iterable, **kwargs)
     return iterable
 
 
