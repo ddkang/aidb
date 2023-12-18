@@ -36,17 +36,14 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
 
-    def sum_function(a, b, c, d):
-      return a + b + c + d
-
-    def multiply(a, b):
-      return a * b
+    def sum_function(*args):
+      return sum(args)
 
     def is_equal(col1, col2):
       return col1 == col2
 
     def max_function(*args):
-      return max(*args)
+      return max(args)
 
     def power_function(col1, col2):
       return col1**col2
@@ -59,7 +56,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
 
     aidb_engine._config.add_user_defined_function('sum_function', sum_function)
-    aidb_engine._config.add_user_defined_function('multiply', multiply)
     aidb_engine._config.add_user_defined_function('is_equal', is_equal)
     aidb_engine._config.add_user_defined_function('max_function', max_function)
     aidb_engine._config.add_user_defined_function('power_function', power_function)
@@ -115,7 +111,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         'full_scan',
         '''
         SELECT y_min, color
-        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE 
+        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE max_function(x_min, x_max) < max_function(y_min, y_max) AND x_min > 600 OR (x_max >600 AND y_min > 800)
         ''',
@@ -154,8 +150,19 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         FROM objects00 join colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
         WHERE POWER(x_min, 2) > 640000 AND (x_min > 600 OR (x_max >600 AND y_min > 800))
         '''
+      ),
+      # named function for exact aggregation query
+      (
+        'full_scan',
+        ''' 
+        SELECT sum_function(SUM(x_min), SUM(y_max))
+        FROM objects00 
+        ''',
+        ''' 
+        SELECT SUM(x_min) + SUM(y_max)
+        FROM objects00 
+        '''
       )
-
     ]
 
     for query_type, aidb_query, exact_query in queries:
@@ -168,7 +175,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       # TODO: may have problem with decimal number
-      print(len(gt_res), len(aidb_res))
       assert len(gt_res) == len(aidb_res)
       assert Counter(gt_res) == Counter(aidb_res)
     del gt_engine

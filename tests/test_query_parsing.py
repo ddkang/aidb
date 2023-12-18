@@ -291,5 +291,285 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     self._test_query(query_str2, config, normalized_query_str2, correct_fp, correct_service, correct_tables, 2)
 
 
+  async def test_udf_query(self):
+    def _test_equality(test_query_list, config):
+      for test_query in test_query_list:
+        query = Query(test_query['query_str'], config)
+        dataframe_sql, query_after_extraction = query.udf_query_extraction
+        self.assertEqual(query_after_extraction.sql_str, test_query['query_after_extraction'])
+        assert len(dataframe_sql['udf_mapping']) == len(test_query['dataframe_sql']['udf_mapping'])
+        assert all(any(e1 == e2 for e2 in dataframe_sql['udf_mapping'])
+                  for e1 in test_query['dataframe_sql']['udf_mapping'])
+        assert dataframe_sql['select_col'] == test_query['dataframe_sql']['select_col']
+        filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
+        if filter_predicate:
+          filter_predicate = filter_predicate.sql()
+        assert filter_predicate == test_query['dataframe_sql']['filter_predicate']
+
+
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+    config = aidb_engine._config
+
+    test_query_list = []
+    # user defined function in SELECT clause
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT x_min, function1(x_min, y_min), y_max, function2()
+        FROM objects00
+        WHERE x_min > 600
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, objects00.y_max AS col__2 "
+        "FROM objects00 "
+        "WHERE (objects00.x_min > 600)",
+      'dataframe_sql':{
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__1'],
+           'function_name': 'function1',
+           'result_col_name': 'function__0'},
+          {'col_names': [],
+           'function_name': 'function2',
+           'result_col_name': 'function__1'}],
+        'select_col': ['col__0', 'function__0', 'col__2', 'function__1'],
+        'filter_predicate': None
+        }
+      }
+    test_query_list.append(test_query)
+
+
+    # test function with constant parameters
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT x_min, function1(y_min, 2, 3)
+        FROM objects00
+        WHERE x_min > 600
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, 2 AS col__2, 3 AS col__3 "
+        "FROM objects00 "
+        "WHERE (objects00.x_min > 600)",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__1', 'col__2', 'col__3'],
+           'function_name': 'function1',
+           'result_col_name': 'function__0'}],
+        'select_col': ['col__0', 'function__0'],
+        'filter_predicate': None
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    # user defined function in JOIN clause
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT objects00.frame, x_min, y_max, color
+        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE 
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE color = 'blue'
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
+        "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6 "
+        "FROM objects00 JOIN colors02 "
+        "WHERE (colors02.color = 'blue')",
+      'dataframe_sql':{
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__4'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__0'},
+          {'col_names': ['col__5', 'col__6'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__1'}],
+        'select_col': ['col__0', 'col__1', 'col__2', 'col__3'],
+        'filter_predicate': '(function__0 = TRUE) AND (function__1 = TRUE)'
+        }
+      }
+    test_query_list.append(test_query)
+
+    # user defined function in WHERE clause
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT objects00.frame, x_min, y_max, color
+        FROM objects00 JOIN colors02 
+        WHERE is_equal(objects00.frame, colors02.frame) = TRUE 
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE AND sum_function(x_max, y_min) > 1500
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
+        "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
+        "objects00.x_max AS col__7, objects00.y_min AS col__8 "
+        "FROM objects00 JOIN colors02",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__4'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__0'},
+          {'col_names': ['col__5', 'col__6'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__1'},
+          {'col_names': ['col__7', 'col__8'],
+           'function_name': 'sum_function',
+           'result_col_name': 'function__2'}],
+        'select_col': ['col__0', 'col__1', 'col__2', 'col__3'],
+        'filter_predicate': '(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500)'
+      }
+    }
+    test_query_list.append(test_query)
+
+    # user defined function in SELECT, JOIN, WHERE clause
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT multiply_function(x_min, y_max), color
+        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE 
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE sum_function(x_min, y_min) > 1500
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
+        "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
+        "objects00.y_min AS col__7 "
+        "FROM objects00 JOIN colors02",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__1'],
+           'function_name': 'multiply_function',
+           'result_col_name': 'function__0'},
+          {'col_names': ['col__3', 'col__4'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__1'},
+          {'col_names': ['col__5', 'col__6'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__2'},
+          {'col_names': ['col__0', 'col__7'],
+           'function_name': 'sum_function',
+           'result_col_name': 'function__3'}],
+        'select_col': ['function__0', 'col__2'],
+        'filter_predicate': '(function__1 = TRUE) AND (function__2 = TRUE) AND (function__3 > 1500)'
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    # OR operator in WHERE clause
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT x_min, y_max, color
+        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE 
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE sum_function(x_min, y_min) > 1500 OR color = 'blue'
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
+        "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
+        "objects00.y_min AS col__7 "
+        "FROM objects00 JOIN colors02",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__3', 'col__4'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__0'},
+          {'col_names': ['col__5', 'col__6'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__1'},
+          {'col_names': ['col__0', 'col__7'],
+           'function_name': 'sum_function',
+           'result_col_name': 'function__2'}],
+        'select_col': ['col__0', 'col__1', 'col__2'],
+        'filter_predicate': "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500 OR col__2 = 'blue')"
+      }
+    }
+    test_query_list.append(test_query)
+
+    # comparison between user defined function
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT x_min, y_max, color
+        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE 
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE sum_function(x_min, y_min) > multiply_function(x_min, y_min)
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
+        "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
+        "objects00.y_min AS col__7 "
+        "FROM objects00 JOIN colors02",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__3', 'col__4'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__0'},
+          {'col_names': ['col__5', 'col__6'],
+           'function_name': 'is_equal',
+           'result_col_name': 'function__1'},
+          {'col_names': ['col__0', 'col__7'],
+           'function_name': 'multiply_function',
+           'result_col_name': 'function__2'},
+          {'col_names': ['col__0', 'col__7'],
+           'function_name': 'sum_function',
+           'result_col_name': 'function__3'}],
+        'select_col': ['col__0', 'col__1', 'col__2'],
+        'filter_predicate': "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__3 > function__2)"
+      }
+    }
+    test_query_list.append(test_query)
+
+    # test user defined function for exact aggregation query
+    test_query = {
+      'query_str':
+        ''' 
+        SELECT sum_function(SUM(x_min), SUM(y_max))
+        FROM objects00 
+        ''',
+      'query_after_extraction':
+        "SELECT SUM(objects00.x_min) AS col__0, SUM(objects00.y_max) AS col__1 "
+        "FROM objects00",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__1'],
+           'function_name': 'sum_function',
+           'result_col_name': 'function__0'}],
+        'select_col': ['function__0'],
+        'filter_predicate': None
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    _test_equality(test_query_list, config)
+
+
+  async def test_invalid_udf_query(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+    config = aidb_engine._config
+
+    invalid_query_str = [
+      '''SELECT function1(AVG(x_min), AVG(y_min)) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%;''',
+      '''SELECT function1(x_min) FROM objects00 RECALL_TARGET 90% CONFIDENCE 95%;''',
+      '''SELECT function1(x_min) FROM objects00 LIMIT 100;''',
+      '''SELECT function1(x_min) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
+      '''SELECT function1(x_min) AS fun1 FROM objects00 WHERE fun1 > 300'''
+    ]
+    for query_str in invalid_query_str:
+      query = Query(query_str, config)
+      with self.assertRaises(Exception):
+        _ = query.udf_query_validity_check
+
+
 if __name__ == '__main__':
   unittest.main()

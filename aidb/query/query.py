@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict
+from typing import Dict, List
 
 import sqlglot.expressions as exp
 from sqlglot.rewriter import Rewriter
@@ -666,6 +666,10 @@ class Query(object):
 
 
   def convert_and_connected_fp_to_exp(self, and_connected_fp_list):
+    '''
+    This function connected filter predicates in a list of list
+    e.g. [[fp1, fp2], [fp3, fp4]] will be converted to the expression of '(fp1 OR fp2) AND (fp3 OR fp4)'
+    '''
     def _build_tree(elements, operator):
       if len(elements) == 0:
         return None
@@ -684,9 +688,18 @@ class Query(object):
 
 
   @cached_property
-  def is_udf_query(self):
-    all_udf_in_query = [e for e in self._expression.find_all(exp.UserFunction)]
-    if len(all_udf_in_query) > 0:
+  def udf_query_validity_check(self):
+    if self._expression.find(exp.UserFunction):
+      if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
+        raise Exception('We only support user defined function for exact query currently.')
+      if len(self.all_queries_in_expressions) > 1:
+        raise Exception("We don't support user defined function with nested query currently")
+
+      # FIXME: parsing alias for user defined function, will fix it in a separate PR
+      for expression in self._expression.find_all(exp.UserFunction):
+        if isinstance(expression.parent, exp.Alias):
+          raise Exception("We don't support user defined function with alias currently")
+
       return True
     else:
       return False
@@ -696,12 +709,22 @@ class Query(object):
   def udf_query_extraction(self):
     '''
     This function is used to parse the query that includes user defined functions.
-    e.g. 'SELECT x_min, function1(x_max, y_max) from objects00'
-    the parsed query will be 'SELECT x_min, x_max, y_max from objects00
-    old_to_new_index_mapping = {function1: [1, 2]}
-    new_query_str = '
+    return parameters:
+    * dataframe_sql (store information for query of dataframe)
+    * parsed_query (executed by normal db)
+    e.g. 'SELECT udf(x_max, y_max) from objects00'
+      the parsed query will be 'SELECT objects00.x_max AS col__0, objects00.y_max AS col__1 from objects00
+      dataframe_sql ={
+          'udf_mapping': [{'col_names': ['col__0', 'col__1'], 'function_name': 'udf','result_col_name': 'function__0'}],
+          'select_col': ['function__0'],
+          'filter_predicate': None
+      }
+      udf_mapping: store information for user defined function
+      select_col: columns in SELECT clause in dataframe query
+      filter_predicate: filter_predicate for dataframe query
     '''
 
+    # this class is used to extract needed information from query
     class QueryModifier:
       def __init__(self):
         self.added_select = set()

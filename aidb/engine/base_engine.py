@@ -377,7 +377,11 @@ class BaseEngine():
       dataframe_sql: Dict,
       query: Query
   ):
-
+    '''
+    This function receive the query result from database, and then applies user defined function to query result.
+    After getting function results, this function execute query which is extracted from original query and return final
+    result.
+    '''
     for udf in dataframe_sql['udf_mapping']:
       res_df[udf['result_col_name']] = res_df.apply(
           self._call_user_function,

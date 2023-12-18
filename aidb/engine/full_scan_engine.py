@@ -14,7 +14,7 @@ class FullScanEngine(BaseEngine):
     Executes a query by doing a full scan and returns the results.
     '''
     # The query is irrelevant since we do a full scan anyway
-    is_udf_query = query.is_udf_query
+    is_udf_query = query.udf_query_validity_check
     if is_udf_query:
       dataframe_sql, query = query.udf_query_extraction
 
@@ -37,6 +37,7 @@ class FullScanEngine(BaseEngine):
       if is_udf_query:
         offset = 0
         res = []
+        # selectively load data from database to avoid large memory usage
         while True:
           query = query.add_limit_keyword(QUERY_LIMIT)
           query = query.add_offset_keyword(offset)
