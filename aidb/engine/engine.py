@@ -13,10 +13,6 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
     '''
     try:
       parsed_query = Query(query, self._config)
-      query_contains_udf = False
-      if parsed_query.is_udf_query:
-        function_to_index_mapping, parsed_query = parsed_query.udf_query_extraction
-        query_contains_udf = True
       all_queries = parsed_query.all_queries_in_expressions
       result = None
 
@@ -31,9 +27,6 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
           result = asyncio_run(self.execute_full_scan(parsed_single_query, **kwargs))
         else:
           result = asyncio_run(self.execute_non_select(parsed_single_query))
-
-      if query_contains_udf:
-        result = self.execute_user_defined_function(result, function_to_index_mapping)
 
       return result
     except Exception as e:

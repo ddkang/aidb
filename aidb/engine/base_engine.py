@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
+import duckdb
 
 from aidb.config.config import Config
 from aidb.config.config_types import InferenceBinding
@@ -360,36 +361,40 @@ class BaseEngine():
     return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
 
 
-  def _call_user_function(self, function_name, args):
-    return self._config.user_defined_function[function_name](*args)
+  def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
+    function_name = str.lower(function_name)
+    if function_name not in self._config.user_defined_function:
+      raise Exception(f'{function_name} has not been added into config, please add it first.')
+    parameter_list = []
+    for args in args_list:
+      parameter_list.append(res_df[args])
+    return self._config.user_defined_function[function_name](*parameter_list)
 
 
   def execute_user_defined_function(
       self,
-      query_results: List[tuple],
-      function_to_index_mapping: Dict[str, List[int]]
+      res_df: pd.DataFrame,
+      dataframe_sql: Dict,
+      query: Query
   ):
-    new_query_results = []
-    index_to_function_mapping = {}
-    for key, value_list in function_to_index_mapping.items():
-      for value in value_list:
-        index_to_function_mapping[value] = key
-    for row in query_results:
-      new_row = []
-      index = 0
-      while index < len(row):
-        if index in index_to_function_mapping:
-          function_name = index_to_function_mapping[index]
-          parameter_list = []
 
-          while index < len(row) and index_to_function_mapping.get(index) == function_name:
-            parameter_list.append(row[index])
-            index += 1
+    for udf in dataframe_sql['udf_mapping']:
+      res_df[udf['result_col_name']] = res_df.apply(
+          self._call_user_function,
+          args=(udf['function_name'], udf['col_names']),
+          axis=1
+      )
 
-          new_row.append(self._call_user_function(function_name, parameter_list))
-        else:
-          new_row.append(row[index])
-          index += 1
+    select_str = ', '.join(dataframe_sql['select_col'])
 
-      new_query_results.append(tuple(new_row))
-    return new_query_results
+    where_condition = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
+    if where_condition:
+      where_str = f'WHERE {where_condition.sql()}'
+    else:
+      where_str = ''
+    df_query = f'''SELECT {select_str} FROM res_df {where_str}'''
+
+    new_results_df = duckdb.sql(df_query).df()
+    res_list_of_tuple = [tuple(row) for row in new_results_df.itertuples(index=False)]
+
+    return res_list_of_tuple

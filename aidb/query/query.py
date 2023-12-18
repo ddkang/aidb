@@ -265,6 +265,7 @@ class Query(object):
     converted_logical_expression = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
     return converted_logical_expression
 
+
   @cached_property
   def filtering_predicates(self):
     """
@@ -649,34 +650,42 @@ class Query(object):
     return Query(new_sql.expression.sql(), self.config)
 
 
+  def add_offset_keyword(self, offset):
+    expression = self._expression.copy()
+    if offset != 0:
+      offset_node = exp.Offset(this=exp.Literal(this=offset, is_string=False))
+      expression.set('offset', offset_node)
+    return Query(expression.sql(), self.config)
+
+
+  def add_limit_keyword(self, limit):
+    expression = self._expression.copy()
+    limit_node = exp.Limit(this=exp.Literal(this=limit, is_string=False))
+    expression.set('limit', limit_node)
+    return Query(expression.sql(), self.config)
+
+
   def convert_and_connected_fp_to_exp(self, and_connected_fp_list):
     def _build_tree(elements, operator):
-      if len(elements) == 1:
+      if len(elements) == 0:
+        return None
+      elif len(elements) == 1:
         return elements[0]
       else:
         return operator(this=elements[0], expression=_build_tree(elements[1:], operator))
-
-    and_connected_list = []
+    new_or_connected_expression_list = []
     for or_connected_fp in and_connected_fp_list:
-      and_connected_list.append(exp.Paren(this=_build_tree(or_connected_fp, exp.Or)))
+      new_or_connected_expression = _build_tree(or_connected_fp, exp.Or)
+      if new_or_connected_expression:
+        new_or_connected_expression_list.append(exp.Paren(this=new_or_connected_expression))
 
-    return _build_tree(and_connected_list, exp.And)
+    new_and_connected_expression = _build_tree(new_or_connected_expression_list, exp.And)
+    return new_and_connected_expression
 
 
   @cached_property
   def is_udf_query(self):
     all_udf_in_query = [e for e in self._expression.find_all(exp.UserFunction)]
-    # udf_in_select_clause = []
-    # for select_exp in self._expression.args['expressions']:
-    #   if select_exp.find(exp.UserFunction) is not None:
-    #     all_user_function = [user_function for user_function in select_exp.find_all(exp.UserFunction)]
-    #     if len(all_user_function) > 1:
-    #       raise Exception("We don't support recursive user defined function currently, "
-    #                       "please register a new function to do that. ")
-    #     udf_in_select_clause += all_user_function
-
-
-    print(len(all_udf_in_query))
     if len(all_udf_in_query) > 0:
       return True
     else:
@@ -693,55 +702,68 @@ class Query(object):
     new_query_str = '
     '''
 
+    class QueryModifier:
+      def __init__(self):
+        self.added_select = set()
+        self.new_select_exp_list = []
+        self.col_index_mapping = {}
+        self.new_select_col_index = 0
+        self.function_index = 0
+        self.udf_mapping_list = []
+        self.dataframe_select_col_list = []
+
+
+      def add_column_with_alias(self, node, is_select_col = False):
+        if node not in self.added_select:
+          self.added_select.add(node)
+          if isinstance(node.parent, exp.Alias):
+            alias = node.parent.args['alias']
+            select_col_with_alias = node.parent
+          else:
+            alias = f'col__{self.new_select_col_index}'
+            select_col_with_alias = exp.Alias(this=node, alias=alias)
+          self.new_select_exp_list.append(select_col_with_alias)
+          self.col_index_mapping[node] = alias
+          self.new_select_col_index += 1
+        if is_select_col:
+          self.dataframe_select_col_list.append(self.col_index_mapping[node])
+
+
+      def add_udf(self, user_defined_function, is_select_col = False):
+        function_col_dict = {
+          'col_names': [],
+          'function_name': user_defined_function.args['this'],
+          'result_col_name': f'function__{self.function_index}'
+        }
+        for col in user_defined_function.args['expressions']:
+          self.add_column_with_alias(col)
+          function_col_dict['col_names'].append(self.col_index_mapping[col])
+        self.udf_mapping_list.append(function_col_dict)
+        if is_select_col:
+          self.dataframe_select_col_list.append(f'function__{self.function_index}')
+        self.function_index += 1
+
+
+    modified_query = QueryModifier()
     normalized_query = self.query_after_normalizing
     expression = normalized_query.get_expression().copy()
-    new_select_exp_list = []
-    dataframe_select_col_list = []
-    udf_mapping_list = []
-    col_index_mapping = dict()
-    function_index = 0
-    new_select_col_index = 0
-    added_select = set()
+
     for select_exp in expression.args['expressions']:
-      function_col_dict= {}
-      function_col_dict['col_names'] = []
       user_function = select_exp.find(exp.UserFunction)
-      if user_function is not None:
-        function_name = user_function.args['this']
-        function_col_dict['function_name'] = function_name
-        for col in user_function.args['expressions']:
-          if col not in added_select:
-            added_select.add(col.copy())
-            # add alias to avoid same column name
-            select_col_with_alias = exp.Alias(this=col, alias=f'col__{new_select_col_index}')
-            new_select_exp_list.append(select_col_with_alias)
-            col_index_mapping[col.copy()] = f'col__{new_select_col_index}'
-            new_select_col_index += 1
-          function_col_dict['col_names'].append(col_index_mapping[col])
-        function_col_dict['result_col_name'] = f'function__{function_index}'
-        udf_mapping_list.append(function_col_dict)
-        dataframe_select_col_list.append(f'function__{function_index}')
-        function_index += 1
+      if user_function:
+        modified_query.add_udf(user_function, is_select_col=True)
       else:
-        if select_exp not in added_select:
-          added_select.add(select_exp.copy())
-          select_col_with_alias = exp.Alias(this=select_exp, alias=f'col__{new_select_col_index}')
-          new_select_exp_list.append(select_col_with_alias)
-          col_index_mapping[select_exp.copy()] = f'col__{new_select_col_index}'
-          new_select_col_index += 1
-        dataframe_select_col_list.append(col_index_mapping[select_exp.copy()])
+        modified_query.add_column_with_alias(select_exp, is_select_col=True)
 
     filter_predicates = []
+
     # find user defined function in JOIN condition, if exists, add them into filter predicates, 
     # then remove this join condition
-    
     if expression.find(exp.Join) is not None:
       for join_exp in expression.args['joins']:
-        if hasattr(join_exp, 'on'):
-          if join_exp.args['on'].find(exp.UserFunction):
+        if join_exp.args['on'] is not None and join_exp.args['on'].find(exp.UserFunction):
             filter_predicates.extend(self._convert_logical_condition_to_cnf(join_exp.args['on']).copy())
             join_exp.set('on', None)
-
     # we don't need to replace column with root column here, so we don't use query.filtering_predicates directly
     if expression.find(exp.Where):
       filter_predicates.extend(self._convert_logical_condition_to_cnf(expression.find(exp.Where)))
@@ -761,47 +783,35 @@ class Query(object):
 
       new_or_connected_fp = []
       for fp in or_connected:
-        for node, _, key in fp.walk():
+        fp_copy = fp.copy()
+        for node, _, key in fp_copy.walk():
           if isinstance(node, exp.Expression) and self._check_in_subquery(node):
             continue
           if isinstance(node, exp.UserFunction):
-            function_name = node.args['this']
-            converted_fp = exp.Column(this=exp.Identifier(this=f'function__{function_index}'))
-            function_col_dict = {}
-            function_col_dict['col_names'] = []
-            function_col_dict['function_name'] = function_name
-            function_col_dict['result_col_name'] = f'function__{function_index}'
-            # FIXME: for IN operator'
-            for col in node.args['expressions']:
-              if col not in added_select:
-                # node in WHERE clause will be changed, so using .copy()
-                added_select.add(col.copy())
-                select_col_with_alias = exp.Alias(this=col, alias=f'col__{new_select_col_index}')
-                new_select_exp_list.append(select_col_with_alias.copy())
-                col_index_mapping[col.copy()] = f'col__{new_select_col_index}'
-                new_select_col_index += 1
-              function_col_dict['col_names'].append(col_index_mapping[col])
-            udf_mapping_list.append(function_col_dict)
-            function_index += 1
+            converted_fp = exp.Column(this=exp.Identifier(this=f'function__{modified_query.function_index}'))
+            modified_query.add_udf(node.copy())
+            # FIXME: for IN operator
             node.parent.set(key, converted_fp)
 
           elif isinstance(node, exp.Column):
-            if node not in added_select:
-              added_select.add(node.copy())
-              # add alias to avoid same column name
-              select_col_with_alias = exp.Alias(this=node, alias=f'col__{new_select_col_index}')
-              new_select_exp_list.append(select_col_with_alias.copy())
-              col_index_mapping[node.copy()] = f'col__{new_select_col_index}'
-              new_select_col_index += 1
-            node.args['this'].set('this', col_index_mapping[node.copy()])
+            node_copy = node.copy()
+            modified_query.add_column_with_alias(node_copy)
+            node.args['this'].set('this', modified_query.col_index_mapping[node_copy])
             node.set('table', None)
-
-        new_or_connected_fp.append(fp)
+        new_or_connected_fp.append(fp_copy)
       filter_predicates_in_dataframe.append(new_or_connected_fp)
 
-
-    new_where_clause = exp.Where(this=self.convert_and_connected_fp_to_exp(filter_predicates_in_sql))
+    new_where_condition = self.convert_and_connected_fp_to_exp(filter_predicates_in_sql)
+    if new_where_condition:
+      new_where_clause = exp.Where(this=new_where_condition)
+    else:
+      new_where_clause = None
     expression.set('where', new_where_clause)
+    expression.set('expressions', modified_query.new_select_exp_list)
 
-    expression.set('expressions', new_select_exp_list)
-    return filter_predicates_in_dataframe, dataframe_select_col_list, udf_mapping_list, Query(expression.sql(), self.config)
+    dataframe_sql = {
+      'udf_mapping': modified_query.udf_mapping_list,
+      'select_col': modified_query.dataframe_select_col_list,
+      'filter_predicate': filter_predicates_in_dataframe
+    }
+    return dataframe_sql, Query(expression.sql(), self.config)
