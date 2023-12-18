@@ -30,6 +30,7 @@ def command_line_utility(engine):
         if isinstance(results, list):
           print(f"Query Execution Time = {int((end_time - start_time) * 100) / 100} seconds")
           print("Query Result")
-          print(pd.DataFrame(results))
+          with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(pd.DataFrame(results))
       except Exception as e:
         print(e)
