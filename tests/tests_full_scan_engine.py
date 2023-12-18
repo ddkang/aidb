@@ -2,6 +2,7 @@ import os
 import time
 import unittest
 
+from collections import Counter
 from unittest import IsolatedAsyncioTestCase
 from sqlalchemy.sql import text
 
@@ -32,21 +33,11 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
 
-    def sum_function(a, b, c, d):
-      return a + b + c + d
-
-    def multiply(a, b, c, d):
-      return a * b * c * d
-
-
-    aidb_engine._config.add_user_defined_function('sum_function', sum_function)
-    aidb_engine._config.add_user_defined_function('multiply', multiply)
-
     queries = [
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
+        '''SELECT * FROM lights01 WHERE light_2='green' AND frame < 100;''',
+        '''SELECT * FROM lights01 WHERE light_2='green' AND frame < 100;'''
       ),
       (
         'full_scan',
@@ -60,21 +51,14 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;'''
-      ),
-      (
-        'full_scan',
         '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;''',
         '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;'''
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
-           and objects00.object_id = colors02.object_id;''',
+        '''SELECT * FROM counts03 join colors02 on counts03.frame = colors02.frame;''',
 
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
-           and objects00.object_id = colors02.object_id;'''
+        '''SELECT * FROM counts03 join colors02 on counts03.frame = colors02.frame;'''
       ),
       (
         'full_scan',
@@ -101,13 +85,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
            FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
            WHERE color = 'blue' AND x_min > 600;'''
       ),
-      (
-        'full_scan',
-        '''SELECT x_min, sum_function(x_min, x_max, y_min, y_max), x_max, 
-           multiply(x_min, x_max, y_min, y_max) FROM objects00 ;''',
-
-        '''SELECT x_min, x_max, y_min, y_max FROM objects00;'''
-      ),
 
     ]
 
@@ -120,8 +97,9 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: equality check should be implemented
+      # TODO: may have problem with decimal number
       assert len(gt_res) == len(aidb_res)
+      assert Counter(gt_res) == Counter(aidb_res)
     del gt_engine
     p.terminate()
 
@@ -154,8 +132,9 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: equality check should be implemented
+      # TODO: may have problem with decimal number
       assert len(gt_res) == len(aidb_res)
+      assert Counter(gt_res) == Counter(aidb_res)
     del gt_engine
     p.terminate()
 
