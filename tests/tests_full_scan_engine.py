@@ -110,39 +110,39 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     del gt_engine
     p.terminate()
 
-  # async def test_multi_table_input(self):
-  #   dirname = os.path.dirname(__file__)
-  #   data_dir = os.path.join(dirname, 'data/multi_table_input')
-  #
-  #   p = Process(target=run_server, args=[str(data_dir)])
-  #   p.start()
-  #
-  #   queries = [
-  #     (
-  #       'full_scan',
-  #       '''SELECT tweet_id, sentiment FROM blobs_00;''',
-  #       '''SELECT tweet_id, sentiment FROM blobs_00;''',
-  #     )
-  #   ]
-  #
-  #   gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-  #
-  #   register_inference_services(aidb_engine, data_dir)
-  #
-  #   for query_type, aidb_query, exact_query in queries:
-  #     logger.info(f'Running query {exact_query} in ground truth database')
-  #     # Run the query on the ground truth database
-  #     async with gt_engine.begin() as conn:
-  #       gt_res = await conn.execute(text(exact_query))
-  #       gt_res = gt_res.fetchall()
-  #     # Run the query on the aidb database
-  #     logger.info(f'Running query {aidb_query} in aidb database')
-  #     aidb_res = aidb_engine.execute(aidb_query)
-  #     # TODO: may have problem with decimal number
-  #     assert len(gt_res) == len(aidb_res)
-  #     assert Counter(gt_res) == Counter(aidb_res)
-  #   del gt_engine
-  #   p.terminate()
+  async def test_multi_table_input(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/multi_table_input')
+
+    p = Process(target=run_server, args=[str(data_dir)])
+    p.start()
+
+    queries = [
+      (
+        'full_scan',
+        '''SELECT tweet_id, sentiment FROM blobs_00;''',
+        '''SELECT tweet_id, sentiment FROM blobs_00;''',
+      )
+    ]
+
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+
+    for query_type, aidb_query, exact_query in queries:
+      logger.info(f'Running query {exact_query} in ground truth database')
+      # Run the query on the ground truth database
+      async with gt_engine.begin() as conn:
+        gt_res = await conn.execute(text(exact_query))
+        gt_res = gt_res.fetchall()
+      # Run the query on the aidb database
+      logger.info(f'Running query {aidb_query} in aidb database')
+      aidb_res = aidb_engine.execute(aidb_query)
+      # TODO: may have problem with decimal number
+      assert len(gt_res) == len(aidb_res)
+      assert Counter(gt_res) == Counter(aidb_res)
+    del gt_engine
+    p.terminate()
 
 
 if __name__ == '__main__':

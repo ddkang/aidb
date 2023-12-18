@@ -21,32 +21,22 @@ DB_URL = "sqlite+aiosqlite://"
 # DB_URL = "mysql+aiomysql://aidb:aidb@localhost"
 class FullScanEngineTests(IsolatedAsyncioTestCase):
 
-  def test_equaility_of_udf_query(self):
-    pass
-
-  async def test_jackson_number_objects(self):
-
-    dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/jackson')
-
-    p = Process(target=run_server, args=[str(data_dir)])
-    p.start()
-    time.sleep(3)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-
-    register_inference_services(aidb_engine, data_dir)
-
+  def add_user_defined_function(self, aidb_engine):
     def sum_function(*args):
       return sum(args)
+
 
     def is_equal(col1, col2):
       return col1 == col2
 
+
     def max_function(*args):
       return max(args)
 
+
     def power_function(col1, col2):
       return col1**col2
+
 
     def replace_color(column1, selected_color, new_color):
       if column1 == selected_color:
@@ -60,6 +50,21 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     aidb_engine._config.add_user_defined_function('max_function', max_function)
     aidb_engine._config.add_user_defined_function('power_function', power_function)
     aidb_engine._config.add_user_defined_function('replace_color', replace_color)
+
+
+  async def test_jackson_number_objects(self):
+
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+
+    p = Process(target=run_server, args=[str(data_dir)])
+    p.start()
+    time.sleep(3)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    register_inference_services(aidb_engine, data_dir)
+
+    self.add_user_defined_function(aidb_engine)
 
     queries = [
       # join condition test

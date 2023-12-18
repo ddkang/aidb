@@ -63,7 +63,7 @@ jobs:
       run: python3 -m tests.tests_full_scan_nested_query
 
     - name: Run Full Scan Tests for udf queries
-      run: python3 -m tests.tests_full_scan_udf
+      run: python3 -m tests.tests_full_scan_engine_udf
 
     - name: Run Query Parsing Tests for nested queries
       run: python3 -m tests.test_query_parsing
