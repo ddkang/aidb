@@ -145,14 +145,12 @@ class CachedBoundInferenceService(BoundInferenceService):
     return list(tables)
 
 
-  async def _insert_in_cache_table(self, inp_rows: List[pd.Series], conn):
-    if len(inp_rows) > 0:
-      inp_rows_df = pd.DataFrame(inp_rows).reset_index(drop=True)
-      inp_rows_df.columns = [self.convert_normalized_col_name_to_cache_col_name(col) for col in inp_rows_df.columns]
-      # convert the pandas datatype to python native type
-      inp_rows_df = inp_rows_df.astype('object')
-      # this doesn't support upsert queries
-      await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
+  async def _insert_in_cache_table(self, inp_rows_df: pd.DataFrame, conn):
+    inp_rows_df.columns = [self.convert_normalized_col_name_to_cache_col_name(col) for col in inp_rows_df.columns]
+    # convert the pandas datatype to python native type
+    inp_rows_df = inp_rows_df.astype('object')
+    # this doesn't support upsert queries
+    await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
 
 
   async def _insert_output_results_in_tables(self, output_results_data: List[pd.DataFrame], conn):
@@ -169,22 +167,24 @@ class CachedBoundInferenceService(BoundInferenceService):
         await conn.run_sync(lambda conn: tmp_df.to_sql(table, conn, if_exists='append', index=False))
 
 
-  async def _check_inputs_in_cache_table(self, inputs: pd.DataFrame, conn):
+  async def _get_inputs_not_in_cache_table(self, inputs: pd.DataFrame, conn):
     """
-    checks the presence of inputs in the cache table
+    checks the presence of inputs in the cache table and returns the inputs that are not in the cache table
     """
     cache_entries = await conn.run_sync(lambda conn: pd.read_sql(text(str(self._cache_query_stub.compile())), conn))
     cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
     normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
                              self._cache_columns]
-    is_in_cache = []
+    out_cache_idx = []
     if len(normalized_cache_cols) == 1:
       for ind, row in inputs.iterrows():
-        is_in_cache.append(row[normalized_cache_cols[0]] in cache_entries.index)
+        if normalized_cache_cols[0] not in cache_entries.index:
+          out_cache_idx.append(ind)
     else:
       for ind, row in inputs.iterrows():
-        is_in_cache.append(tuple([row[col] for col in normalized_cache_cols]) in cache_entries.index)
-    return is_in_cache
+        if tuple([row[col] for col in normalized_cache_cols]) not in cache_entries.index:
+          out_cache_idx.append(ind)
+    return inputs.iloc[out_cache_idx]
 
 
   async def infer(self, inputs: pd.DataFrame):
@@ -194,41 +194,17 @@ class CachedBoundInferenceService(BoundInferenceService):
 
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      is_in_cache = await self._check_inputs_in_cache_table(inputs, conn)
-      results = []
+      out_cache_inputs = await self._get_inputs_not_in_cache_table(inputs, conn)
       records_to_insert_in_table = []
-      inputs_to_insert_in_cache_table = []
-      # TODO
-      # - Batch the service inference
-      # - Batch the selection for cached results... How to do this?
-      for idx, (_, inp_row) in self.optional_tqdm(enumerate(inputs.iterrows()), total=len(inputs)):
-        if is_in_cache[idx]:
-          query = self._result_query_stub.where(
-            sqlalchemy.sql.and_(
-              *[getattr(self._cache_table.c, self.convert_normalized_col_name_to_cache_col_name(col)) == pandas_dtype_to_native_type(getattr(inp_row, col)) for col in
-                self.binding.input_columns]
-            )
-          )
-          df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
-          results.append(df)
-        else:
-          inference_results = self.service.infer_one(inp_row)
-          for idx, col in enumerate(self.binding.output_columns):
-            if idx < len(inference_results.columns):
-              inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
-            else:  # assume later columns are copied from input
-              # assume columns with same name in input / output tables are the same
-              _, col_n = col.split('.')
-              for c in self.binding.input_columns:
-                if c.split('.')[1] == col_n:
-                  inference_results[col] = inp_row[c]
-                  break
-          records_to_insert_in_table.append(inference_results)
-          results.append(inference_results)
-          inputs_to_insert_in_cache_table.append(inp_row)
-      await self._insert_in_cache_table(inputs_to_insert_in_cache_table, conn)
+      bs = self.service.preferred_batch_size
+      input_batches = [out_cache_inputs.iloc[i:i + bs] for i in range(0, len(out_cache_inputs), bs)]
+      # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
+      for input_batch in self.optional_tqdm(input_batches):
+        inference_results = self.service.infer_batch(input_batch)
+        records_to_insert_in_table.extend(inference_results)
+      # TODO: rename column, return list of dataframe, not dataframe
+      await self._insert_in_cache_table(out_cache_inputs, conn)
       await self._insert_output_results_in_tables(records_to_insert_in_table, conn)
-    return results
 
 
   def __hash__(self):
