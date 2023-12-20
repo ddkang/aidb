@@ -331,10 +331,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__0', 'col__1'],
            'function_name': 'function1',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': [],
            'function_name': 'function2',
-           'result_col_name': 'function__1'}],
+           'result_col_name': ['function__1']}],
         'select_col': ['col__0', 'function__0', 'col__2', 'function__1'],
         'filter_predicate': None
         }
@@ -358,7 +358,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__1', 'col__2', 'col__3'],
            'function_name': 'function1',
-           'result_col_name': 'function__0'}],
+           'result_col_name': ['function__0']}],
         'select_col': ['col__0', 'function__0'],
         'filter_predicate': None
       }
@@ -384,10 +384,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__0', 'col__4'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': ['col__5', 'col__6'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__1'}],
+           'result_col_name': ['function__1']}],
         'select_col': ['col__0', 'col__1', 'col__2', 'col__3'],
         'filter_predicate': '(function__0 = TRUE) AND (function__1 = TRUE)'
         }
@@ -412,13 +412,13 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__0', 'col__4'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': ['col__5', 'col__6'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__1'},
+           'result_col_name': ['function__1']},
           {'col_names': ['col__7', 'col__8'],
            'function_name': 'sum_function',
-           'result_col_name': 'function__2'}],
+           'result_col_name': ['function__2']}],
         'select_col': ['col__0', 'col__1', 'col__2', 'col__3'],
         'filter_predicate': '(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500)'
       }
@@ -443,16 +443,16 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__0', 'col__1'],
            'function_name': 'multiply_function',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': ['col__3', 'col__4'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__1'},
+           'result_col_name': ['function__1']},
           {'col_names': ['col__5', 'col__6'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__2'},
+           'result_col_name': ['function__2']},
           {'col_names': ['col__0', 'col__7'],
            'function_name': 'sum_function',
-           'result_col_name': 'function__3'}],
+           'result_col_name': ['function__3']}],
         'select_col': ['function__0', 'col__2'],
         'filter_predicate': '(function__1 = TRUE) AND (function__2 = TRUE) AND (function__3 > 1500)'
       }
@@ -478,13 +478,13 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__3', 'col__4'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': ['col__5', 'col__6'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__1'},
+           'result_col_name': ['function__1']},
           {'col_names': ['col__0', 'col__7'],
            'function_name': 'sum_function',
-           'result_col_name': 'function__2'}],
+           'result_col_name': ['function__2']}],
         'select_col': ['col__0', 'col__1', 'col__2'],
         'filter_predicate': "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500 OR col__2 = 'blue')"
       }
@@ -509,16 +509,16 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__3', 'col__4'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__0'},
+           'result_col_name': ['function__0']},
           {'col_names': ['col__5', 'col__6'],
            'function_name': 'is_equal',
-           'result_col_name': 'function__1'},
+           'result_col_name': ['function__1']},
           {'col_names': ['col__0', 'col__7'],
            'function_name': 'multiply_function',
-           'result_col_name': 'function__2'},
+           'result_col_name': ['function__2']},
           {'col_names': ['col__0', 'col__7'],
            'function_name': 'sum_function',
-           'result_col_name': 'function__3'}],
+           'result_col_name': ['function__3']}],
         'select_col': ['col__0', 'col__1', 'col__2'],
         'filter_predicate': "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__3 > function__2)"
       }
@@ -539,7 +539,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         'udf_mapping': [
           {'col_names': ['col__0', 'col__1'],
            'function_name': 'sum_function',
-           'result_col_name': 'function__0'}],
+           'result_col_name': ['function__0']}],
         'select_col': ['function__0'],
         'filter_predicate': None
       }

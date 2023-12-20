@@ -664,8 +664,8 @@ class Query(object):
     expression.set('limit', limit_node)
     return Query(expression.sql(), self.config)
 
-
-  def convert_and_connected_fp_to_exp(self, and_connected_fp_list):
+  @staticmethod
+  def convert_and_connected_fp_to_exp(and_connected_fp_list):
     '''
     This function connected filter predicates in a list of list
     e.g. [[fp1, fp2], [fp3, fp4]] will be converted to the expression of '(fp1 OR fp2) AND (fp3 OR fp4)'
@@ -715,7 +715,7 @@ class Query(object):
     e.g. 'SELECT udf(x_max, y_max) from objects00'
       the parsed query will be 'SELECT objects00.x_max AS col__0, objects00.y_max AS col__1 from objects00
       dataframe_sql ={
-          'udf_mapping': [{'col_names': ['col__0', 'col__1'], 'function_name': 'udf','result_col_name': 'function__0'}],
+          'udf_mapping': [{'col_names': ['col__0', 'col__1'], 'function_name': 'udf','result_col_name': ['function__0']}],
           'select_col': ['function__0'],
           'filter_predicate': None
       }
@@ -756,14 +756,15 @@ class Query(object):
         function_col_dict = {
           'col_names': [],
           'function_name': user_defined_function.args['this'],
-          'result_col_name': f'function__{self.function_index}'
+          'result_col_name': [f'function__{self.function_index}']
         }
         for col in user_defined_function.args['expressions']:
           self.add_column_with_alias(col)
           function_col_dict['col_names'].append(self.col_index_mapping[col])
         self.udf_mapping_list.append(function_col_dict)
         if is_select_col:
-          self.dataframe_select_col_list.append(f'function__{self.function_index}')
+          for col_name in function_col_dict['result_col_name']:
+            self.dataframe_select_col_list.append(col_name)
         self.function_index += 1
 
 
