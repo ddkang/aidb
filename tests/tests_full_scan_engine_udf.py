@@ -225,7 +225,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         FROM blobs_00
         ''',
         '''
-        SELECT object_name, confidence, x_min, y_min, x_max, y_max, object_id, frame
+        SELECT object_name, confidence_score, x_min, y_min, x_max, y_max, object_id, frame
         FROM objects00
         '''
       ),
