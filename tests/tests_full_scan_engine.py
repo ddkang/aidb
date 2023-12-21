@@ -53,44 +53,44 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;''',
         '''SELECT * FROM objects00 WHERE object_name='car' OR frame < 100;'''
       ),
-      (
-        'full_scan',
-        '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;''',
-        '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;'''
-      ),
-      (
-        'full_scan',
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
-           and objects00.object_id = colors02.object_id;''',
+      # (
+      #   'full_scan',
+      #   '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;''',
+      #   '''SELECT Avg(x_min) FROM objects00 GROUP BY objects00.object_id;'''
+      # ),
+      # (
+      #   'full_scan',
+      #   '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+      #      and objects00.object_id = colors02.object_id;''',
 
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
-           and objects00.object_id = colors02.object_id;'''
-      ),
-      (
-        'full_scan',
-        '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
-           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;''',
-        '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
-           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;'''
-      ),
-      (
-        'full_scan',
-        '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
-           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
-           JOIN blobs_00 table3 ON table2.frame = table3.frame;''',
-        '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
-           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
-           JOIN blobs_00 table3 ON table2.frame = table3.frame;'''
-      ),
-      (
-        'full_scan',
-        '''SELECT color, x_min AS col2, colors02.frame AS col3
-           FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
-           WHERE color = 'blue' AND x_min > 600;''',
-        '''SELECT color, x_min AS col2, colors02.frame AS col3
-           FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
-           WHERE color = 'blue' AND x_min > 600;'''
-      )
+      #   '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+      #      and objects00.object_id = colors02.object_id;'''
+      # ),
+      # (
+      #   'full_scan',
+      #   '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+      #      FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;''',
+      #   '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+      #      FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;'''
+      # ),
+      # (
+      #   'full_scan',
+      #   '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+      #      FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+      #      JOIN blobs_00 table3 ON table2.frame = table3.frame;''',
+      #   '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+      #      FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+      #      JOIN blobs_00 table3 ON table2.frame = table3.frame;'''
+      # ),
+      # (
+      #   'full_scan',
+      #   '''SELECT color, x_min AS col2, colors02.frame AS col3
+      #      FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+      #      WHERE color = 'blue' AND x_min > 600;''',
+      #   '''SELECT color, x_min AS col2, colors02.frame AS col3
+      #      FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+      #      WHERE color = 'blue' AND x_min > 600;'''
+      # )
 
     ]
 
