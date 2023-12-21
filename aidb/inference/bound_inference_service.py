@@ -11,7 +11,6 @@ from aidb.inference.inference_service import InferenceService
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import cache_table_name_from_inputs
 from aidb.utils.logger import logger
-from aidb.utils.type_conversion import pandas_dtype_to_native_type
 
 
 @dataclass
