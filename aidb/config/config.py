@@ -147,6 +147,13 @@ class Config:
     '''
     column_service = dict()
     for bound_service in self.inference_bindings:
+      actual_output_columns = bound_service.binding.output_columns
+      len_copied = len(bound_service.service.copied_input_columns)
+      max_copied_idx = max(bound_service.service.copied_input_columns)
+      len_input = len(bound_service.binding.input_columns)
+      assert len_copied <= len_input and max_copied_idx < len_input, "The number of copied input columns is larger than the number of input columns"
+      if len_copied > 0:
+        actual_output_columns = actual_output_columns[:-len_copied]
       for output_col in bound_service.binding.output_columns:
         if output_col in column_service:
           raise Exception(f'Column {output_col} is bound to multiple services')

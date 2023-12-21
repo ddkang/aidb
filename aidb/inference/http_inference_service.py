@@ -168,7 +168,7 @@ class HTTPInferenceService(CachedInferenceService):
         if len(output[k]) > 0:
           assert isinstance(output[k][0], _type), f'Output column {k} must be of type {_type}'
 
-    return pd.DataFrame(output)
+    return output
 
 
   @call_counter
@@ -177,7 +177,10 @@ class HTTPInferenceService(CachedInferenceService):
     response = self.request(request)
     output = self.convert_response_to_output(response)
 
-    return output
+    for copied_input_col_idx in self.copied_input_columns:
+      output[len(output)] = input[input.keys()[copied_input_col_idx]]
+
+    return pd.DataFrame(output)
 
 
   def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
@@ -189,7 +192,13 @@ class HTTPInferenceService(CachedInferenceService):
     response.raise_for_status()
 
     # We assume the server returns a list of responses
+    # we assume one output must correspond to one input
+    # but we actually don't know which input corresponds to which output
+    # because one input may correspond to 0 / 1 / multiple outputs
     response = response.json()
     outputs = [pd.read_json(r, orient='records') for r in response]
+    for output in outputs:
+      for copied_input_col_idx in self.copied_input_columns:
+        output[len(output)] = inputs[inputs.keys()[copied_input_col_idx]]
 
     return outputs

@@ -3,6 +3,8 @@ Input: document segmentation model weights (model_final.pth), csv with paths to 
 
 Output: csv with OCR'd text.
 """
+from typing import List
+
 import numpy as np
 import pandas as pd
 import pdf2image
@@ -21,9 +23,10 @@ class DetectronLocalOCR(CachedInferenceService):
       name: str,
       model_path: str,
       device: str="cuda",
+      copied_input_columns: List[int]=[],
       is_single: bool=False,
   ):
-    super().__init__(name=name, preferred_batch_size=1, is_single=is_single)
+    super().__init__(name=name, preferred_batch_size=1, is_single=is_single, copied_input_columns=copied_input_columns)
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
     cfg.MODEL.DEVICE = device
@@ -57,7 +60,10 @@ class DetectronLocalOCR(CachedInferenceService):
       margin_y1 = min(im.shape[0], y1+30)
       cropped_im = im[margin_y0:margin_y1, margin_x0:margin_x1]
       ocr_text = pytesseract.image_to_string(cropped_im)
-    return pd.DataFrame([{'ocr_text': ocr_text}])
+    output = {"ocr_text": [ocr_text]}
+    for idx in self.copied_input_columns:
+      output[len(output)] = input[input.keys()[idx]]
+    return pd.DataFrame(output)
 
 
   def infer_batch(self, inputs: pd.DataFrame) -> pd.DataFrame:

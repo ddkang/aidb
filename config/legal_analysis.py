@@ -8,7 +8,8 @@ DB_NAME = 'aidb_test_legal.sqlite'
 
 ocr = DetectronLocalOCR(
   name="ocr",
-  model_path="tests/data/model_final.pth")
+  model_path="tests/data/model_final.pth",
+  copied_input_columns=[1],)
 
 openai_gpt = OpenAIText(
   name="openai_gpt",
@@ -17,6 +18,7 @@ openai_gpt = OpenAIText(
   response_keys_to_columns=[('choices', AIDBListType(), 'message', 'content')],
   input_columns_types=[str],
   output_columns_types=[str],
+  copied_input_columns=[1],
   default_args={"model": "gpt-4-1106-preview",
                 ('messages', AIDBListType(), 'role'): "user"},
   prompt_prefix='"',

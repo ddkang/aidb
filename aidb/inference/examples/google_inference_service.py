@@ -27,9 +27,10 @@ class GoogleVisionAnnotate(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
+      copied_input_columns: List[int]=[],
+      rate_limit: Union[int, None]=None,
       project_id: str=None,
       infer_type: str='images',
   ):
@@ -55,4 +56,5 @@ class GoogleVisionAnnotate(HTTPInferenceService):
         response_keys_to_columns=response_keys_to_columns,
         input_columns_types=input_columns_types,
         output_columns_types=output_columns_types,
+        copied_input_columns=copied_input_columns,
     )

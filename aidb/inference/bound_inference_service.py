@@ -156,6 +156,8 @@ class CachedBoundInferenceService(BoundInferenceService):
   async def _insert_output_results_in_tables(self, output_results_data: List[pd.DataFrame], conn):
     if len(output_results_data) > 0:
       inference_results = pd.concat(output_results_data, ignore_index=True)
+      for idx, col in enumerate(self.binding.output_columns):
+        inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
       tables = self.get_tables(self.binding.output_columns)
       for table in tables:
         columns = [col for col in self.binding.output_columns if col.startswith(table + '.')]
@@ -202,7 +204,6 @@ class CachedBoundInferenceService(BoundInferenceService):
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
         records_to_insert_in_table.extend(inference_results)
-      # TODO: rename column, return list of dataframe, not dataframe
       await self._insert_in_cache_table(out_cache_inputs, conn)
       await self._insert_output_results_in_tables(records_to_insert_in_table, conn)
 

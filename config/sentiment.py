@@ -16,6 +16,7 @@ sentiment_inference_service = HuggingFaceNLP(
                             (AIDBListType(), AIDBListType(), 'score')],
   input_columns_types=[str],
   output_columns_types=[str, float],
+  copied_input_columns=[1],
   model="LiYuan/amazon-review-sentiment-analysis",
   default_args={("options", "wait_for_model"): True},
   rate_limit=100)
