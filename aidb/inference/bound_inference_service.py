@@ -176,16 +176,16 @@ class CachedBoundInferenceService(BoundInferenceService):
     cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
     normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
                              self._cache_columns]
-    out_cache_idx = []
+    out_cache_row = []
     if len(normalized_cache_cols) == 1:
       for ind, row in inputs.iterrows():
         if row[normalized_cache_cols[0]] not in cache_entries.index:
-          out_cache_idx.append(ind)
+          out_cache_row.append(row)
     else:
       for ind, row in inputs.iterrows():
         if tuple([row[col] for col in normalized_cache_cols]) not in cache_entries.index:
-          out_cache_idx.append(ind)
-    return inputs.iloc[out_cache_idx]
+          out_cache_row.append(row)
+    return pd.DataFrame(out_cache_row)
 
 
   async def infer(self, inputs: pd.DataFrame):
