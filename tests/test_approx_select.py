@@ -67,7 +67,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
       for aidb_query, exact_query in queries:
         logger.info(f'Running query {aidb_query} in approx select engine')
         seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
-        aidb_res = aidb_engine.execute(aidb_query, seed=seed)
+        aidb_res = aidb_engine.execute(aidb_query, __seed=seed)
 
         logger.info(f'Running query {exact_query} in ground truth database')
         async with gt_engine.begin() as conn:

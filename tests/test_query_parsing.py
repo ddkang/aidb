@@ -27,7 +27,6 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       for or_connected in and_connected:
         or_fp.append(or_connected.sql())
       and_fp.append(or_fp)
-
     self.are_lists_equal(and_fp, correct_fp)
     self.are_lists_equal(query.inference_engines_required_for_filtering_predicates, correct_service)
     self.are_lists_equal(query.tables_in_filtering_predicates, correct_tables)
@@ -142,6 +141,73 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     correct_service = [{}]
     correct_tables = [{}]
     self._test_query(query_str5, config, normalized_query_str5, correct_fp, correct_service, correct_tables, 3)
+
+
+    query_str6 = '''
+                 SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;
+                 '''
+
+    normalized_query_str6 = ("SELECT colors02.color, objects00.x_min, objects00.y_min "
+                             "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame")
+
+    correct_fp = [[]]
+
+    correct_service = [{}]
+    correct_tables = [{}]
+    self._test_query(query_str6, config, normalized_query_str6, correct_fp, correct_service, correct_tables, 1)
+
+
+    query_str7 = '''
+                 SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+                 FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+                 JOIN blobs_00 table3 ON table2.frame = table3.frame;
+                 '''
+
+    normalized_query_str7 = ("SELECT colors02.color, objects00.x_min, blobs_00.frame "
+                             "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
+                             "JOIN blobs_00 ON objects00.frame = blobs_00.frame")
+
+    correct_fp = [[]]
+
+    correct_service = [{}]
+    correct_tables = [{}]
+    self._test_query(query_str7, config, normalized_query_str7, correct_fp, correct_service, correct_tables, 1)
+
+
+    query_str8 = '''
+                 SELECT color, x_min AS col2, colors02.frame AS col3
+                 FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+                 WHERE color = 'blue' AND x_min > 600;
+                 '''
+
+    normalized_query_str8 = ("SELECT colors02.color, objects00.x_min, colors02.frame "
+                             "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
+                             "WHERE colors02.color = 'blue' AND objects00.x_min > 600")
+
+    correct_fp = [["colors02.color = 'blue'"], ['objects00.x_min > 600']]
+
+    correct_service = [{'colors02'}, {'objects00'}]
+    correct_tables = [{'colors02'}, {'objects00'}]
+    self._test_query(query_str8, config, normalized_query_str8, correct_fp, correct_service, correct_tables, 1)
+
+
+    query_str9 = '''
+                 SELECT color, userfunction(x_min, y_min, x_max, y_max)
+                 FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+                 WHERE table2.frame > 10000 OR y_max < 800;
+                 '''
+
+    normalized_query_str9 = ("SELECT colors02.color, userfunction(objects00.x_min, objects00.y_min, "
+                             "objects00.x_max, objects00.y_max) "
+                             "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
+                             "WHERE objects00.frame > 10000 OR objects00.y_max < 800")
+
+    correct_fp = [['blobs_00.frame > 10000', 'objects00.y_max < 800']]
+
+    correct_service = [{'objects00'}]
+    correct_tables = [{'objects00'}]
+    self._test_query(query_str9, config, normalized_query_str9, correct_fp, correct_service, correct_tables, 1)
 
 
   # We don't support using approximate query as a subquery

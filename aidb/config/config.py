@@ -218,7 +218,7 @@ class Config:
         if fk_col in self.tables[output_table].primary_key:
           if refers_to not in input_primary_key_columns:
             raise Exception(f'{output_table} primary key column {fk_col} is not in input tables')
-          out_foreign_key_columns.add(refers_to)
+        out_foreign_key_columns.add(refers_to)
 
       for pk_col in self.tables[output_table].primary_key:
         out_primary_key_columns.add(f"{output_table}.{pk_col}")

@@ -307,7 +307,6 @@ class Query(object):
     else:
       return tables_of_column[0]
 
-
   @cached_property
   def query_after_normalizing(self):
     """
@@ -317,6 +316,16 @@ class Query(object):
     e.g. for this query: SELECT frame FROM blobs b WHERE b.timestamp > 100
     the expression will be converted into SELECT blobs.frame FROM blobs WHERE blobs.timestamp > 100
     """
+
+    def _remove_alias_in_expression(original_list):
+      removed_alias_list = []
+      for element in original_list:
+        if isinstance(element, exp.Alias):
+          removed_alias_list.append(element.args['this'])
+        else:
+          removed_alias_list.append(element)
+      return removed_alias_list
+
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
@@ -339,21 +348,17 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
     # remove alias
-    for node, dirs, _ in copied_expression.walk():
-      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
-        continue
-      if isinstance(node, exp.Alias):
-        if 'expressions' in dirs.args:
-          alias_list = dirs.args['expressions'].copy()
-          original_name_list = []
-          for alias in alias_list:
-            original_name_list.append(alias.args['this'])
-          dirs.set('expressions', original_name_list)
-        elif 'this' in dirs.args:
-          alias = dirs.args['this'].copy()
-          dirs.set('this', alias.args['this'])
-        else:
-          raise Exception('Unsupported attribute in the parent of Alias type')
+
+    copied_expression.set('expressions', _remove_alias_in_expression(copied_expression.args['expressions']))
+    copied_expression.args['from'].set(
+      'expressions',
+      _remove_alias_in_expression(copied_expression.args['from'].args['expressions'])
+    )
+
+    for join_element in copied_expression.args['joins']:
+      if isinstance(join_element.args['this'], exp.Alias):
+        join_element.set('this', join_element.args['this'].args['this'])
+
     return Query(copied_expression.sql(), self.config)
 
 
@@ -504,8 +509,27 @@ class Query(object):
     return self.error_target is not None and self.confidence is not None
 
 
-  def is_select_query(self):
-    return isinstance(self._expression, exp.Select)
+  # Get aggregation types with columns corresponding
+  @cached_property
+  def aggregation_type_list_in_query(self):
+    '''
+    Return list of aggregation types
+    eg: SELECT AVG(col1), AVG(col2), COUNT(*) from table1;
+    the function will return [exp.AVG, exp.AVG, exp.COUNT]
+    '''
+    select_exp = self._expression.args['expressions']
+    agg_type_with_cols = []
+    for expression in select_exp:
+      aggregate_expression = expression.find(exp.AggFunc)
+      if isinstance(aggregate_expression, exp.Avg):
+        agg_type_with_cols.append(exp.Avg)
+      elif isinstance(aggregate_expression, exp.Count):
+        agg_type_with_cols.append(exp.Count)
+      elif isinstance(aggregate_expression, exp.Sum):
+        agg_type_with_cols.append(exp.Sum)
+      else:
+        raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+    return agg_type_with_cols
 
 
   # Validate AQP
@@ -527,16 +551,8 @@ class Query(object):
           Try running without the error target and confidence.'''
       )
 
-    # Count the number of distinct aggregates
-    expression_counts = defaultdict(int)
-    for expression in query_no_aqp_expression.args['expressions']:
-      expression_counts[type(expression)] += 1
-
-    if len(expression_counts) > 1:
-      raise Exception('Multiple expression types found')
-
-    if exp.Avg not in expression_counts and exp.Count not in expression_counts and exp.Sum not in expression_counts:
-      raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+    # check aggregation function in SELECT clause
+    _ = self.aggregation_type_list_in_query
 
     if not self.error_target or not self.confidence:
       raise Exception('Aggregation query should contain error target and confidence')
@@ -577,6 +593,10 @@ class Query(object):
       return True
 
 
+  def is_select_query(self):
+    return isinstance(self._expression, exp.Select)
+
+
   @cached_property
   def base_sql_no_aqp(self):
     _exp_no_aqp = self._expression.transform(_remove_aqp)
@@ -591,24 +611,6 @@ class Query(object):
     if _exp_no_where is None:
       raise Exception('SQL contains no non-AQP statements')
     return Query(_exp_no_where.sql(), self.config)
-
-
-  # Get aggregation type
-  @cached_property
-  def get_agg_type(self):
-    # Only support one aggregation for the time being
-    query_no_aqp_expression = self.base_sql_no_aqp.get_expression()
-    if len(query_no_aqp_expression.args['expressions']) != 1:
-      raise Exception('Multiple expressions found')
-    select_exp = query_no_aqp_expression.args['expressions'][0]
-    if isinstance(select_exp, exp.Avg):
-      return exp.Avg
-    elif isinstance(select_exp, exp.Sum):
-      return exp.Sum
-    elif isinstance(select_exp, exp.Count):
-      return exp.Count
-    else:
-      raise Exception('Unsupported aggregation')
 
 
   # FIXME: move it to sqlglot.rewriter
