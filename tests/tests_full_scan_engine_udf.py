@@ -275,7 +275,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         WHERE (output3 > 600 AND output6 < 1400) OR frame < 1000
         ''',
         '''
-        SELECT object_name, confidence, x_min, y_min, x_max, y_max, object_id, frame
+        SELECT object_name, confidence_score, x_min, y_min, x_max, y_max, object_id, frame
         FROM objects00
         WHERE (x_min > 600 AND y_max < 1400) OR frame < 1000
         '''
