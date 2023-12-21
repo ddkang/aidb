@@ -76,6 +76,20 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       return asyncio_run(async_lights_inference(df))
 
 
+    async def async_colors_inference(blob_id):
+      # Simulate some async operation
+      for service in aidb_engine._config.inference_bindings:
+        if service.service.name == 'colors02':
+          inference_service = service
+          outputs = await inference_service.infer(blob_id)
+          return outputs[0]
+
+
+    def colors_inference(blob_id, object_id):
+      df = pd.DataFrame({'blob_id': [blob_id], 'input_col2': object_id})
+      return asyncio_run(async_colors_inference(df))
+
+
     async def async_counts_inference(blob_id):
       # Simulate some async operation
       for service in aidb_engine._config.inference_bindings:
@@ -97,6 +111,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     aidb_engine._config.add_user_defined_function('replace_color', replace_color)
     aidb_engine._config.add_user_defined_function('objects_inference', objects_inference)
     aidb_engine._config.add_user_defined_function('lights_inference', lights_inference)
+    aidb_engine._config.add_user_defined_function('colors_inference', colors_inference)
     aidb_engine._config.add_user_defined_function('counts_inference', counts_inference)
 
 
@@ -250,7 +265,74 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         SELECT light_1, light_2, light_3, light_4, frame
         FROM lights01
         '''
-      )
+      ),
+      # test user function with alias and filter based on the outputs of user function
+      (
+        'full_scan',
+        '''
+        SELECT objects_inference(frame) AS (output1, output2, output3, output4, output5, output6, output7, output8)
+        FROM blobs_00
+        WHERE (output3 > 600 AND output6 < 1400) OR frame < 1000
+        ''',
+        '''
+        SELECT object_name, confidence, x_min, y_min, x_max, y_max, object_id, frame
+        FROM objects00
+        WHERE (x_min > 600 AND y_max < 1400) OR frame < 1000
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT lights_inference(frame) AS (output1, output2, output3, output4, output5)
+        FROM blobs_00
+        WHERE (output1 = 'red' AND output2 LIKE 'red') OR output3 = 'yellow'
+        ''',
+        '''
+        SELECT light_1, light_2, light_3, light_4, frame
+        FROM lights01
+        WHERE (light_1 = 'red' AND light_2 LIKE 'red') OR light_3 = 'yellow'
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min, y_max
+        FROM objects00
+        WHERE (x_min > 600 AND output1 LIKE 'blue') OR (y_max < 1000 AND x_max < 1000)
+        ''',
+        '''
+        SELECT color, colors02.frame, colors02.object_id, x_min, y_max
+        FROM objects00 JOIN colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE (x_min > 600 AND color LIKE 'blue') OR (y_max < 1000 AND x_max < 1000)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min AS col1, y_max AS col2
+        FROM objects00
+        WHERE (col1 > 600 AND output1 LIKE 'blue') OR (col2 < 1000 AND x_max < 1000)
+        ''',
+        '''
+        SELECT color, colors02.frame, colors02.object_id, x_min AS col1, y_max AS col2
+        FROM objects00 JOIN colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE (col1 > 600 AND color LIKE 'blue') OR (col2 < 1000 AND x_max < 1000)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT max_function(y_max, y_min) AS output1, power_function(x_min, 2) AS output2, y_min, color
+        FROM objects00 join colors02
+        WHERE is_equal(objects00.frame, colors02.frame) = TRUE AND is_equal(objects00.object_id, colors02.object_id)
+            = TRUE AND (x_min > 600 OR (x_max >600 AND y_min > 800)) AND output1 > 1000 AND output2 > 640000
+        ''',
+        '''
+        SELECT MAX(y_max, y_min) AS output1, POWER(x_min, 2) AS output2, y_min, color
+        FROM objects00 join colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE (x_min > 600 OR (x_max >600 AND y_min > 800)) AND output1 > 1000 AND output2 > 640000
+        '''
+      ),
     ]
 
     for query_type, aidb_query, exact_query in queries:
