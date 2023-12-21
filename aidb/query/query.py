@@ -150,43 +150,43 @@ class Query(object):
 
     return table_alias_to_name, column_alias_to_name
 
-
-  def udf_alias_in_query(self):
+  @cached_property
+  def udf_outputs_aliases(self):
     """
     Find alias of user defined function in query
     """
-    udf_to_alias_mapping = {}
-    udf_alias_set = set()
+    udf_output_to_alias_mapping = {}
+    udf_output_alias_set = set()
     alias_index = 0
     for node, _, _ in self._expression.walk(bfs=False):
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Alias) and 'alias' in node.args and 'this' in node.args:
         if isinstance(node.args['this'], exp.UserFunction):
-          udf_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
+          udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
           alias_index += 1
-          udf_to_alias_mapping[udf_alias_key] = []
+          udf_output_to_alias_mapping[udf_output_alias_key] = []
           if 'alias' in node.args:
             alias = str.lower(node.args['alias'].args['this'])
-            udf_to_alias_mapping[udf_alias_key].append(alias)
-            if alias not in udf_alias_set:
-              udf_alias_set.add(alias)
+            udf_output_to_alias_mapping[udf_output_alias_key].append(alias)
+            if alias not in udf_output_alias_set:
+              udf_output_alias_set.add(alias)
             else:
               raise Exception('Duplicated alias is not allowed, please use another alias')
       elif isinstance(node, exp.Aliases) and 'expressions' in node.args and 'this' in node.args:
         if isinstance(node.args['this'], exp.UserFunction):
-          udf_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
+          udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
           alias_index += 1
-          udf_to_alias_mapping[udf_alias_key] = []
+          udf_output_to_alias_mapping[udf_output_alias_key] = []
           for expression in node.args['expressions']:
             alias = str.lower(expression.args['this'])
-            udf_to_alias_mapping[udf_alias_key].append(alias)
-            if alias not in udf_alias_set:
-              udf_alias_set.add(alias)
+            udf_output_to_alias_mapping[udf_output_alias_key].append(alias)
+            if alias not in udf_output_alias_set:
+              udf_output_alias_set.add(alias)
             else:
               raise Exception('Duplicated alias is not allowed, please use another alias')
 
-    return udf_to_alias_mapping, udf_alias_set
+    return udf_output_to_alias_mapping, udf_output_alias_set
 
 
   @cached_property
@@ -374,7 +374,7 @@ class Query(object):
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
-    udf_to_alias_mapping, udf_alias_set = self.udf_alias_in_query()
+    udf_output_to_alias_mapping, udf_output_alias_set = self.udf_outputs_aliases
 
     for node, _, _ in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
@@ -389,7 +389,7 @@ class Query(object):
             table_name = str.lower(node.args['table'].args['this'])
             if table_name in table_alias_to_name:
               table_name = table_alias_to_name[table_name]
-          elif col_name in udf_alias_set:
+          elif col_name in udf_output_alias_set:
             continue
           else:
             table_name = self._get_table_of_column(col_name)
@@ -731,7 +731,7 @@ class Query(object):
 
 
   @cached_property
-  def udf_query_validity_check(self):
+  def is_udf_query_valid(self):
     if self._expression.find(exp.UserFunction):
       if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
         raise Exception('We only support user defined function for exact query currently.')
@@ -752,19 +752,19 @@ class Query(object):
     if expression.find(exp.UserFunction):
       return True
 
-    udf_to_alias_mapping, udf_alias_set = self.udf_alias_in_query()
+    udf_output_to_alias_mapping, udf_output_alias_set = self.udf_outputs_aliases
     for node, _, _ in expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Column):
-        if node.args['this'].args['this'] in udf_alias_set:
+        if node.args['this'].args['this'] in udf_output_alias_set:
           return True
 
     return False
 
 
   @cached_property
-  def udf_query_extraction(self):
+  def udf_query(self):
     '''
     This function is used to parse the query that includes user defined functions.
     return parameters:
@@ -790,7 +790,7 @@ class Query(object):
         self.col_index_mapping = {}
         self.new_select_col_index = 0
         self.function_index = 0
-        self.udf_alias_index = 0
+        self.udf_output_alias_index = 0
         self.udf_mapping_list = []
         self.dataframe_select_col_list = []
 
@@ -807,17 +807,17 @@ class Query(object):
           self.dataframe_select_col_list.append(self.col_index_mapping[node])
 
 
-      def add_udf(self, user_defined_function, udf_to_alias_mapping, is_select_col = False):
-        udf_with_index = f"{user_defined_function.args['this']}__{self.udf_alias_index}"
-        if udf_with_index in udf_to_alias_mapping:
-          udf_alias = udf_to_alias_mapping[udf_with_index]
-          self.udf_alias_index += 1
+      def add_udf(self, user_defined_function, udf_output_to_alias_mapping, is_select_col = False):
+        udf_with_index = f"{user_defined_function.args['this']}__{self.udf_output_alias_index}"
+        if udf_with_index in udf_output_to_alias_mapping:
+          udf_output_alias = udf_output_to_alias_mapping[udf_with_index]
+          self.udf_output_alias_index += 1
         else:
-          udf_alias = [f'function__{self.function_index}']
+          udf_output_alias = [f'function__{self.function_index}']
         function_col_dict = {
           'col_names': [],
           'function_name': user_defined_function.args['this'],
-          'result_col_name': udf_alias
+          'result_col_name': udf_output_alias
         }
         for col in user_defined_function.args['expressions']:
           self.add_column_with_alias(col)
@@ -833,11 +833,11 @@ class Query(object):
     normalized_query = self.query_after_normalizing
     expression = normalized_query.get_expression().copy()
 
-    udf_to_alias_mapping, udf_alias_set = self.udf_alias_in_query()
+    udf_output_to_alias_mapping, udf_output_alias_set = self.udf_outputs_aliases
     for select_exp in expression.args['expressions']:
       user_function = select_exp.find(exp.UserFunction)
       if user_function:
-        modified_query.add_udf(user_function, udf_to_alias_mapping, is_select_col=True)
+        modified_query.add_udf(user_function, udf_output_to_alias_mapping, is_select_col=True)
       else:
         modified_query.add_column_with_alias(select_exp, is_select_col=True)
 
@@ -875,13 +875,13 @@ class Query(object):
             continue
           if isinstance(node, exp.UserFunction):
             converted_fp = exp.Column(this=exp.Identifier(this=f'function__{modified_query.function_index}'))
-            modified_query.add_udf(node.copy(), udf_to_alias_mapping)
+            modified_query.add_udf(node.copy(), udf_output_to_alias_mapping)
             # FIXME: for IN operator
             node.parent.set(key, converted_fp)
 
           elif isinstance(node, exp.Column):
             # for the column that uses udf alias, we directly use it
-            if node.args['this'].args['this'] in udf_alias_set:
+            if node.args['this'].args['this'] in udf_output_alias_set:
               continue
             node_copy = node.copy()
             modified_query.add_column_with_alias(node_copy)

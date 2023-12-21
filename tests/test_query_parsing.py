@@ -295,7 +295,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     def _test_equality(test_query_list, config):
       for test_query in test_query_list:
         query = Query(test_query['query_str'], config)
-        dataframe_sql, query_after_extraction = query.udf_query_extraction
+        dataframe_sql, query_after_extraction = query.udf_query
         self.assertEqual(query_after_extraction.sql_str, test_query['query_after_extraction'])
         assert len(dataframe_sql['udf_mapping']) == len(test_query['dataframe_sql']['udf_mapping'])
         assert all(any(e1 == e2 for e2 in dataframe_sql['udf_mapping'])
@@ -658,7 +658,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     for query_str in invalid_query_str:
       query = Query(query_str, config)
       with self.assertRaises(Exception):
-        _ = query.udf_query_validity_check
+        _ = query.is_udf_query_valid
 
 
 if __name__ == '__main__':
