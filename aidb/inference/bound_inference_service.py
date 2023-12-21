@@ -179,7 +179,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     out_cache_idx = []
     if len(normalized_cache_cols) == 1:
       for ind, row in inputs.iterrows():
-        if normalized_cache_cols[0] not in cache_entries.index:
+        if row[normalized_cache_cols[0]] not in cache_entries.index:
           out_cache_idx.append(ind)
     else:
       for ind, row in inputs.iterrows():
