@@ -62,7 +62,7 @@ class BaseTablesSetup(object):
         print(f"Skipping: Blob table is already populated with the blobs")
 
 
-  def insert_blob_meta_data(self, table_name, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
+  def insert_blob_meta_data(self, table_name: str, blob_data: Union[pd.DataFrame, List[Blob]], primary_key_cols: List[str]):
     '''
     creates the blob table and the blob key configuration table
     inserts the blob data in the blob table
@@ -70,15 +70,29 @@ class BaseTablesSetup(object):
     assert len(primary_key_cols) > 0, 'Primary key should be specified'
     if not isinstance(blob_data, pd.DataFrame):
       blob_data = pd.DataFrame([b.to_dict() for b in blob_data])
-    assert blob_data.shape[0] > 0, 'No blobs to insert in the blob table'
+    self.create_input_table(table_name, list(map(lambda x: {"name": x, "dtype": blob_data[x].dtype, "is_primary_key": x in primary_key_cols}, blob_data.columns)))
+    self.insert_input_data(table_name, blob_data)
+
+
+  def create_input_table(self, table_name: str, blob_table_columns: List[dict]):
+    '''
+    creates the blob table and the blob key configuration table
+    example input:
+      table_name = "video"
+      table_columns = [{"name": "video_path", "dtype": str, "is_primary_key": True}]
+    '''
     table_columns = []
-    for column in blob_data.columns:
-      dtype = python_type_to_sqlalchemy_type(blob_data[column].dtype)
-      if dtype == sqlalchemy.String:
-        c_type = sqlalchemy.Text()
-      else:
-        c_type = dtype
-      table_columns.append((column, c_type, column in primary_key_cols))
+    for column in blob_table_columns:
+      dtype = python_type_to_sqlalchemy_type(column["dtype"])
+      c_type = sqlalchemy.Text() if dtype == sqlalchemy.String else dtype
+      table_columns.append((column["name"], c_type, column.get("is_primary_key", False)))
     asyncio_run(self._create_table(table_name, table_columns))
     asyncio_run(self._setup_blob_config_table(table_name, table_columns))
+
+
+  def insert_input_data(self, table_name: str, blob_data: pd.DataFrame):
+    '''
+    inserts the blob data in the blob table
+    '''
+    assert blob_data.shape[0] > 0, 'No blobs to insert in the blob table'
     asyncio_run(self._insert_data_in_table(table_name, blob_data))
