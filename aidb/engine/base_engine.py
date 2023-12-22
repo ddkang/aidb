@@ -425,7 +425,7 @@ class BaseEngine():
       res_df: pd.DataFrame,
       dataframe_sql: Dict,
       query: Query
-  ):
+  ) -> List[Tuple]:
     '''
     This function receive the query result from database, and then applies user defined function to query result.
     After getting function results, this function execute query which is extracted from original query and return final
@@ -462,14 +462,6 @@ class BaseEngine():
     df_query = f'''SELECT {select_str} FROM processed_udf_result_df {where_str}'''
 
     new_results_df = duckdb.sql(df_query).df()
-    res_list_of_tuple = []
-    for row in new_results_df.itertuples(index=False):
-      row_list = []
-      for item in row:
-        if isinstance(item, tuple) or isinstance(item, list):
-          row_list.extend(list(item))
-        else:
-          row_list.append(item)
-      res_list_of_tuple.append(tuple(row_list))
+    res_list_of_tuple = [tuple(row) for row in new_results_df.itertuples(index=False)]
 
     return res_list_of_tuple
