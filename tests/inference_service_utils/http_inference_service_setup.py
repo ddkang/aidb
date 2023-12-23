@@ -45,17 +45,27 @@ def run_server(data_dir: str, port=8000):
     @app.post(f'/{service_name}')
     async def inference(inp: Request):
       service_name = inp.url.path.split('/')[-1]
-      try:
-        inp = await inp.json()
-        # Get the rows where the input columns match
-        df = name_to_df[service_name]
-        tmp = df
-        for col in name_to_input_cols[service_name]:
-          tmp = tmp[tmp[col] == inp[col]]
-        res = tmp[name_to_output_cols[service_name]].to_dict(orient='list')
-        return res
-      except Exception as e:
-        raise Exception(e)
+      inp = await inp.json()
+      df = name_to_df[service_name]
+
+      # Initialize a mask for row selection
+      mask = pd.Series([True] * len(df))
+
+      # Update the mask for each input column
+      for col in name_to_input_cols[service_name]:
+        # Use `isin` for vectorized comparison
+        if isinstance(inp[col], list):
+          mask = mask & df[col].isin(inp[col])
+        else:
+          mask = mask & (df[col] == inp[col])
+
+      # Apply the mask to the DataFrame
+      filtered_df = df[mask]
+
+      # Select and return the output columns
+      res = filtered_df[name_to_output_cols[service_name]].to_dict(orient='list')
+      return res
+
 
   # config = Config(app=app, host="127.0.0.1", port=8000)
   # server = Server(config=config)

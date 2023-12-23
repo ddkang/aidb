@@ -35,7 +35,9 @@ def register_inference_services(engine: Engine, data_dir: str, port=8000):
       url=f'http://127.0.0.1:{port}/{service_name}',
       headers={'Content-Type': 'application/json'},
       columns_to_input_keys=columns_to_input_keys,
-      response_keys_to_columns=output_keys_to_columns
+      response_keys_to_columns=output_keys_to_columns,
+      batch_supported=False,
+      preferred_batch_size=100,
     )
 
     engine.register_inference_service(service)

@@ -187,8 +187,8 @@ class HTTPInferenceService(CachedInferenceService):
     if not self._batch_supported:
       return super().infer_batch(inputs)
     
-    body = inputs.to_json(orient='records')
-    response = requests.post(self._url, data=body, headers=self._headers)
+    body = inputs.to_dict(orient='list')
+    response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
 
     # We assume the server returns a list of responses
@@ -196,9 +196,8 @@ class HTTPInferenceService(CachedInferenceService):
     # but we actually don't know which input corresponds to which output
     # because one input may correspond to 0 / 1 / multiple outputs
     response = response.json()
-    outputs = [pd.read_json(r, orient='records') for r in response]
-    for output in outputs:
-      for copied_input_col_idx in self.copied_input_columns:
-        output[len(output)] = inputs[inputs.keys()[copied_input_col_idx]]
 
-    return outputs
+    for copied_input_col_idx in self.copied_input_columns:
+      response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
+
+    return [pd.DataFrame(response)]
