@@ -362,13 +362,13 @@ class BaseEngine():
 
   def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
     function_name = str.lower(function_name)
-    if function_name not in self._config.user_defined_function:
+    if function_name not in self._config.user_defined_functions:
       raise Exception(f'{function_name} has not been added into config, please add it first.')
     parameter_list = []
     for args in args_list:
       parameter_list.append(res_df[args])
 
-    function_results = self._config.user_defined_function[function_name](*parameter_list)
+    function_results = self._config.user_defined_functions[function_name](*parameter_list)
     # for result that has dataframe format, change it to a list of tuples
     if isinstance(function_results, pd.DataFrame):
       res_list_of_tuple = [tuple(row) for row in function_results.itertuples(index=False)]
@@ -447,7 +447,7 @@ class BaseEngine():
     try:
       import duckdb
     except ImportError:
-      raise Exception('Package duckdb imports failed. Please install it with version 0.9.2 first,')
+      raise Exception('Package duckdb is needed for query with UDF. Please install it with version 0.9.2 first,')
 
     processed_udf_result_df, expanded_columns_mapping = self._get_udf_result(res_df, dataframe_sql)
 

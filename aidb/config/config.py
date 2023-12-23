@@ -41,7 +41,7 @@ class Config:
   relations: Dict[str, str] = field(default_factory=dict)  # left -> right
 
   # User defined function. Optional
-  user_defined_function: Dict[str, Callable] = field(default_factory=dict)
+  user_defined_functions: Dict[str, Callable] = field(default_factory=dict)
 
 
   @cached_property
@@ -384,4 +384,4 @@ class Config:
   def add_user_defined_function(self, function_name: str, function: Callable):
     self.clear_cached_properties()
     logger.info(f'Added user defined function {function_name}')
-    self.user_defined_function[str.lower(function_name)] = function
+    self.user_defined_functions[str.lower(function_name)] = function
