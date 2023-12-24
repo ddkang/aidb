@@ -173,7 +173,9 @@ class CachedBoundInferenceService(BoundInferenceService):
     """
     checks the presence of inputs in the cache table
     """
-    cache_entries = await conn.run_sync(lambda conn: pd.read_sql(text(str(self._cache_query_stub.compile())), conn))
+    cache_entries = await conn.run_sync(
+        lambda conn: pd.read_sql_query(text(str(self._cache_query_stub.compile())), conn)
+    )
     cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
     normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
                              self._cache_columns]
