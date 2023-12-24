@@ -14,11 +14,9 @@ from multiprocessing import Process
 
 setup_test_logger('full_scan_engine')
 
-# DB_URL = "postgresql+asyncpg://jun:password@localhost:5432"
+DB_URL = "postgresql+asyncpg://user:testaidb@localhost:5432"
 
-password = os.getenv('MYSQL_ROOT_PASSWORD')
-print(password)
-DB_URL = "mysql+aiomysql://root:testaidb@localhost:3306"
+# DB_URL = "mysql+aiomysql://root:testaidb@localhost:3306"
 class FullScanEngineTests(IsolatedAsyncioTestCase):
 
   async def test_jackson_number_objects(self):

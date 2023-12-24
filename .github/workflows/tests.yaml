@@ -16,6 +16,14 @@ jobs:
         ports:
           - 3306:3306
 
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: testaidb
+        ports:
+          - 5432:5432
+
     steps:
     - name: Check out code
       uses: actions/checkout@v2
@@ -72,7 +80,7 @@ jobs:
 #    - name: Run Query Parsing Tests for nested queries
 #      run: python3 -m tests.test_query_parsing
 
-    - name: Run Query Parsing Tests for nested queries
+    - name: Run Full Scan Tests for MySQL and Postgresql
       run: python3 -m tests.tests_full_scan_engine_postgresql
 
     # - name: Run aggregation query tests
