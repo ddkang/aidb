@@ -39,7 +39,7 @@ class ApproxSelectEngine(TastiEngine):
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service,
                                                                                 self.blob_mapping_table_name,
                                                                                 sampled_index)
-      inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
+      inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
       inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
@@ -76,22 +76,25 @@ class ApproxSelectEngine(TastiEngine):
         query_no_where
     )
 
-    all_df = await conn.run_sync(lambda conn: pd.read_sql(text(all_query_add_filter_key.sql_str), conn))
-    # drop duplicated columns, this will happen when 'select *'
-    all_df = all_df.loc[:, ~all_df.columns.duplicated()]
-    all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
+    async with self._sql_engine.begin() as conn:
+      all_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(all_query_add_filter_key.sql_str), conn))
+      raise Exception('test')
+      # drop duplicated columns, this will happen when 'select *'
+      all_df = all_df.loc[:, ~all_df.columns.duplicated()]
+      all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
-    sample_query_add_filter_key, _ = self.add_filter_key_into_query(
-        table_columns,
-        sampled_df,
-        query_after_adding_join
-    )
+      sample_query_add_filter_key, _ = self.add_filter_key_into_query(
+          table_columns,
+          sampled_df,
+          query_after_adding_join
+      )
 
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_query_add_filter_key.sql_str), conn))
-    # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
-    # So we need to drop duplicated columns
-    res_df = res_df.loc[:, ~res_df.columns.duplicated()]
-    res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
+      res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_query_add_filter_key.sql_str), conn))
+
+      # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
+      # So we need to drop duplicated columns
+      res_df = res_df.loc[:, ~res_df.columns.duplicated()]
+      res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
     return res_df, all_df
 

@@ -64,21 +64,21 @@ class CachedBoundInferenceService(BoundInferenceService):
       fk_constraints = {}
       for column_name in self.binding.input_columns:
         column = self._columns[column_name]
-        new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
-        logger.debug('New table col name', new_table_col_name)
-        logger.debug('Ref column', str(column))
-        fk_ref_table_name = str(column).split('.')[0]
-        if fk_ref_table_name not in fk_constraints:
-          fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
-        # both tables will have same column name
-        fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
-        fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
-        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
+        if column.primary_key:
+          new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
+          logger.debug('New table col name', new_table_col_name)
+          logger.debug('Ref column', str(column))
+          fk_ref_table_name = str(column).split('.')[0]
+          if fk_ref_table_name not in fk_constraints:
+            fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
+          # both tables will have same column name
+          fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
+          fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
+          columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
 
       multi_table_fk_constraints = []
       for _, fk_cons in fk_constraints.items():
         multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
-
       table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns, *multi_table_fk_constraints)
       # Create the table if it doesn't exist
       if not self._cache_table_name in inspector.get_table_names():
@@ -211,7 +211,7 @@ class CachedBoundInferenceService(BoundInferenceService):
                 self.binding.input_columns]
             )
           )
-          df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
+          df = await conn.run_sync(lambda conn: pd.read_sql_query(query, conn))
           results.append(df)
         else:
           inference_results = self.service.infer_one(inp_row)
