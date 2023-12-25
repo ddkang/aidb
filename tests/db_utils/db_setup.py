@@ -87,7 +87,10 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
           dtype = python_type_to_sqlalchemy_type(df[column].dtype)
           if dtype == sqlalchemy.String:
             # TODO: VAR CHAR lenth should be based on the number of characters
-            column_info.dtype = sqlalchemy.TEXT #sqlalchemy.String(20)  # 20 characters long
+            if column_info.is_primary_key or column_info.refers_to:
+              column_info.dtype = sqlalchemy.String(20)
+            else:
+              column_info.dtype = sqlalchemy.TEXT
           else:
             column_info.dtype = dtype
           columns_info.append(column_info)
