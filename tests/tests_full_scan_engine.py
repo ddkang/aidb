@@ -18,7 +18,6 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-# db_url = "mysql+aiomysql://aidb:aidb@localhost"
 class FullScanEngineTests(IsolatedAsyncioTestCase):
 
   async def test_jackson_number_objects(self):
