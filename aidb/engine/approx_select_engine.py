@@ -78,7 +78,6 @@ class ApproxSelectEngine(TastiEngine):
 
     async with self._sql_engine.begin() as conn:
       all_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(all_query_add_filter_key.sql_str), conn))
-      raise Exception('test')
       # drop duplicated columns, this will happen when 'select *'
       all_df = all_df.loc[:, ~all_df.columns.duplicated()]
       all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
@@ -90,7 +89,6 @@ class ApproxSelectEngine(TastiEngine):
       )
 
       res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_query_add_filter_key.sql_str), conn))
-
       # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
       # So we need to drop duplicated columns
       res_df = res_df.loc[:, ~res_df.columns.duplicated()]

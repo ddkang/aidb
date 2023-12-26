@@ -191,8 +191,7 @@ class ApproximateAggregateEngine(FullScanEngine):
                   {query_add_count.sql_str}
                   GROUP BY {', '.join(selected_column)}
                  '''
-
-    # After running the inference, it is necessary to restart the MySQL database engine
+    # In MySQL database, after running inference, the database will lose connection. We need to restart the engine,
     async with self._sql_engine.begin() as conn:
       res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query_str), conn))
     res_df[WEIGHT_COL_NAME] = 1. / self.blob_count
@@ -211,6 +210,7 @@ class ApproximateAggregateEngine(FullScanEngine):
   ):
     sample_blobs_query_str = self.get_sample_blobs_query(blob_tables, num_samples, blob_key_filtering_predicates_str)
     sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_blobs_query_str), conn))
+
     if len(sample_blobs_df) < num_samples:
       raise Exception(f'Require {num_samples} samples, but only get {len(sample_blobs_df)} samples')
 

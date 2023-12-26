@@ -79,6 +79,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       multi_table_fk_constraints = []
       for _, fk_cons in fk_constraints.items():
         multi_table_fk_constraints.append(ForeignKeyConstraint(fk_cons['cols'], fk_cons['cols_refs']))
+
       table = sqlalchemy.schema.Table(self._cache_table_name, metadata, *columns, *multi_table_fk_constraints)
       # Create the table if it doesn't exist
       if not self._cache_table_name in inspector.get_table_names():
@@ -173,9 +174,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     """
     checks the presence of inputs in the cache table
     """
-    cache_entries = await conn.run_sync(
-        lambda conn: pd.read_sql_query(text(str(self._cache_query_stub.compile())), conn)
-    )
+    cache_entries = await conn.run_sync(lambda conn: pd.read_sql_query(text(str(self._cache_query_stub.compile())), conn))
     cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
     normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
                              self._cache_columns]
