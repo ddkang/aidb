@@ -48,28 +48,29 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     seed = mp.current_process().pid
     tasti = Tasti(index_name, user_database, BUDGET, seed=seed)
 
-    count = 0
+    queries = [
+      (
+        f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON'
+                    RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
+        '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
+      ),
+      (
+        f'''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5)
+                  RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
+        '''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5);'''
+      ),
+    ]
+
     db_url_list = [MYSQL_URL, POSTGRESQL_URL, SQLITE_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
+      count_list = [0] * len(queries)
       for i in range(100):
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, tasti)
 
         register_inference_services(aidb_engine, data_dir)
-        queries = [
-          (
-            f'''SELECT entity_id FROM entities00 where type LIKE 'PERSON'
-                RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
-            '''SELECT entity_id FROM entities00 where type LIKE 'PERSON';'''
-          ),
-          (
-            f'''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5)
-              RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;''',
-            '''SELECT entity_id FROM entities00 where type IN (SELECT type FROM entities00 WHERE blob_id < 5);'''
-          ),
-        ]
-
+        k = 0
         for aidb_query, exact_query in queries:
           logger.info(f'Running query {aidb_query} in approx select engine')
           seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
@@ -84,10 +85,10 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
             await gt_engine.dispose()
 
           if len(aidb_res) / len(gt_res) > RECALL_TARGET / 100:
-            count += 1
-
+            count_list[k] += 1
+          k += 1
           logger.info(f'AIDB_res: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
-                       f' Times of trial:{i + 1}, Count: {count}')
+                       f' Times of trial:{i + 1}, Count: {count_list}')
 
         del gt_engine
         del aidb_engine
