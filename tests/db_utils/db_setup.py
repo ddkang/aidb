@@ -145,7 +145,6 @@ async def insert_data_in_tables(conn, data_dir: str, only_blob_data: bool):
   gt_dir = f'{data_dir}/ground_truth'
   gt_csv_fnames = glob.glob(f'{gt_dir}/*.csv')
 
-  # async with engine.begin() as conn:
   gt_csv_fnames = await conn.run_sync(get_insertion_order, gt_csv_fnames, )
   # Create tables
   for csv_fname in gt_csv_fnames:
