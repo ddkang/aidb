@@ -182,8 +182,8 @@ async def setup_config_tables(conn):
 
     class BlobTables(Base):
       __tablename__ = BLOB_TABLE_NAMES_TABLE
-      table_name = sqlalchemy.Column(sqlalchemy.String(30), primary_key=True)
-      blob_key = sqlalchemy.Column(sqlalchemy.String(30), primary_key=True)
+      table_name = sqlalchemy.Column(sqlalchemy.String(1024), primary_key=True)
+      blob_key = sqlalchemy.Column(sqlalchemy.String(1024), primary_key=True)
 
     Base.metadata.create_all(conn)
 
