@@ -5,12 +5,18 @@ Output: csv with OCR'd text.
 """
 import numpy as np
 import pandas as pd
-import pdf2image
 
-import pytesseract
-from detectron2 import model_zoo
-from detectron2.engine import DefaultPredictor
-from detectron2.config import get_cfg
+try:
+  import pdf2image
+except ImportError:
+  import subprocess
+  subprocess.run(["pip", "install", "pdf2image", "pytesseract", "detectron2"])
+finally:
+  import pdf2image
+  import pytesseract
+  from detectron2 import model_zoo
+  from detectron2.engine import DefaultPredictor
+  from detectron2.config import get_cfg
 
 from aidb.inference.cached_inference_service import CachedInferenceService
 

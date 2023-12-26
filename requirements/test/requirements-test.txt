@@ -1,0 +1,4 @@
+gdown
+uvicorn
+networkx
+pytest
