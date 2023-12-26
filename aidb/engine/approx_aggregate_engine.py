@@ -161,7 +161,7 @@ class ApproximateAggregateEngine(FullScanEngine):
           new_query
       )
 
-      input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_add_filter_key.sql_str), conn))
+      input_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query_add_filter_key.sql_str), conn))
       await bound_service.infer(input_df)
       inference_services_executed.add(bound_service.service.name)
 
@@ -188,7 +188,7 @@ class ApproximateAggregateEngine(FullScanEngine):
                   GROUP BY {', '.join(selected_column)}
                  '''
 
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
+    res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query_str), conn))
     res_df[WEIGHT_COL_NAME] = 1. / self.blob_count
     res_df[MASS_COL_NAME] = 1
 
@@ -204,7 +204,7 @@ class ApproximateAggregateEngine(FullScanEngine):
       conn
   ):
     sample_blobs_query_str = self.get_sample_blobs_query(blob_tables, num_samples, blob_key_filtering_predicates_str)
-    sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_blobs_query_str), conn))
+    sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_blobs_query_str), conn))
 
     if len(sample_blobs_df) < num_samples:
       raise Exception(f'Require {num_samples} samples, but only get {len(sample_blobs_df)} samples')
