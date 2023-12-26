@@ -95,7 +95,6 @@ class TastiEngine(FullScanEngine):
     score_list = []
     # FIXME: for different database, the IN grammar maybe different
     for fp in filering_predicate_score_map:
-      # score_list.append(f'IIF({fp}, 1, 0) AS {filering_predicate_score_map[fp]}')
       score_list.append(f'(CASE WHEN {fp} THEN 1 ELSE 0 END) AS {filering_predicate_score_map[fp]}')
     score_list.append(f'{rep_table_name}.{VECTOR_ID_COLUMN}')
     select_str = ', '.join(score_list)
