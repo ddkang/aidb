@@ -238,8 +238,7 @@ class TastiEngine(FullScanEngine):
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: self._create_tasti_table(topk, conn))
       rep_blob_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(rep_blob_query_str), conn))
-      # FIXME: same as db_setup.py line 147, in case of mysql,
-      #  this function doesn't wait, hence throwing integrity error
+
       await conn.run_sync(lambda conn: rep_blob_df.to_sql(self.rep_table_name, conn, if_exists='append', index=False))
       await conn.run_sync(lambda conn: new_topk_for_all.to_sql(self.topk_table_name, conn,
                                                                if_exists='append', index=False))
