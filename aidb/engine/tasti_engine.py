@@ -93,7 +93,6 @@ class TastiEngine(FullScanEngine):
     '''
     filering_predicate_score_map, score_connected = self._get_filter_predicate_score_map(query)
     score_list = []
-    # FIXME: for different database, the IN grammar maybe different
     for fp in filering_predicate_score_map:
       score_list.append(f'(CASE WHEN {fp} THEN 1 ELSE 0 END) AS {filering_predicate_score_map[fp]}')
     score_list.append(f'{rep_table_name}.{VECTOR_ID_COLUMN}')
