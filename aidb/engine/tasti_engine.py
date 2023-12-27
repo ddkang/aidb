@@ -93,7 +93,7 @@ class TastiEngine(FullScanEngine):
     '''
     filering_predicate_score_map, score_connected = self._get_filter_predicate_score_map(query)
     score_list = []
-    # FIXME: for different database, the IN grammar maybe different
+
     for fp in filering_predicate_score_map:
       score_list.append(f'(CASE WHEN {fp} THEN 1 ELSE 0 END) AS {filering_predicate_score_map[fp]}')
     score_list.append(f'{rep_table_name}.{VECTOR_ID_COLUMN}')
@@ -239,8 +239,7 @@ class TastiEngine(FullScanEngine):
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: self._create_tasti_table(topk, conn))
       rep_blob_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(rep_blob_query_str), conn))
-      # FIXME: same as db_setup.py line 147, in case of mysql,
-      #  this function doesn't wait, hence throwing integrity error
+
       await conn.run_sync(lambda conn: rep_blob_df.to_sql(self.rep_table_name, conn, if_exists='append', index=False))
       await conn.run_sync(lambda conn: new_topk_for_all.to_sql(self.topk_table_name, conn,
                                                                if_exists='append', index=False))
