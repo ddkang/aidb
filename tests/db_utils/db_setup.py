@@ -88,7 +88,7 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
           if dtype == sqlalchemy.String:
             # TODO: VAR CHAR lenth should be based on the number of characters
             if column_info.is_primary_key or column_info.refers_to:
-              column_info.dtype = sqlalchemy.String(20)
+              column_info.dtype = sqlalchemy.VARCHAR(256)
             else:
               column_info.dtype = sqlalchemy.TEXT
           else:
@@ -182,8 +182,8 @@ async def setup_config_tables(conn):
 
     class BlobTables(Base):
       __tablename__ = BLOB_TABLE_NAMES_TABLE
-      table_name = sqlalchemy.Column(sqlalchemy.String(1024), primary_key=True)
-      blob_key = sqlalchemy.Column(sqlalchemy.String(1024), primary_key=True)
+      table_name = sqlalchemy.Column(sqlalchemy.VARCHAR(256), primary_key=True)
+      blob_key = sqlalchemy.Column(sqlalchemy.VARCHAR(256), primary_key=True)
 
     Base.metadata.create_all(conn)
 
