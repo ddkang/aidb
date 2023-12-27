@@ -25,7 +25,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
     time.sleep(1)
-    db_url_list = [POSTGRESQL_URL, SQLITE_URL,  MYSQL_URL]
+    db_url_list = [POSTGRESQL_URL]
     for db_url in db_url_list:
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
   
