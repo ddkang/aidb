@@ -173,7 +173,7 @@ class TastiEngine(FullScanEngine):
     columns.append(sqlalchemy.Column(VECTOR_ID_COLUMN, sqlalchemy.Integer, primary_key=True, autoincrement=False))
     for i in range(topk):
       columns.append(sqlalchemy.Column(f'topk_reps_{str(i)}', sqlalchemy.Integer))
-      columns.append(sqlalchemy.Column(f'topk_dists_{str(i)}', sqlalchemy.Float))
+      columns.append(sqlalchemy.Column(f'topk_dists_{str(i)}', sqlalchemy.Float(32)))
     topk_table = sqlalchemy.schema.Table(self.topk_table_name, metadata, *columns)
     metadata.create_all(conn)
 
