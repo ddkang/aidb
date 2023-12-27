@@ -90,7 +90,7 @@ async def setup_db(db_url: str, db_name: str, data_dir: str):
             if column_info.is_primary_key or column_info.refers_to:
               column_info.dtype = sqlalchemy.VARCHAR(256)
             else:
-              column_info.dtype = sqlalchemy.TEXT
+              column_info.dtype = sqlalchemy.VARCHAR(2048)
           else:
             column_info.dtype = dtype
           columns_info.append(column_info)
