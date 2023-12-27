@@ -49,13 +49,13 @@ class TastiEngine(FullScanEngine):
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service, self.rep_table_name)
       async with self._sql_engine.begin() as conn:
-        inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
+        inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
       inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
       await bound_service.infer(inp_df)
 
     score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
-      score_df = await conn.run_sync(lambda conn: pd.read_sql(text(score_query_str), conn))
+      score_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(score_query_str), conn))
     score_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
     # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
@@ -93,9 +93,9 @@ class TastiEngine(FullScanEngine):
     '''
     filering_predicate_score_map, score_connected = self._get_filter_predicate_score_map(query)
     score_list = []
-    # FIXME: for different database, the IN grammar maybe different
+
     for fp in filering_predicate_score_map:
-      score_list.append(f'IIF({fp}, 1, 0) AS {filering_predicate_score_map[fp]}')
+      score_list.append(f'(CASE WHEN {fp} THEN 1 ELSE 0 END) AS {filering_predicate_score_map[fp]}')
     score_list.append(f'{rep_table_name}.{VECTOR_ID_COLUMN}')
     select_str = ', '.join(score_list)
     cols = list(filering_predicate_score_map.keys())
@@ -112,7 +112,7 @@ class TastiEngine(FullScanEngine):
   async def propagate_score_for_all_vector_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
-      topk_df = await conn.run_sync(lambda conn: pd.read_sql(text(topk_query_str), conn))
+      topk_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(topk_query_str), conn))
     topk_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
 
     topk = len(topk_df.columns) // 2
@@ -222,7 +222,7 @@ class TastiEngine(FullScanEngine):
                                     '''
 
       async with self._sql_engine.begin() as conn:
-        vector_ids = await conn.run_sync(lambda conn: pd.read_sql(text(vector_id_select_query_str), conn))
+        vector_ids = await conn.run_sync(lambda conn: pd.read_sql_query(text(vector_id_select_query_str), conn))
     self.tasti_index.set_vector_ids(vector_ids)
 
     rep_ids = self.tasti_index.get_representative_vector_ids()
@@ -238,9 +238,8 @@ class TastiEngine(FullScanEngine):
 
     async with self._sql_engine.begin() as conn:
       await conn.run_sync(lambda conn: self._create_tasti_table(topk, conn))
-      rep_blob_df = await conn.run_sync(lambda conn: pd.read_sql(text(rep_blob_query_str), conn))
-      # FIXME: same as db_setup.py line 147, in case of mysql,
-      #  this function doesn't wait, hence throwing integrity error
+      rep_blob_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(rep_blob_query_str), conn))
+
       await conn.run_sync(lambda conn: rep_blob_df.to_sql(self.rep_table_name, conn, if_exists='append', index=False))
       await conn.run_sync(lambda conn: new_topk_for_all.to_sql(self.topk_table_name, conn,
                                                                if_exists='append', index=False))

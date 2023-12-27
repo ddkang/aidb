@@ -5,19 +5,35 @@ from aidb.utils.logger import logger
 
 async def setup_gt_and_aidb_engine(db_url, data_dir, tasti_index = None, port = 8000):
   # Set up the ground truth database
-  gt_db_fname = f'aidb_gt_{port}.sqlite'
+  dialect = db_url.split("+")[0]
+  if dialect == "postgresql" or dialect == "mysql":
+    gt_db_fname = f'aidb_gt_{port}'
+    aidb_db_fname = f'aidb_test_{port}'
+  elif dialect == "sqlite":
+    gt_db_fname = f'aidb_gt_{port}.sqlite'
+    aidb_db_fname = f'aidb_test_{port}.sqlite'
+  else:
+    raise Exception('Unsupported database. We support mysql, sqlite and postgresql currently.')
+
   await create_db(db_url, gt_db_fname)
   gt_engine = await setup_db(db_url, gt_db_fname, data_dir)
-  await insert_data_in_tables(gt_engine, data_dir, False)
+  try:
+    async with gt_engine.begin() as conn:
+      await insert_data_in_tables(conn, data_dir, False)
+  finally:
+    await gt_engine.dispose()
 
   # Set up the aidb database
-  aidb_db_fname = f'aidb_test_{port}.sqlite'
   await create_db(db_url, aidb_db_fname)
   tmp_engine = await setup_db(db_url, aidb_db_fname, data_dir)
-  await clear_all_tables(tmp_engine)
-  await insert_data_in_tables(tmp_engine, data_dir, True)
-  await setup_config_tables(tmp_engine)
-  del tmp_engine
+  try:
+    async with tmp_engine.begin() as conn:
+      await clear_all_tables(conn)
+      await insert_data_in_tables(conn, data_dir, True)
+      await setup_config_tables(conn)
+  finally:
+    await tmp_engine.dispose()
+
   # Connect to the aidb database
   engine = Engine(
     f'{db_url}/{aidb_db_fname}',

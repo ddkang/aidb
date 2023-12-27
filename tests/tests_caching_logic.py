@@ -12,8 +12,9 @@ from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 setup_test_logger('caching_logic')
 
-DB_URL = 'sqlite+aiosqlite://'
-
+POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
+SQLITE_URL = 'sqlite+aiosqlite://'
+MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
 class CachingLogic(IsolatedAsyncioTestCase):
 
@@ -23,43 +24,45 @@ class CachingLogic(IsolatedAsyncioTestCase):
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
-    time.sleep(3)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-
-    register_inference_services(aidb_engine, data_dir)
-
-    queries = [
-      (
-        'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;'''
-      ),
-      (
-        'full_scan',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;''',
-        '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;'''
-      ),
-    ]
-
-    # no service calls before executing query
-    assert aidb_engine._config.inference_services["objects00"].infer_one.calls == 0
-
-    calls = [20, 27]
-    for index, (query_type, aidb_query, exact_query) in enumerate(queries):
-      logger.info(f'Running query {exact_query} in ground truth database')
-      # Run the query on the ground truth database
-      async with gt_engine.begin() as conn:
-        gt_res = await conn.execute(text(exact_query))
-        gt_res = gt_res.fetchall()
-      # Run the query on the aidb database
-      logger.info(f'Running query {aidb_query} in aidb database')
-      aidb_res = aidb_engine.execute(aidb_query)
-      assert len(gt_res) == len(aidb_res)
-      # running the same query, so number of inference calls should remain same
-
-      assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index]
-      aidb_engine
-    del gt_engine
+    time.sleep(1)
+    db_url_list = [POSTGRESQL_URL]
+    for db_url in db_url_list:
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
+  
+      register_inference_services(aidb_engine, data_dir)
+  
+      queries = [
+        (
+          'full_scan',
+          '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;''',
+          '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;'''
+        ),
+        (
+          'full_scan',
+          '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;''',
+          '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 400;'''
+        ),
+      ]
+  
+      # no service calls before executing query
+      assert aidb_engine._config.inference_services["objects00"].infer_one.calls == 0
+  
+      calls = [20, 27]
+      for index, (query_type, aidb_query, exact_query) in enumerate(queries):
+        logger.info(f'Running query {exact_query} in ground truth database')
+        # Run the query on the ground truth database
+        async with gt_engine.begin() as conn:
+          gt_res = await conn.execute(text(exact_query))
+          gt_res = gt_res.fetchall()
+        # Run the query on the aidb database
+        logger.info(f'Running query {aidb_query} in aidb database')
+        aidb_res = aidb_engine.execute(aidb_query)
+        assert len(gt_res) == len(aidb_res)
+        # running the same query, so number of inference calls should remain same
+  
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index]
+      del gt_engine
+      del aidb_engine
     p.terminate()
 
 
