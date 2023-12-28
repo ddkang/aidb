@@ -91,6 +91,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
            FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
            WHERE color = 'blue' AND x_min > 600;'''
       )
+
     ]
 
     for query_type, aidb_query, exact_query in queries:
