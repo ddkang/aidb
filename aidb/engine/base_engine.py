@@ -379,6 +379,13 @@ class BaseEngine():
       return function_results
 
 
+  # ---------------------
+  # User Defined Function
+  # ---------------------
+  def register_user_defined_function(self, function_name, function):
+    self._config.add_user_defined_function(function_name, function)
+
+
   def _get_udf_result(self, res_df, dataframe_sql):
     '''
     this function get results of user defined function
