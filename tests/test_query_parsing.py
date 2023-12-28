@@ -312,6 +312,15 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     data_dir = os.path.join(dirname, 'data/jackson')
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
 
+    aidb_engine.register_user_defined_function('sum_function', None)
+    aidb_engine.register_user_defined_function('is_equal', None)
+    aidb_engine.register_user_defined_function('power_function', None)
+    aidb_engine.register_user_defined_function('max_function', None)
+    aidb_engine.register_user_defined_function('multiply_function', None)
+    aidb_engine.register_user_defined_function('function1', None)
+    aidb_engine.register_user_defined_function('function2', None)
+    aidb_engine.register_user_defined_function('colors_inference', None)
+
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config
 
@@ -379,7 +388,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       'query_after_extraction':
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
         "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6 "
-        "FROM objects00 JOIN colors02 "
+        "FROM objects00 CROSS JOIN colors02 "
         "WHERE (colors02.color = 'blue')",
       'dataframe_sql':{
         'udf_mapping': [
@@ -409,7 +418,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
         "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.x_max AS col__7, objects00.y_min AS col__8 "
-        "FROM objects00 JOIN colors02",
+        "FROM objects00 CROSS JOIN colors02",
       'dataframe_sql': {
         'udf_mapping': [
           {'col_names': ['col__0', 'col__4'],
@@ -441,7 +450,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
-        "FROM objects00 JOIN colors02",
+        "FROM objects00 CROSS JOIN colors02",
       'dataframe_sql': {
         'udf_mapping': [
           {'col_names': ['col__0', 'col__1'],
@@ -476,7 +485,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
-        "FROM objects00 JOIN colors02",
+        "FROM objects00 CROSS JOIN colors02",
       'dataframe_sql': {
         'udf_mapping': [
           {'col_names': ['col__3', 'col__4'],
@@ -508,7 +517,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
-        "FROM objects00 JOIN colors02",
+        "FROM objects00 CROSS JOIN colors02",
       'dataframe_sql': {
         'udf_mapping': [
           {'col_names': ['col__3', 'col__4'],
@@ -614,7 +623,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.y_max AS col__0, objects00.y_min AS col__1, objects00.x_min AS col__2, 2 AS col__3, "
         "colors02.color AS col__4, objects00.frame AS col__5, colors02.frame AS col__6, objects00.object_id AS col__7, "
         "colors02.object_id AS col__8 "
-        "FROM objects00 JOIN colors02 "
+        "FROM objects00 CROSS JOIN colors02 "
         "WHERE (objects00.x_min > 600 OR objects00.x_max > 600) AND (objects00.x_min > 600 OR objects00.y_min > 800)",
       'dataframe_sql': {
         'udf_mapping': [
@@ -644,6 +653,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, 'data/jackson')
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+
+    aidb_engine.register_user_defined_function('function1', None)
+    aidb_engine.register_user_defined_function('function2', None)
 
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config

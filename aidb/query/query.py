@@ -752,7 +752,7 @@ class Query(object):
 
   def _expression_contains_udf(self, expression):
     # check if the expression contain user defined function
-    for expression in self._expression.find_all(exp.UserFunction):
+    for expression in expression.find_all(exp.UserFunction):
       if expression.args['this'] in self.config.user_defined_functions:
         return True
 
