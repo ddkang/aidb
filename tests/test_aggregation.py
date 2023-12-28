@@ -18,6 +18,8 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
+_NUMBER_OF_RUNS = os.environ.get('NUMBER_OF_TEST_RUNS', 100)
+
 queries = [
   (
     'approx_aggregate',
@@ -153,7 +155,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       else:
         selected_queries = queries
       count_list = [0] * len(selected_queries)
-      for i in range(100):
+      for i in range(_NUMBER_OF_RUNS):
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
         register_inference_services(aidb_engine, data_dir)
         k = 0

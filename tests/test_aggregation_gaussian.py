@@ -23,6 +23,8 @@ if not os.path.exists(ground_truth_dir):
 if not os.path.exists(inference_dir):
     os.makedirs(inference_dir)
 
+_NUMBER_OF_RUNS = os.environ.get('NUMBER_OF_TEST_RUNS', 100)
+
 def generate_gaussian_samples(mean, std_dev, num_samples, seed=1234):
   np.random.seed(seed)
   samples = np.random.normal(mean, std_dev, num_samples)
@@ -98,7 +100,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
   async def test_agg_query(self):
     generate_csv_file(100, 100, 1000000)
     count_list = [0] * len(queries)
-    for i in range(100):
+    for i in range(_NUMBER_OF_RUNS):
       dirname = os.path.dirname(__file__)
       data_dir = os.path.join(dirname, 'data/gaussian')
 
