@@ -115,6 +115,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         aidb_res = aidb_engine.execute(aidb_query)
         # TODO: equality check should be implemented
         assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
       del gt_engine
       del aidb_engine
     p.terminate()
