@@ -72,6 +72,9 @@ jobs:
     - name: Run query parser tests
       run: python3 -m tests.test_queries
 
+    - name: Debug Environment Variables
+      run: env
+
     - name: Run exact aggregation query tests
       run: python3 -m tests.test_exact_aggregation
 
