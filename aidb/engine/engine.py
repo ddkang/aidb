@@ -36,3 +36,5 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
       return result
     except Exception as e:
       raise e
+    finally:
+      self.__del__()
