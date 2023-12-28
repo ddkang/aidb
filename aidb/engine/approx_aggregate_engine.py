@@ -131,12 +131,16 @@ class ApproximateAggregateEngine(FullScanEngine):
           col_name_set.add(col_name)
 
     select_column_str = ', '.join(select_column)
+    if self._config.dialect == 'mysql':
+      random_func = 'RAND()'
+    else:
+      random_func = 'RANDOM()'
     # FIXME: add condition that samples are not in previous sampled data
     sample_blobs_query_str = f'''
                               SELECT {select_column_str}
                               {join_str}
                               {blob_key_filtering_predicates_str}
-                              ORDER BY RANDOM()
+                              ORDER BY {random_func}
                               LIMIT {num_samples};
                               '''
     return sample_blobs_query_str
@@ -161,12 +165,12 @@ class ApproximateAggregateEngine(FullScanEngine):
           new_query
       )
 
-      input_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_add_filter_key.sql_str), conn))
+      input_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query_add_filter_key.sql_str), conn))
       await bound_service.infer(input_df)
       inference_services_executed.add(bound_service.service.name)
 
 
-  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame, conn) -> pd.DataFrame:
+  async def get_results_for_each_blob(self, query: Query, sample_df: pd.DataFrame) -> pd.DataFrame:
     '''
     Return aggregation results of each sample blob, contains weight, mass, statistics, num_items
     For example, if there is 1000 blobs, blob A has two detected objects with x_min = 500 and x_min = 1000,
@@ -187,8 +191,9 @@ class ApproximateAggregateEngine(FullScanEngine):
                   {query_add_count.sql_str}
                   GROUP BY {', '.join(selected_column)}
                  '''
-
-    res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query_str), conn))
+    # In MySQL database, after running inference, the database will lose connection. We need to restart the engine,
+    async with self._sql_engine.begin() as conn:
+      res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query_str), conn))
     res_df[WEIGHT_COL_NAME] = 1. / self.blob_count
     res_df[MASS_COL_NAME] = 1
 
@@ -204,14 +209,14 @@ class ApproximateAggregateEngine(FullScanEngine):
       conn
   ):
     sample_blobs_query_str = self.get_sample_blobs_query(blob_tables, num_samples, blob_key_filtering_predicates_str)
-    sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql(text(sample_blobs_query_str), conn))
+    sample_blobs_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_blobs_query_str), conn))
 
     if len(sample_blobs_df) < num_samples:
       raise Exception(f'Require {num_samples} samples, but only get {len(sample_blobs_df)} samples')
 
     await self.execute_inference_services(query, sample_blobs_df, conn)
 
-    results_for_each_blob = await self.get_results_for_each_blob(query, sample_blobs_df, conn)
+    results_for_each_blob = await self.get_results_for_each_blob(query, sample_blobs_df)
 
     return results_for_each_blob
 
