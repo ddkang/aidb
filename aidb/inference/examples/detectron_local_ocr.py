@@ -3,16 +3,14 @@ Input: document segmentation model weights (model_final.pth), csv with paths to 
 
 Output: csv with OCR'd text.
 """
-from typing import List
-
-import numpy as np
-import pandas as pd
-import pdf2image
-
-import pytesseract
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
+import numpy as np
+import pandas as pd
+import pdf2image
+import pytesseract
+from typing import List
 
 from aidb.inference.cached_inference_service import CachedInferenceService
 
