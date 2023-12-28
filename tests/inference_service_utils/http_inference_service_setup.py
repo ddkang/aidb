@@ -42,28 +42,23 @@ def run_server(data_dir: str, port=8000):
     name_to_output_cols[service_name] = output_cols
     logger.info(f'Creating service {service_name}')
 
+
     @app.post(f'/{service_name}')
     async def inference(inp: Request):
       service_name = inp.url.path.split('/')[-1]
       inp = await inp.json()
       df = name_to_df[service_name]
 
-      # Initialize a mask for row selection
-      mask = pd.Series([True] * len(df))
+      # Construct a DataFrame from the input
+      inp_df = pd.DataFrame({col: [inp[col]] if not isinstance(inp[col], list) else inp[col] 
+                            for col in name_to_input_cols[service_name]})
 
-      # Update the mask for each input column
-      for col in name_to_input_cols[service_name]:
-        # Use `isin` for vectorized comparison
-        if isinstance(inp[col], list):
-          mask = mask & df[col].isin(inp[col])
-        else:
-          mask = mask & (df[col] == inp[col])
-
-      # Apply the mask to the DataFrame
-      filtered_df = df[mask]
+      # Performing the merge
+      # Note: We're using an inner join, so only rows with matching values in both DataFrames will be in the result
+      merged_df = pd.merge(df, inp_df, how='inner', on=name_to_input_cols[service_name])
 
       # Select and return the output columns
-      res = filtered_df[name_to_output_cols[service_name]].to_dict(orient='list')
+      res = merged_df[name_to_output_cols[service_name]].to_dict(orient='list')
       return res
 
 

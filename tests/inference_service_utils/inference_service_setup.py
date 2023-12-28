@@ -36,7 +36,7 @@ def register_inference_services(engine: Engine, data_dir: str, port=8000):
       headers={'Content-Type': 'application/json'},
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns,
-      batch_supported=False,
+      batch_supported=True,
       preferred_batch_size=100,
     )
 
