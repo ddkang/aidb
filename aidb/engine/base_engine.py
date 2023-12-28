@@ -362,8 +362,7 @@ class BaseEngine():
 
   def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
     function_name = str.lower(function_name)
-    if function_name not in self._config.user_defined_functions:
-      raise Exception(f'{function_name} has not been added into config, please add it first.')
+
     parameter_list = []
     for args in args_list:
       parameter_list.append(res_df[args])

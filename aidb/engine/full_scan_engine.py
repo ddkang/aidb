@@ -5,7 +5,7 @@ from typing import List
 from aidb.engine.base_engine import BaseEngine
 from aidb.query.query import Query
 
-QUERY_LIMIT = 10000
+RETRIEVAL_BATCH_SIZE = 10000
 
 
 class FullScanEngine(BaseEngine):
@@ -39,14 +39,14 @@ class FullScanEngine(BaseEngine):
         res = []
         # selectively load data from database to avoid large memory usage
         while True:
-          query = query.add_limit_keyword(QUERY_LIMIT)
+          query = query.add_limit_keyword(RETRIEVAL_BATCH_SIZE)
           query = query.add_offset_keyword(offset)
-          res_df = await conn.run_sync(lambda conn: pd.read_sql(text(query.sql_query_text), conn))
+          res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query.sql_query_text), conn))
           res_satisfy_udf = self.execute_user_defined_function(res_df, dataframe_sql, query)
           res.extend(res_satisfy_udf)
-          if len(res_df) != QUERY_LIMIT:
+          if len(res_df) != RETRIEVAL_BATCH_SIZE:
             return res
-          offset += QUERY_LIMIT
+          offset += RETRIEVAL_BATCH_SIZE
 
       else:
         res = await conn.execute(text(query.sql_query_text))
