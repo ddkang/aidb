@@ -23,7 +23,7 @@ if not os.path.exists(ground_truth_dir):
 if not os.path.exists(inference_dir):
     os.makedirs(inference_dir)
 
-_NUMBER_OF_RUNS = os.environ.get('NUMBER_OF_TEST_RUNS', 100)
+_NUMBER_OF_RUNS = int(os.environ.get('NUMBER_OF_TEST_RUNS', 100))
 
 def generate_gaussian_samples(mean, std_dev, num_samples, seed=1234):
   np.random.seed(seed)
