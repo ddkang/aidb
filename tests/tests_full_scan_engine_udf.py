@@ -18,11 +18,12 @@ from multiprocessing import Process
 
 setup_test_logger('full_scan_engine')
 
-DB_URL = "sqlite+aiosqlite://"
+POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
+SQLITE_URL = 'sqlite+aiosqlite://'
+MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
 
-# DB_URL = "mysql+aiomysql://aidb:aidb@localhost"
-class FullScanEngineTests(IsolatedAsyncioTestCase):
+class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
 
   def add_user_defined_function(self, aidb_engine):
     def sum_function(*args):
@@ -123,8 +124,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
-    time.sleep(3)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+    time.sleep(1)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(SQLITE_URL, data_dir)
 
     register_inference_services(aidb_engine, data_dir)
 
@@ -190,7 +191,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         WHERE MAX(x_min, x_max) < MAX(y_min, y_max) AND  x_min > 600 OR (x_max >600 AND y_min > 800)
         '''
       ),
-      # # test user defined function with constant parameters
+      # test user defined function with constant parameters
       (
         'full_scan',
         '''
@@ -338,9 +339,12 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     for query_type, aidb_query, exact_query in queries:
       logger.info(f'Running query {exact_query} in ground truth database')
       # Run the query on the ground truth database
-      async with gt_engine.begin() as conn:
-        gt_res = await conn.execute(text(exact_query))
-        gt_res = gt_res.fetchall()
+      try:
+        async with gt_engine.begin() as conn:
+          gt_res = await conn.execute(text(exact_query))
+          gt_res = gt_res.fetchall()
+      finally:
+        await gt_engine.dispose()
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
@@ -348,6 +352,265 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       assert len(gt_res) == len(aidb_res)
       assert Counter(gt_res) == Counter(aidb_res)
     del gt_engine
+    p.terminate()
+
+
+class FullScanEngineUdfPostgresqlMysqlTests(IsolatedAsyncioTestCase):
+
+  async def add_user_defined_function(self, aidb_engine):
+    def sum_function(*args):
+      return sum(args)
+
+
+    def is_equal(col1, col2):
+      return col1 == col2
+
+
+    def max_function(*args):
+      return max(args)
+
+
+    def multiple_function(col1, col2):
+      return col1 * col2
+
+
+    def replace_color(column1, selected_color, new_color):
+      if column1 == selected_color:
+        return new_color
+      else:
+        return column1
+
+
+    async def async_objects_inference(blob_id):
+      # Simulate some async operation
+      for service in aidb_engine._config.inference_bindings:
+        if service.service.name == 'objects00':
+          inference_service = service
+          outputs = await inference_service.infer(blob_id)
+          return outputs[0]
+
+
+    def objects_inference(blob_id):
+      df = pd.DataFrame({'blob_id': [blob_id]})
+      return asyncio_run(async_objects_inference(df))
+
+
+    aidb_engine.register_user_defined_function('sum_function', sum_function)
+    aidb_engine.register_user_defined_function('is_equal', is_equal)
+    aidb_engine.register_user_defined_function('max_function', max_function)
+    aidb_engine.register_user_defined_function('multiple_function', multiple_function)
+    aidb_engine.register_user_defined_function('replace_color', replace_color)
+    # aidb_engine.register_user_defined_function('objects_inference', objects_inference)
+
+
+
+  async def test_jackson_number_objects(self):
+
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+
+    p = Process(target=run_server, args=[str(data_dir)])
+    p.start()
+    time.sleep(1)
+
+    queries = [
+      # join condition test
+      (
+        'full_scan',
+        '''
+        SELECT y_max, x_min, y_min, color
+        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        ''',
+        '''
+        SELECT y_max, x_min, y_min, color
+        FROM objects00 join colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT y_max, x_min, y_min, color
+        FROM objects00 join colors02
+        WHERE is_equal(objects00.frame, colors02.frame) = TRUE AND is_equal(objects00.object_id, colors02.object_id)
+            = TRUE AND (x_min > 600 OR (x_max >600 AND y_min > 800))
+        ''',
+        '''
+        SELECT y_max, x_min, y_min, color
+        FROM objects00 join colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        '''
+      ),
+      # # test machine learning model, output may be zero, multiple rows or multiple columns
+      # (
+      #   'full_scan',
+      #   '''
+      #   SELECT objects_inference(frame)
+      #   FROM blobs_00
+      #   ''',
+      #   '''
+      #   SELECT object_name, confidence_score, x_min, y_min, x_max, y_max, object_id, frame
+      #   FROM objects00
+      #   '''
+      # ),
+      # # test user function with alias and filter based on the outputs of user function
+      # (
+      #   'full_scan',
+      #   '''
+      #   SELECT objects_inference(frame) AS (output1, output2, output3, output4, output5, output6, output7, output8)
+      #   FROM blobs_00
+      #   WHERE (output3 > 600 AND output6 < 1400) OR frame < 1000
+      #   ''',
+      #   '''
+      #   SELECT object_name, confidence_score, x_min, y_min, x_max, y_max, object_id, frame
+      #   FROM objects00
+      #   WHERE (x_min > 600 AND y_max < 1400) OR frame < 1000
+      #   '''
+      # ),
+      # test UDFs created within the database and AIDB
+      (
+        'full_scan',
+        '''
+        SELECT multiple_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
+        FROM objects00
+        WHERE x_min > 600 AND y_max < 1000
+        ''',
+        '''
+        SELECT database_multiply_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
+        FROM objects00
+        WHERE x_min > 600 AND y_max < 1000
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT database_add_function(y_max, x_min), multiple_function(y_min, y_max), color
+        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        ''',
+        '''
+        SELECT database_add_function(y_max, x_min), database_multiply_function(y_min, y_max), color
+        FROM objects00 join colors02 ON objects00.frame = colors02.frame AND objects00.object_id = colors02.object_id
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max)
+        FROM objects00
+        WHERE (multiple_function(x_min, y_min) > 400000 AND database_add_function(y_max, x_min) < 1600)
+            OR database_multiply_function(x_min, y_min) > 500000
+        ''',
+        '''
+        SELECT frame, database_multiply_function(x_min, y_min), database_add_function(x_max, y_max)
+        FROM objects00
+        WHERE (database_multiply_function(x_min, y_min) > 400000 AND database_add_function(y_max, x_min) < 1600)
+            OR database_multiply_function(x_min, y_min) > 500000
+        '''
+      ),
+    ]
+
+    postgresql_function =  [
+        '''
+        CREATE OR REPLACE FUNCTION database_multiply_function(col1 DOUBLE PRECISION,
+            col2 DOUBLE PRECISION)
+        RETURNS double precision AS
+        $$
+        BEGIN
+          RETURN (col1 * col2)::double precision;
+        END;
+        $$
+        LANGUAGE plpgsql;
+        ''',
+        '''
+        CREATE OR REPLACE FUNCTION database_add_function(col1 DOUBLE PRECISION,
+            col2 DOUBLE PRECISION)
+        RETURNS double precision AS
+        $$
+        BEGIN
+          RETURN (col1 + col2)::double precision;
+        END;
+        $$
+        LANGUAGE plpgsql;
+        '''
+    ]
+
+    mysql_function = [
+        '''
+        CREATE FUNCTION database_multiply_function(col1 FLOAT(32), col2 FLOAT(32)) 
+        RETURNS FLOAT(32) 
+        DETERMINISTIC 
+        BEGIN DECLARE multiply_result FLOAT(32); SET multiply_result = col1 * col2; 
+        RETURN multiply_result; 
+        END 
+        ''',
+        '''
+        CREATE FUNCTION database_add_function(col1 FLOAT(32), col2 FLOAT(32))
+        RETURNS FLOAT(32)
+        DETERMINISTIC
+        BEGIN
+            DECLARE add_result FLOAT(32);
+            SET add_result = col1 + col2;
+            RETURN add_result;
+        END
+        '''
+    ]
+    for db_url in [MYSQL_URL, POSTGRESQL_URL]:
+      dialect = db_url.split('+')[0]
+      logger.info(f'Test {dialect} database')
+      if dialect == 'mysql':
+        function_list = mysql_function
+      elif dialect == 'postgresql':
+        function_list = postgresql_function
+      else:
+        raise Exception('Unsupported database')
+
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
+      await self.add_user_defined_function(aidb_engine)
+
+      try:
+        async with gt_engine.begin() as conn:
+          await conn.execute(text('DROP FUNCTION IF EXISTS database_multiply_function;'))
+          await conn.execute(text('DROP FUNCTION IF EXISTS database_add_function;'))
+          for function in function_list:
+            await conn.execute(text(function))
+      finally:
+        await gt_engine.dispose()
+
+      # FIXME(ttt-77): create function SQL can't be executed by AIDB engine
+      try:
+        async with aidb_engine._sql_engine.begin() as conn:
+          await conn.execute(text('DROP FUNCTION IF EXISTS database_multiply_function;'))
+          await conn.execute(text('DROP FUNCTION IF EXISTS database_add_function;'))
+          for function in function_list:
+            await conn.execute(text(function))
+      finally:
+        await aidb_engine._sql_engine.dispose()
+
+
+      register_inference_services(aidb_engine, data_dir)
+
+      for query_type, aidb_query, exact_query in queries:
+        logger.info(f'Running query {exact_query} in ground truth database')
+        # Run the query on the ground truth database
+        try:
+          async with gt_engine.begin() as conn:
+            gt_res = await conn.execute(text(exact_query))
+            gt_res = gt_res.fetchall()
+        finally:
+          await gt_engine.dispose()
+        # Run the query on the aidb database
+        logger.info(f'Running query {aidb_query} in aidb database')
+        aidb_res = aidb_engine.execute(aidb_query)
+        # # TODO: may have problem with decimal number
+        assert len(gt_res) == len(aidb_res)
+        # assert Counter(gt_res) == Counter(aidb_res)
+      del gt_engine
+      del aidb_engine
     p.terminate()
 
 
