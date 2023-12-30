@@ -105,13 +105,13 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
 
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, 'data/jackson')
-
-    p = Process(target=run_server, args=[str(data_dir)])
+    port = 8010
+    p = Process(target=run_server, args=[str(data_dir), port])
     p.start()
     time.sleep(1)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(SQLITE_URL, data_dir)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(SQLITE_URL, data_dir, port)
 
-    register_inference_services(aidb_engine, data_dir)
+    register_inference_services(aidb_engine, data_dir, port)
 
     self.add_user_defined_function(aidb_engine)
 
@@ -336,6 +336,7 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
       assert len(gt_res) == len(aidb_res)
       assert Counter(gt_res) == Counter(aidb_res)
     del gt_engine
+    del aidb_engine
     p.terminate()
 
 
@@ -562,6 +563,7 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         assert len(gt_res) == len(aidb_res)
         # assert Counter(gt_res) == Counter(aidb_res)
       del gt_engine
+      del aidb_engine
     p.terminate()
 
 
