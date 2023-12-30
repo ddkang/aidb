@@ -646,6 +646,124 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     }
     test_query_list.append(test_query)
 
+
+    # test user defined functions both within the database and within AIDB
+    test_query = {
+      'query_str':
+        '''
+        SELECT multiply_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
+        FROM objects00
+        WHERE x_min > 600 AND y_max < 1000
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, database_multiply_function(objects00.x_min, "
+        "objects00.y_min) AS col__2, objects00.x_max AS col__3, objects00.y_max AS col__4 "
+        "FROM objects00 "
+        "WHERE (objects00.x_min > 600) AND (objects00.y_max < 1000)",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__0', 'col__1'],
+           'function_name': 'multiply_function',
+           'result_col_name': ['function__0']},
+        ],
+        'select_col': ['function__0', 'col__2', 'col__3', 'col__4'],
+        'filter_predicate': None
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    test_query = {
+      'query_str':
+        '''
+        SELECT database_add_function(y_max, x_min), multiply_function(y_min, y_max), color
+        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
+            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
+        ''',
+      'query_after_extraction':
+        "SELECT database_add_function(objects00.y_max, objects00.x_min) AS col__0, objects00.y_min AS col__1, "
+        "objects00.y_max AS col__2, colors02.color AS col__3, objects00.frame AS col__4, colors02.frame AS col__5, "
+        "objects00.object_id AS col__6, colors02.object_id AS col__7 "
+        "FROM objects00 CROSS JOIN colors02 "
+        "WHERE (objects00.x_min > 600 OR objects00.x_max > 600) AND (objects00.x_min > 600 OR objects00.y_min > 800)",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__1', 'col__2'],
+           'function_name': 'multiply_function',
+           'result_col_name': ['function__0']},
+          {'col_names': ['col__4', 'col__5'],
+           'function_name': 'is_equal',
+           'result_col_name': ['function__1']},
+          {'col_names': ['col__6', 'col__7'],
+           'function_name': 'is_equal',
+           'result_col_name': ['function__2']},
+        ],
+        'select_col': ['col__0', 'function__0', 'col__3'],
+        'filter_predicate': '(function__1 = TRUE) AND (function__2 = TRUE)'
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    test_query = {
+      'query_str':
+        '''
+        SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max)
+        FROM objects00
+        WHERE (multiply_function(x_min, y_min) > 400000 AND database_add_function(y_max, x_min) < 1600)
+            OR database_multiply_function(x_min, y_min) > 500000
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
+        "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
+        "FROM objects00 "
+        "WHERE (database_add_function(objects00.y_max, objects00.x_min) < 1600 OR "
+        "database_multiply_function(objects00.x_min, objects00.y_min) > 500000)",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__2', 'col__3'],
+           'function_name': 'sum_function',
+           'result_col_name': ['function__0']},
+          {'col_names': ['col__4', 'col__5'],
+           'function_name': 'multiply_function',
+           'result_col_name': ['function__1']},
+        ],
+        'select_col': ['col__0', 'col__1', 'function__0'],
+        'filter_predicate': '(function__1 > 400000 OR col__1 > 500000)'
+      }
+    }
+    test_query_list.append(test_query)
+
+
+    test_query = {
+      'query_str':
+        '''
+        SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max) AS output1
+        FROM objects00
+        WHERE (multiply_function(x_min, y_min) > 400000 AND output1 < 1600)
+            OR database_multiply_function(x_min, y_min) > 500000
+        ''',
+      'query_after_extraction':
+        "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
+        "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
+        "FROM objects00",
+      'dataframe_sql': {
+        'udf_mapping': [
+          {'col_names': ['col__2', 'col__3'],
+           'function_name': 'sum_function',
+           'result_col_name': ['output1']},
+          {'col_names': ['col__4', 'col__5'],
+           'function_name': 'multiply_function',
+           'result_col_name': ['function__1']},
+        ],
+        'select_col': ['col__0', 'col__1', 'output1'],
+        'filter_predicate': '(function__1 > 400000 OR col__1 > 500000) AND (output1 < 1600 OR col__1 > 500000)'
+      }
+    }
+    test_query_list.append(test_query)
+
+
     _test_equality(test_query_list, config)
 
 
