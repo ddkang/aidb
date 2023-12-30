@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
+import inspect
 import pandas as pd
 
 from aidb.config.config import Config
@@ -360,14 +361,23 @@ class BaseEngine():
     return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
 
 
+  # ---------------------
+  # User Defined Function
+  # ---------------------
+  def register_user_defined_function(self, function_name, function):
+    self._config.add_user_defined_function(function_name, function)
+
+
   def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
     function_name = str.lower(function_name)
 
     parameter_list = []
     for args in args_list:
       parameter_list.append(res_df[args])
-
-    function_results = self._config.user_defined_functions[function_name](*parameter_list)
+    if inspect.iscoroutinefunction(self._config.user_defined_functions[function_name]):
+      function_results = asyncio_run(self._config.user_defined_functions[function_name](*parameter_list))
+    else:
+      function_results = self._config.user_defined_functions[function_name](*parameter_list)
     # for result that has dataframe format, change it to a list of tuples
     if isinstance(function_results, pd.DataFrame):
       res_list_of_tuple = [tuple(row) for row in function_results.itertuples(index=False)]
@@ -377,13 +387,6 @@ class BaseEngine():
       return [function_results]
     else:
       return function_results
-
-
-  # ---------------------
-  # User Defined Function
-  # ---------------------
-  def register_user_defined_function(self, function_name, function):
-    self._config.add_user_defined_function(function_name, function)
 
 
   def _get_udf_result(self, res_df, dataframe_sql):
