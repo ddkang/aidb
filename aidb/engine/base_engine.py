@@ -382,11 +382,20 @@ class BaseEngine():
     if isinstance(function_results, pd.DataFrame):
       res_list_of_tuple = [tuple(row) for row in function_results.itertuples(index=False)]
       return res_list_of_tuple
-    # tuple type means one row with multiple columns
-    elif isinstance(function_results, tuple):
-      return [function_results]
+    # list type means the multiple rows result
+    elif isinstance(function_results, list):
+      res_list_of_tuple = []
+      for row in function_results:
+        # this means the multiple columns result
+        if isinstance(row, list):
+          res_list_of_tuple.append(row)
+        # single value or polars
+        else:
+          res_list_of_tuple.append(tuple((row,)))
+    # single value or polars
     else:
-      return function_results
+      res_list_of_tuple = [tuple((function_results,))]
+    return res_list_of_tuple
 
 
   def _get_udf_result(self, res_df, dataframe_sql):
