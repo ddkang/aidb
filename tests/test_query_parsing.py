@@ -787,8 +787,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     ]
     for query_str in invalid_query_str:
       query = Query(query_str, config)
+      assert query.is_udf_query == True
       with self.assertRaises(Exception):
-        _ = query.is_udf_query_valid
+       query.check_udf_query_validity()
 
 
 if __name__ == '__main__':

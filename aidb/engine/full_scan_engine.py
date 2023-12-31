@@ -14,8 +14,9 @@ class FullScanEngine(BaseEngine):
     Executes a query by doing a full scan and returns the results.
     '''
     # The query is irrelevant since we do a full scan anyway
-    is_udf_query = query.is_udf_query_valid
+    is_udf_query = query.is_udf_query
     if is_udf_query:
+      query.check_udf_query_validity()
       dataframe_sql, query = query.udf_query
 
     bound_service_list = query.inference_engines_required_for_query

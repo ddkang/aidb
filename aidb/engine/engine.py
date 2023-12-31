@@ -18,7 +18,8 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
       # FIXME: We have many validity checks for different queries.
       #     It's better to put them together and check the validity first.
       # check validity of user defined function query
-      _ = parsed_query.is_udf_query_valid
+      if parsed_query.is_udf_query:
+        parsed_query.check_udf_query_validity()
       result = None
 
       for parsed_single_query, _ in all_queries:

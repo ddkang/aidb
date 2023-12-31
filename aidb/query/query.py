@@ -157,13 +157,15 @@ class Query(object):
     Find alias of user defined function in query
     """
     udf_output_to_alias_mapping = {}
+    # Dictionary of aliases for user-defined functions defined in AIDB
     alias_to_udf_mapping = {}
     alias_index = 0
     for node, _, _ in self._expression.walk(bfs=False):
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Alias) and 'alias' in node.args and 'this' in node.args:
-        if isinstance(node.args['this'], exp.UserFunction) and node.args['alias'].args['this'] is not None:
+        if (isinstance(node.args['this'], exp.UserFunction) and node.args['alias'].args['this'] is not None
+            and node.args['this'].args['this'] in self.config.user_defined_functions):
           udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
           alias_index += 1
           udf_output_to_alias_mapping[udf_output_alias_key] = []
@@ -174,7 +176,8 @@ class Query(object):
           else:
             raise Exception('Duplicated alias is not allowed, please use another alias')
       elif isinstance(node, exp.Aliases) and 'expressions' in node.args and 'this' in node.args:
-        if isinstance(node.args['this'], exp.UserFunction) and len(node.args['expressions']) != 0:
+        if (isinstance(node.args['this'], exp.UserFunction) and len(node.args['expressions']) != 0
+            and node.args['this'].args['this'] in self.config.user_defined_functions):
           udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
           alias_index += 1
           udf_output_to_alias_mapping[udf_output_alias_key] = []
@@ -731,23 +734,25 @@ class Query(object):
 
 
   @cached_property
-  def is_udf_query_valid(self):
-    is_udf_query = False
+  def is_udf_query(self):
+    for expression in self._expression.find_all(exp.UserFunction):
+      if expression.args['this'] in self.config.user_defined_functions:
+        return True
+    return False
+
+
+  def check_udf_query_validity(self):
     for expression in self._expression.find_all(exp.UserFunction):
       if isinstance(expression.parent, exp.UserFunction):
-        raise Exception("We don't support nested user defined function currently")
-      if expression.args['this'] in self.config.user_defined_functions:
-        is_udf_query = True
+        if (expression.parent.args['this'] in self.config.user_defined_functions
+            and expression.args['this'] in self.config.user_defined_functions):
+          raise Exception("We don't support nested user defined function currently")
 
-    if is_udf_query:
-      if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
-        raise Exception('We only support user defined function for exact query currently.')
-      if len(self.all_queries_in_expressions) > 1:
-        raise Exception("We don't support user defined function with nested query currently")
+    if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
+      raise Exception('We only support user defined function for exact query currently.')
+    if len(self.all_queries_in_expressions) > 1:
+      raise Exception("We don't support user defined function with nested query currently")
 
-      return True
-    else:
-      return False
 
 
   def _expression_contains_udf(self, expression):
