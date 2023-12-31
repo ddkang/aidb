@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import networkx as nx
 import sqlalchemy
@@ -39,6 +39,9 @@ class Config:
   tables: Dict[str, Table] = field(default_factory=dict)
   columns: Dict[str, Column] = field(default_factory=dict)
   relations: Dict[str, str] = field(default_factory=dict)  # left -> right
+
+  # User defined function. Optional
+  user_defined_functions: Dict[str, Callable] = field(default_factory=dict)
 
 
   @cached_property
@@ -376,3 +379,9 @@ class Config:
       self.inference_bindings.remove(bound_service)
       self.clear_cached_properties()
       raise
+
+
+  def add_user_defined_function(self, function_name: str, function: Callable):
+    self.clear_cached_properties()
+    logger.info(f'Added user defined function {function_name}')
+    self.user_defined_functions[str.lower(function_name)] = function

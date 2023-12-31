@@ -14,7 +14,14 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
     try:
       parsed_query = Query(query, self._config)
       all_queries = parsed_query.all_queries_in_expressions
+
+      # FIXME: We have many validity checks for different queries.
+      #     It's better to put them together and check the validity first.
+      # check validity of user defined function query
+      if parsed_query.is_udf_query:
+        parsed_query.check_udf_query_validity()
       result = None
+
       for parsed_single_query, _ in all_queries:
         if parsed_single_query.is_approx_agg_query:
           result = asyncio_run(self.execute_aggregate_query(parsed_single_query, **kwargs))
@@ -26,6 +33,7 @@ class Engine(LimitEngine, ApproximateAggregateEngine, NonSelectQueryEngine, Appr
           result = asyncio_run(self.execute_full_scan(parsed_single_query, **kwargs))
         else:
           result = asyncio_run(self.execute_non_select(parsed_single_query))
+
       return result
     except Exception as e:
       raise e

@@ -38,8 +38,8 @@ jobs:
 
     - name: Download test data
       run: |
-        gdown https://drive.google.com/uc?id=18H5tzgx6LfEb7ykOg1XUuZCmhLP1Wiy8
-        unzip data.zip -d tests/
+        gdown https://drive.google.com/uc?id=1yCtgP-GTKcXtuqiuXlkmXO6Yq-nn52D0
+        unzip data_v2.zip -d tests/
 
     - name: Run db setup tests
       run: python3 -m tests.tests_db_setup
@@ -76,6 +76,9 @@ jobs:
 
     - name: Run Full Scan Tests for nested queries
       run: python3 -m tests.tests_full_scan_nested_query
+
+    - name: Run Full Scan Tests for udf queries
+      run: python3 -m tests.tests_full_scan_engine_udf
 
     - name: Run Query Parsing Tests for nested queries
       run: python3 -m tests.test_query_parsing
