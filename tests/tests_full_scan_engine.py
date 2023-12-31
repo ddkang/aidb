@@ -113,7 +113,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # TODO: equality check should be implemented
         assert len(gt_res) == len(aidb_res)
         assert sorted(gt_res) == sorted(aidb_res)
       del gt_engine
@@ -156,8 +155,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # TODO: equality check should be implemented
         assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
       del gt_engine
     p.terminate()
 
