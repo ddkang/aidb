@@ -2,6 +2,7 @@ import os
 import time
 import unittest
 
+from collections import Counter
 from unittest import IsolatedAsyncioTestCase
 from sqlalchemy.sql import text
 
@@ -96,11 +97,9 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
-  
-      register_inference_services(aidb_engine, data_dir)
-  
 
-  
+      register_inference_services(aidb_engine, data_dir)
+
       for query_type, aidb_query, exact_query in queries:
         logger.info(f'Running query {exact_query} in ground truth database')
         # Run the query on the ground truth database
