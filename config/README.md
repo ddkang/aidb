@@ -37,6 +37,8 @@ In this section, we will walk through an example of configuring an inference ser
         (AIDBListType(), AIDBListType(), 'score')],
       input_columns_types=[str], # optional, input type check
       output_columns_types=[str, float], # optional, output type check
+      preferred_batch_size=100, # upper bound of batch size, all but the last batch will have this size
+      copied_input_columns=[1], # index of input columns to copy to output
       model="LiYuan/amazon-review-sentiment-analysis", # model for hf
       default_args={("options", "wait_for_model"): True} # default args
       rate_limit=100 # number of requests per minute. Fine-tune this to avoid rate limit error
@@ -58,7 +60,7 @@ In this section, we will walk through an example of configuring an inference ser
     
     Order matters when you define bindings. In the above example,
     - `blobs00.review` and `blobs00.review_id` will be passed to the inference service as the first and second argument, respectively. Only `blobs00.review` will be converted to JSON request according to `columns_to_input_keys` map. 
-    - The output of the inference service will be passed to `sentiment.label`, `sentiment.score` and `sentiment.review_id` as the first, second and third argument, respectively. `sentiment.label` and `sentiment.score` are from the inference service - they are converted from JSON to pandas DataFrame according to `response_keys_to_columns` map. `sentiment.review_id` is copied from `blobs00.review_id`. Keep column name the same if you want to copy from input.
+    - The output of the inference service will be passed to `sentiment.label`, `sentiment.score` and `sentiment.review_id` as the first, second and third argument, respectively. `sentiment.label` and `sentiment.score` are from the inference service - they are converted from JSON to pandas DataFrame according to `response_keys_to_columns` map. `sentiment.review_id` is copied from `blobs00.review_id`, according to `copied_input_columns` because input column `blobs00.review_id` has index 1 in `input_col`. Always put columns copied form input at the end of `output_col` to avoid confusion. If multiple columns are copied from input, put them in the order of their indices in `input_col`.
 
 4. Set up your database configuration, including the URL to your database and its name.
     ```python
