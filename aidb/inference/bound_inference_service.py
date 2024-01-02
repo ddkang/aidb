@@ -1,7 +1,5 @@
-import asyncio
 from dataclasses import dataclass
 from typing import Dict, List
-import tqdm
 
 import pandas as pd
 import sqlalchemy.ext.asyncio
@@ -40,7 +38,8 @@ class CachedBoundInferenceService(BoundInferenceService):
 
   def optional_tqdm(self, iterable, **kwargs):
     if self._verbose:
-        return tqdm.tqdm(iterable, **kwargs)
+      from tqdm import tqdm
+      return tqdm(iterable, **kwargs)
     return iterable
 
 
@@ -65,16 +64,17 @@ class CachedBoundInferenceService(BoundInferenceService):
       fk_constraints = {}
       for column_name in self.binding.input_columns:
         column = self._columns[column_name]
-        new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
-        logger.debug('New table col name', new_table_col_name)
-        logger.debug('Ref column', str(column))
-        fk_ref_table_name = str(column).split('.')[0]
-        if fk_ref_table_name not in fk_constraints:
-          fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
-        # both tables will have same column name
-        fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
-        fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
-        columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
+        if column.primary_key:
+          new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
+          logger.debug('New table col name', new_table_col_name)
+          logger.debug('Ref column', str(column))
+          fk_ref_table_name = str(column).split('.')[0]
+          if fk_ref_table_name not in fk_constraints:
+            fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
+          # both tables will have same column name
+          fk_constraints[fk_ref_table_name]['cols'].append(new_table_col_name)
+          fk_constraints[fk_ref_table_name]['cols_refs'].append(column)
+          columns.append(sqlalchemy.schema.Column(new_table_col_name, column.type))
 
       multi_table_fk_constraints = []
       for _, fk_cons in fk_constraints.items():
@@ -174,7 +174,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     """
     checks the presence of inputs in the cache table
     """
-    cache_entries = await conn.run_sync(lambda conn: pd.read_sql(text(str(self._cache_query_stub.compile())), conn))
+    cache_entries = await conn.run_sync(lambda conn: pd.read_sql_query(text(str(self._cache_query_stub.compile())), conn))
     cache_entries = cache_entries.set_index([col.name for col in self._cache_columns])
     normalized_cache_cols = [self.convert_cache_column_name_to_normalized_column_name(col.name) for col in
                              self._cache_columns]
@@ -210,7 +210,7 @@ class CachedBoundInferenceService(BoundInferenceService):
                 self.binding.input_columns]
             )
           )
-          df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
+          df = await conn.run_sync(lambda conn: pd.read_sql_query(query, conn))
           results.append(df)
         else:
           inference_results = self.service.infer_one(inp_row)

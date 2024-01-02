@@ -20,7 +20,13 @@ class ColumnsInQueryTests(IsolatedAsyncioTestCase):
     await create_db(DB_URL, aidb_db_fname)
 
     tmp_engine = await setup_db(DB_URL, aidb_db_fname, data_dir)
-    await setup_config_tables(tmp_engine)
+    try:
+      async with tmp_engine.begin() as conn:
+        await setup_config_tables(conn)
+    except Exception:
+      raise Exception('Fail to setup config table.')
+    finally:
+      await tmp_engine.dispose()
     del tmp_engine
     # Connect to the aidb database
     aidb_engine = Engine(
