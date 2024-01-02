@@ -9,6 +9,7 @@ import pandas as pd
 from sqlalchemy.sql import text
 
 from aidb.utils.logger import logger
+from aidb.inference.bound_inference_service import CachedBoundInferenceService
 from tests.inference_service_utils.inference_service_setup import register_inference_services
 from tests.inference_service_utils.http_inference_service_setup import run_server
 from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
@@ -20,6 +21,15 @@ setup_test_logger('full_scan_engine_udf')
 POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
+
+
+def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
+  for idx, col in enumerate(inference_service.binding.input_columns):
+    input_df.rename(columns={input_df.columns[idx]: col}, inplace=True)
+  outputs = inference_service.service.infer_batch(input_df)[0]
+  for idx, col in enumerate(inference_service.binding.output_columns):
+    outputs.rename(columns={outputs.columns[idx]: col}, inplace=True)
+  return outputs
 
 
 class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
@@ -56,36 +66,27 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
       input_df = pd.DataFrame({'blob_id': [blob_id]})
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'objects00':
-          inference_service = service
-          outputs = await inference_service.infer(input_df)
-          return outputs[0]
-
+          return inference(service, input_df)
 
     async def async_lights_inference(blob_id):
       input_df = pd.DataFrame({'blob_id': [blob_id]})
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'lights01':
-          inference_service = service
-          outputs = await inference_service.infer(input_df)
-          return outputs[0]
+          return inference(service, input_df)
 
 
     async def async_colors_inference(blob_id, object_id):
       input_df = pd.DataFrame({'blob_id': [blob_id], 'input_col2': object_id})
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'colors02':
-          inference_service = service
-          outputs = await inference_service.infer(input_df)
-          return outputs[0]
+          return inference(service, input_df)
 
 
     async def async_counts_inference(blob_id):
       input_df = pd.DataFrame({'blob_id': [blob_id]})
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'counts03':
-          inference_service = service
-          outputs = await inference_service.infer(input_df)
-          return outputs[0]
+          return inference(service, input_df)
 
 
     aidb_engine._config.add_user_defined_function('sum_function', sum_function)
