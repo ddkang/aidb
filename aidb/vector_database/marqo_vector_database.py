@@ -108,7 +108,6 @@ class MarqoVectorDatabase(VectorDatabase):
     '''
     if index_name in self.index_list:
       self.marqo_client.delete_index(index_name)
-      # self.index_list.remove(index_name)
       self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
       logger.info("Index '%s' deleted.", index_name)
   
@@ -131,7 +130,6 @@ class MarqoVectorDatabase(VectorDatabase):
     
     mod_data = []
     for d in data:
-      # print(d)
       _id = str(d['id'])
       _vec = d['values']
       mod_data.append(
