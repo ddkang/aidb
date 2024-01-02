@@ -52,7 +52,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
   def __post_init__(self):
     self._cache_table_name = cache_table_name_from_inputs(self.service.name, self.binding.input_columns)
-    logger.debug('Cache table name', self._cache_table_name)
+    logger.debug(f'Cache table name: {self._cache_table_name}')
 
     # Get table takes a synchronous connection
     def get_table(conn: sqlalchemy.engine.base.Connection):
@@ -65,8 +65,8 @@ class CachedBoundInferenceService(BoundInferenceService):
         column = self._columns[column_name]
         if column.primary_key:
           new_table_col_name = self.convert_normalized_col_name_to_cache_col_name(column_name)
-          logger.debug('New table col name', new_table_col_name)
-          logger.debug('Ref column', str(column))
+          logger.debug(f'New table col name: {new_table_col_name}')
+          logger.debug(f'Ref column: {str(column)}')
           fk_ref_table_name = str(column).split('.')[0]
           if fk_ref_table_name not in fk_constraints:
             fk_constraints[fk_ref_table_name] = {'cols': [], 'cols_refs': []}
@@ -181,13 +181,15 @@ class CachedBoundInferenceService(BoundInferenceService):
         # For a single column, use `isin` and negate the condition
         col = normalized_cache_cols[0]
         out_cache_df = inputs[~inputs[col].isin(cache_entries.index)]
+        out_cache_df_primary = out_cache_df[[col]]
     else:
         # For multiple columns, create tuples and use set operations
         inputs_tuples = inputs[normalized_cache_cols].apply(tuple, axis=1)
         cache_tuples = set(cache_entries.index)
         out_cache_df = inputs[~inputs_tuples.isin(cache_tuples)]
+        out_cache_df_primary = out_cache_df[normalized_cache_cols]
 
-    return out_cache_df
+    return out_cache_df, out_cache_df_primary
 
 
   async def infer(self, inputs: pd.DataFrame):
@@ -197,7 +199,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      out_cache_inputs = await self._get_inputs_not_in_cache_table(inputs, conn)
+      out_cache_inputs, out_cache_inputs_primary = await self._get_inputs_not_in_cache_table(inputs, conn)
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
       input_batches = [out_cache_inputs.iloc[i:i + bs] for i in range(0, len(out_cache_inputs), bs)]
@@ -205,7 +207,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
         records_to_insert_in_table.extend(inference_results)
-      await self._insert_in_cache_table(out_cache_inputs, conn)
+      await self._insert_in_cache_table(out_cache_inputs_primary, conn)
       await self._insert_output_results_in_tables(records_to_insert_in_table, conn)
 
 
