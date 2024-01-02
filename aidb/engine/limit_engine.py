@@ -48,7 +48,7 @@ class LimitEngine(TastiEngine):
                                                                                   self.blob_mapping_table_name,
                                                                                   [index])
         async with self._sql_engine.begin() as conn:
-          inp_df = await conn.run_sync(lambda conn: pd.read_sql(text(inp_query_str), conn))
+          inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
         inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
         await bound_service.infer(inp_df)
 
