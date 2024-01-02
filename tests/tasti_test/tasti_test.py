@@ -6,6 +6,7 @@ from typing import Optional
 
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.marqo_vector_database import MarqoAuth, MarqoVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 from aidb.vector_database.tasti import Tasti
 from aidb.utils.constants import VECTOR_ID_COLUMN
@@ -18,6 +19,7 @@ class VectorDatabaseType(Enum):
   FAISS = 'FAISS'
   CHROMA = 'Chroma'
   WEAVIATE = 'Weaviate'
+  MARQO = 'Marqo'
 
 
 class TastiTests():
@@ -31,6 +33,7 @@ class TastiTests():
     percent_fpf: float = 0.75,
     seed: int = 1234,
     weaviate_auth: Optional[WeaviateAuth] = None,
+    marqo_auth: Optional[MarqoAuth] = None,
     index_path: Optional[str] = None,
   ):
     self.index_name = index_name
@@ -42,8 +45,7 @@ class TastiTests():
     self.seed = seed
 
     self.data, self.vector_ids = self.generate_data(self.data_size, embedding_dim)
-    self.user_database = self.simulate_user_providing_database(index_path, weaviate_auth)
-
+    self.user_database = self.simulate_user_providing_database(index_path, weaviate_auth=weaviate_auth, marqo_auth=marqo_auth)
     self.tasti = Tasti(index_name, self.user_database, nb_buckets, percent_fpf, seed)
 
 
@@ -56,7 +58,7 @@ class TastiTests():
     return data, vector_ids
 
 
-  def simulate_user_providing_database(self, index_path: Optional[str], weaviate_auth: Optional[WeaviateAuth]):
+  def simulate_user_providing_database(self, index_path: Optional[str], weaviate_auth: Optional[WeaviateAuth], marqo_auth: Optional[MarqoAuth]):
     '''
     Originally, user will provide a vector database, and Tasti will read from it.
     This function is used to create a vector database to store original data
@@ -75,6 +77,11 @@ class TastiTests():
 
     elif self.vd_type == VectorDatabaseType.WEAVIATE.value:
       user_database = WeaviateVectorDatabase(weaviate_auth)
+      user_database.create_index(self.index_name, recreate_index=True)
+      user_database.insert_data(self.index_name, self.data)
+
+    elif self.vd_type == VectorDatabaseType.MARQO.value:
+      user_database = MarqoVectorDatabase(marqo_auth, self.embedding_dim)
       user_database.create_index(self.index_name, recreate_index=True)
       user_database.insert_data(self.index_name, self.data)
 
@@ -120,10 +127,11 @@ def test(
     embedding_dim: int,
     nb_buckets: int,
     index_path: Optional[str] = None,
-    weaviate_auth: Optional[WeaviateAuth] = None
+    weaviate_auth: Optional[WeaviateAuth] = None,
+    marqo_auth: Optional[MarqoAuth] = None
 ):
   tasti_test = TastiTests(index_name, data_size, embedding_dim, nb_buckets, vector_database_type,
-                          weaviate_auth=weaviate_auth, index_path=index_path)
+                          weaviate_auth=weaviate_auth, marqo_auth=marqo_auth, index_path=index_path)
   tasti_test.test()
 
 
@@ -143,3 +151,9 @@ if __name__ == '__main__':
     weaviate_auth = WeaviateAuth(url, api_key=api_key)
     test('Weaviate', VectorDatabaseType.WEAVIATE.value, data_size=200,
          embedding_dim=128, nb_buckets=50, weaviate_auth=weaviate_auth)
+    
+    logger.info(f'Running Marqo vector database')
+    url = 'http://0.0.0.0:8882'
+    marqo_auth = MarqoAuth(url=url)
+    test('marqo', VectorDatabaseType.MARQO.value, data_size=200,
+         embedding_dim=128, nb_buckets=50, marqo_auth=marqo_auth)
