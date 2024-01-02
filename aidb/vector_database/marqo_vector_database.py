@@ -124,9 +124,9 @@ class MarqoVectorDatabase(VectorDatabase):
     '''
     index_name = self._check_index_validity(index_name)
 
-    data = data.to_dict(orient="records")
     # Data will have list of dictionaries 
     # with 'id' and 'values' as keys.
+    data = data.to_dict(orient="records")
     
     mod_data = []
     for d in data:
@@ -163,11 +163,8 @@ class MarqoVectorDatabase(VectorDatabase):
       self.load_index()
     index_name = self._check_index_validity(index_name)
     result = []
-    resp = self.marqo_client.index(
-        index_name).get_documents(
-          document_ids=[str(i) for i in ids], expose_facets=True
-        )
-    result = [ii['_tensor_facets'][0]['_embedding'] for ii in resp['results']]
+    response = self.marqo_client.index(index_name).get_documents(document_ids=[str(i) for i in ids], expose_facets=True)
+    result = [ii['_tensor_facets'][0]['_embedding'] for ii in response['results']]
     return np.array(result)
   
 
@@ -184,9 +181,10 @@ class MarqoVectorDatabase(VectorDatabase):
     
     all_topk_reps, all_topk_dists = [], []
     for query_emb in query_emb_list:
+
+      # No query needs to be provided when no_model and custom vectors,
+      # only context - https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model
       response = self.marqo_client.index(index_name).search(
-        # No query needs to be provided when no_model and custom vectors,
-        # only context - https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model
         context={
         'tensor':[{'vector': list(query_emb), 'weight' : 1}],
         }, limit=top_k
@@ -195,7 +193,9 @@ class MarqoVectorDatabase(VectorDatabase):
       dists = []
       for res in response['hits']:
         ids.append(res['_id'])
-        dists.append(1-res['_score']) # Because it is similarity score
+
+        # Because it is similarity score
+        dists.append(1-res['_score']) 
       
       all_topk_reps.append(ids)
       all_topk_dists.append(dists)
