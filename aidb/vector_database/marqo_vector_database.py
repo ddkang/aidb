@@ -185,10 +185,8 @@ class MarqoVectorDatabase(VectorDatabase):
       # No query needs to be provided when no_model and custom vectors,
       # only context - https://docs.marqo.ai/1.4.0/API-Reference/Indexes/create_index/#no-model
       response = self.marqo_client.index(index_name).search(
-        context={
-        'tensor':[{'vector': list(query_emb), 'weight' : 1}],
-        }, limit=top_k
-      )
+        context={'tensor':[{'vector': list(query_emb), 'weight' : 1}],}, limit=top_k)
+      
       ids = []
       dists = []
       for res in response['hits']:
