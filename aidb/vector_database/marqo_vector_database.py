@@ -35,9 +35,6 @@ class MarqoVectorDatabase(VectorDatabase):
     if not status:
       raise Exception('Initial connection to Marqo failed')
     
-    self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
-    self.embedding_dim = embedding_dim
-    
 
   @staticmethod
   def _get_auth_secret(username: Optional[str] = None, password: Optional[str] = None, api_key: Optional[str] = None):
@@ -54,6 +51,7 @@ class MarqoVectorDatabase(VectorDatabase):
   
   def create_index(
     self,
+    embedding_dim: int,
     index_name: str,
     similarity: str = 'l2',
     recreate_index: bool = False
@@ -65,6 +63,9 @@ class MarqoVectorDatabase(VectorDatabase):
     if recreate_index:
       if index_name in self.index_list:
         self.delete_index(index_name)
+
+    self.index_list = [i.index_name for i in self.marqo_client.get_indexes()['results']]
+    self.embedding_dim = embedding_dim
 
     if not index_name:
       raise Exception('Index name must not be none')
