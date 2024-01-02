@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict
+from typing import Dict, List
 
 import sqlglot.expressions as exp
 from sqlglot.rewriter import Rewriter
@@ -148,8 +148,48 @@ class Query(object):
           col_name = node.args['this'].args['this'].args['this']
           column_alias_to_name[str.lower(col_alias)] = str.lower(col_name)
 
-
     return table_alias_to_name, column_alias_to_name
+
+
+  @cached_property
+  def udf_outputs_aliases(self):
+    """
+    Find alias of user defined function in query
+    """
+    udf_output_to_alias_mapping = {}
+    # Dictionary of aliases for user-defined functions defined in AIDB
+    alias_to_udf_mapping = {}
+    alias_index = 0
+    for node, _, _ in self._expression.walk(bfs=False):
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Alias) and 'alias' in node.args and 'this' in node.args:
+        if (isinstance(node.args['this'], exp.UserFunction) and node.args['alias'].args['this'] is not None
+            and node.args['this'].args['this'] in self.config.user_defined_functions):
+          udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
+          alias_index += 1
+          udf_output_to_alias_mapping[udf_output_alias_key] = []
+          alias = str.lower(node.args['alias'].args['this'])
+          udf_output_to_alias_mapping[udf_output_alias_key].append(alias)
+          if alias not in alias_to_udf_mapping:
+            alias_to_udf_mapping[alias] = node.args['this']
+          else:
+            raise Exception('Duplicated alias is not allowed, please use another alias')
+      elif isinstance(node, exp.Aliases) and 'expressions' in node.args and 'this' in node.args:
+        if (isinstance(node.args['this'], exp.UserFunction) and len(node.args['expressions']) != 0
+            and node.args['this'].args['this'] in self.config.user_defined_functions):
+          udf_output_alias_key = f"{node.args['this'].args['this']}__{alias_index}"
+          alias_index += 1
+          udf_output_to_alias_mapping[udf_output_alias_key] = []
+          for expression in node.args['expressions']:
+            alias = str.lower(expression.args['this'])
+            udf_output_to_alias_mapping[udf_output_alias_key].append(alias)
+            if alias not in alias_to_udf_mapping:
+              alias_to_udf_mapping[alias] = node.args['this']
+            else:
+              raise Exception('Duplicated alias is not allowed, please use another alias')
+
+    return udf_output_to_alias_mapping, alias_to_udf_mapping
 
 
   @cached_property
@@ -255,6 +295,17 @@ class Query(object):
     return copied_expression
 
 
+  def _convert_logical_condition_to_cnf(self, logic_condition):
+    # predicate name (used for sympy package) to expression
+    predicate_mappings = {}
+    # predicate mapping will be filled by this function
+    sympy_representation, _ = self._get_sympify_form(logic_condition, 0, predicate_mappings)
+    sympy_expression = sympify(sympy_representation)
+    cnf_expression = to_cnf(sympy_expression)
+    converted_logical_expression = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
+    return converted_logical_expression
+
+
   @cached_property
   def filtering_predicates(self):
     """
@@ -276,13 +327,7 @@ class Query(object):
     if normalized_exp.find(exp.Where) is not None:
       if self._tables is None:
         raise Exception("Need table and column information to support alias")
-      # predicate name (used for sympy package) to expression
-      predicate_mappings = {}
-      # predicate mapping will be filled by this function
-      sympy_representation, _ = self._get_sympify_form(normalized_exp.find(exp.Where), 0, predicate_mappings)
-      sympy_expression = sympify(sympy_representation)
-      cnf_expression = to_cnf(sympy_expression)
-      filtering_predicates = self._get_filtering_predicate_cnf_representation(cnf_expression, predicate_mappings)
+      filtering_predicates = self._convert_logical_condition_to_cnf(normalized_exp.find(exp.Where))
       filtering_clauses = []
       for or_connected_filtering_predicate in filtering_predicates:
         or_connected_clauses = []
@@ -301,11 +346,12 @@ class Query(object):
       if col_name in self._tables[table]:
         tables_of_column.append(table)
     if len(tables_of_column) == 0:
-      raise Exception(f"Column - {col_name} is not present in any table")
+      raise Exception(f"Column - {col_name} is not present in any table or it not any alias of user defined function")
     elif len(tables_of_column) > 1:
       raise Exception(f"Ambiguity in identifying column - {col_name}, it is present in multiple tables")
     else:
       return tables_of_column[0]
+
 
   @cached_property
   def query_after_normalizing(self):
@@ -322,6 +368,8 @@ class Query(object):
       for element in original_list:
         if isinstance(element, exp.Alias):
           removed_alias_list.append(element.args['this'])
+        elif isinstance(element, exp.Aliases):
+          removed_alias_list.append(element.args['this'])
         else:
           removed_alias_list.append(element)
       return removed_alias_list
@@ -329,6 +377,8 @@ class Query(object):
 
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
+    udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
+
     for node, _, _ in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
@@ -342,10 +392,21 @@ class Query(object):
             table_name = str.lower(node.args['table'].args['this'])
             if table_name in table_alias_to_name:
               table_name = table_alias_to_name[table_name]
+          elif col_name in alias_to_udf_mapping:
+            continue
           else:
             table_name = self._get_table_of_column(col_name)
 
           node.set('table', exp.Identifier(this=table_name, quoted=False))
+
+        elif isinstance(node.args['this'], exp.Star):
+          select_exp_list = []
+          for table_name in self.tables_in_query:
+            for col_name, _ in self._tables[table_name].items():
+              new_table = exp.Identifier(this=table_name, quoted=False)
+              new_column = exp.Identifier(this=col_name, quoted=False)
+              select_exp_list.append(exp.Column(this=new_column, table=new_table))
+          copied_expression.set('expressions', select_exp_list)
 
     # remove alias
 
@@ -633,3 +694,245 @@ class Query(object):
     re = Rewriter(expression)
     new_sql = re.add_join(new_join)
     return Query(new_sql.expression.sql(), self.config)
+
+
+  def add_offset_keyword(self, offset):
+    expression = self._expression.copy()
+    if offset != 0:
+      offset_node = exp.Offset(this=exp.Literal(this=offset, is_string=False))
+      expression.set('offset', offset_node)
+    return Query(expression.sql(), self.config)
+
+
+  def add_limit_keyword(self, limit):
+    expression = self._expression.copy()
+    limit_node = exp.Limit(this=exp.Literal(this=limit, is_string=False))
+    expression.set('limit', limit_node)
+    return Query(expression.sql(), self.config)
+
+  @staticmethod
+  def convert_and_connected_fp_to_exp(and_connected_fp_list):
+    '''
+    This function connected filter predicates in a list of list
+    e.g. [[fp1, fp2], [fp3, fp4]] will be converted to the expression of '(fp1 OR fp2) AND (fp3 OR fp4)'
+    '''
+    def _build_tree(elements, operator):
+      if len(elements) == 0:
+        return None
+      elif len(elements) == 1:
+        return elements[0]
+      else:
+        return operator(this=elements[0], expression=_build_tree(elements[1:], operator))
+    new_or_connected_expression_list = []
+    for or_connected_fp in and_connected_fp_list:
+      new_or_connected_expression = _build_tree(or_connected_fp, exp.Or)
+      if new_or_connected_expression:
+        new_or_connected_expression_list.append(exp.Paren(this=new_or_connected_expression))
+
+    new_and_connected_expression = _build_tree(new_or_connected_expression_list, exp.And)
+    return new_and_connected_expression
+
+
+  @cached_property
+  def is_udf_query(self):
+    for expression in self._expression.find_all(exp.UserFunction):
+      if expression.args['this'] in self.config.user_defined_functions:
+        return True
+    return False
+
+
+  def check_udf_query_validity(self):
+    for expression in self._expression.find_all(exp.UserFunction):
+      if isinstance(expression.parent, exp.UserFunction):
+        if (expression.parent.args['this'] in self.config.user_defined_functions
+            and expression.args['this'] in self.config.user_defined_functions):
+          raise Exception("We don't support nested user defined function currently")
+
+    if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
+      raise Exception('We only support user defined function for exact query currently.')
+    if len(self.all_queries_in_expressions) > 1:
+      raise Exception("We don't support user defined function with nested query currently")
+
+
+
+  def _expression_contains_udf(self, expression):
+    # check if the expression contain user defined function
+    for expression in expression.find_all(exp.UserFunction):
+      if expression.args['this'] in self.config.user_defined_functions:
+        return True
+
+    udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
+    for node, _, _ in expression.walk():
+      if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+        continue
+      if isinstance(node, exp.Column):
+        # Check if the udf corresponding to the alias is a udf in the AIDB engine or a udf in the database
+        if node.args['this'].args['this'] in alias_to_udf_mapping:
+          if alias_to_udf_mapping[node.args['this'].args['this']].args['this'] in self.config.user_defined_functions:
+            return True
+
+    return False
+
+
+  @cached_property
+  def udf_query(self):
+    '''
+    This function is used to parse the query that includes user defined functions.
+    return parameters:
+    * dataframe_sql (store information for query of dataframe)
+    * parsed_query (executed by normal db)
+    e.g. 'SELECT udf(x_max, y_max) from objects00'
+      the parsed query will be 'SELECT objects00.x_max AS col__0, objects00.y_max AS col__1 from objects00
+      dataframe_sql ={
+          'udf_mapping': [{'col_names': ['col__0', 'col__1'], 'function_name': 'udf','result_col_name': ['function__0']}],
+          'select_col': ['function__0'],
+          'filter_predicate': None
+      }
+      udf_mapping: store information for user defined function
+      select_col: columns in SELECT clause in dataframe query
+      filter_predicate: filter_predicate for dataframe query
+    '''
+
+    # this class is used to extract needed information from query
+    class QueryModifier:
+      def __init__(self):
+        self.added_select = set()
+        self.new_select_exp_list = []
+        self.col_index_mapping = {}
+        self.new_select_col_index = 0
+        self.function_index = 0
+        self.udf_output_alias_index = 0
+        self.udf_mapping_list = []
+        self.dataframe_select_col_list = []
+
+
+      def add_column_with_alias(self, node, is_select_col = False, predefined_alias = None):
+        if node not in self.added_select:
+          self.added_select.add(node)
+          if predefined_alias:
+            alias = predefined_alias
+          else:
+            alias = f'col__{self.new_select_col_index}'
+          select_col_with_alias = exp.Alias(this=node, alias=alias)
+          self.new_select_exp_list.append(select_col_with_alias)
+          self.col_index_mapping[node] = alias
+          self.new_select_col_index += 1
+        if is_select_col:
+          self.dataframe_select_col_list.append(self.col_index_mapping[node])
+
+
+      def add_udf(self, user_defined_function, udf_output_to_alias_mapping, is_select_col = False):
+        udf_with_index = f"{user_defined_function.args['this']}__{self.udf_output_alias_index}"
+        if udf_with_index in udf_output_to_alias_mapping:
+          udf_output_alias = udf_output_to_alias_mapping[udf_with_index]
+          self.udf_output_alias_index += 1
+        else:
+          udf_output_alias = [f'function__{self.function_index}']
+        self.function_index += 1
+
+        function_col_dict = {
+          'col_names': [],
+          'function_name': user_defined_function.args['this'],
+          'result_col_name': udf_output_alias
+        }
+        for col in user_defined_function.args['expressions']:
+          self.add_column_with_alias(col)
+          function_col_dict['col_names'].append(self.col_index_mapping[col])
+        self.udf_mapping_list.append(function_col_dict)
+        if is_select_col:
+          for col_name in function_col_dict['result_col_name']:
+            self.dataframe_select_col_list.append(col_name)
+
+        return udf_output_alias
+
+
+    aidb_user_defined_functions = self.config.user_defined_functions
+    modified_query = QueryModifier()
+    normalized_query = self.query_after_normalizing
+    expression = normalized_query.get_expression().copy()
+
+    udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
+    for select_exp in expression.args['expressions']:
+      user_function = select_exp.find(exp.UserFunction)
+      if user_function and user_function.args['this'] in aidb_user_defined_functions:
+        _ = modified_query.add_udf(user_function, udf_output_to_alias_mapping, is_select_col=True)
+      else:
+        modified_query.add_column_with_alias(select_exp, is_select_col=True)
+
+    filter_predicates = []
+
+    # find user defined function in JOIN condition, if exists, add them into filter predicates, 
+    # then remove this join condition
+    if expression.find(exp.Join) is not None:
+      for join_exp in expression.args['joins']:
+        if join_exp.args['on'] is not None:
+          user_function = join_exp.args['on'].find(exp.UserFunction)
+          if user_function and user_function.args['this'] in aidb_user_defined_functions:
+            filter_predicates.extend(self._convert_logical_condition_to_cnf(join_exp.args['on']).copy())
+            join_exp.set('on', None)
+        if 'on' not in join_exp.args or join_exp.args['on'] is None:
+          join_exp.set('kind', 'CROSS')
+    # we don't need to replace column with root column here, so we don't use query.filtering_predicates directly
+    if expression.find(exp.Where):
+      filter_predicates.extend(self._convert_logical_condition_to_cnf(expression.find(exp.Where)))
+
+    filter_predicates_in_sql = []
+    filter_predicates_in_dataframe = []
+
+    for or_connected in filter_predicates:
+      include_udf = False
+      for fp in or_connected:
+        if self._expression_contains_udf(fp):
+          include_udf = True
+
+      if not include_udf:
+        filter_predicates_in_sql.append(or_connected)
+        continue
+
+      new_or_connected_fp = []
+      for fp in or_connected:
+        fp_copy = fp.copy()
+        for node, _, key in fp_copy.walk(bfs=False):
+          if isinstance(node, exp.Expression) and self._check_in_subquery(node):
+            continue
+          if isinstance(node, exp.UserFunction):
+            if node.args['this'] in aidb_user_defined_functions:
+              output_alias = modified_query.add_udf(node.copy(), udf_output_to_alias_mapping)
+              if len(output_alias) > 1:
+                raise Exception(
+                    'A user-defined function in the filter predicate should produce a single output. '
+                    'To apply filters for multiple outputs, assign an alias to each output and '
+                    'then specify the filter conditions accordingly.')
+              converted_fp = exp.Column(this=exp.Identifier(this=output_alias[0]))
+              # FIXME: for IN operator
+              node.parent.set(key, converted_fp)
+            else:
+              node_copy = node.copy()
+              modified_query.add_column_with_alias(node_copy)
+              node.parent.set(key, modified_query.col_index_mapping[node_copy])
+
+          elif isinstance(node, exp.Column):
+            # for the column that uses udf alias, we directly use it
+            if node.args['this'].args['this'] in alias_to_udf_mapping:
+              continue
+            node_copy = node.copy()
+            modified_query.add_column_with_alias(node_copy)
+            node.args['this'].set('this', modified_query.col_index_mapping[node_copy])
+            node.set('table', None)
+        new_or_connected_fp.append(fp_copy)
+      filter_predicates_in_dataframe.append(new_or_connected_fp)
+
+    new_where_condition = self.convert_and_connected_fp_to_exp(filter_predicates_in_sql)
+    if new_where_condition:
+      new_where_clause = exp.Where(this=new_where_condition)
+    else:
+      new_where_clause = None
+    expression.set('where', new_where_clause)
+    expression.set('expressions', modified_query.new_select_exp_list)
+
+    dataframe_sql = {
+      'udf_mapping': modified_query.udf_mapping_list,
+      'select_col': modified_query.dataframe_select_col_list,
+      'filter_predicate': filter_predicates_in_dataframe
+    }
+    return dataframe_sql, Query(expression.sql(), self.config)

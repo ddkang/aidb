@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
+import inspect
 import pandas as pd
 
 from aidb.config.config import Config
@@ -358,3 +359,127 @@ class BaseEngine():
       else:
         raise Exception(f'Can\'t join table {rep_table_name} and {table_name}')
     return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
+
+
+  # ---------------------
+  # User Defined Function
+  # ---------------------
+  def register_user_defined_function(self, function_name, function):
+    self._config.add_user_defined_function(function_name, function)
+
+
+  def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
+    function_name = str.lower(function_name)
+
+    parameter_list = []
+    for args in args_list:
+      parameter_list.append(res_df[args])
+    if inspect.iscoroutinefunction(self._config.user_defined_functions[function_name]):
+      function_results = asyncio_run(self._config.user_defined_functions[function_name](*parameter_list))
+    else:
+      function_results = self._config.user_defined_functions[function_name](*parameter_list)
+    # for result that has dataframe format, change it to a list of tuples
+    if isinstance(function_results, pd.DataFrame):
+      res_list_of_tuple = [tuple(row) for row in function_results.itertuples(index=False)]
+      return res_list_of_tuple
+    # list type means the multiple rows result
+    elif isinstance(function_results, list):
+      res_list_of_tuple = []
+      for row in function_results:
+        # this means the multiple columns result
+        if isinstance(row, list):
+          res_list_of_tuple.append(row)
+        # single value or polars
+        else:
+          res_list_of_tuple.append(tuple((row,)))
+    # single value or polars
+    else:
+      res_list_of_tuple = [tuple((function_results,))]
+    return res_list_of_tuple
+
+
+  def _get_udf_result(self, res_df, dataframe_sql):
+    '''
+    this function get results of user defined function
+    the output of UDF has the following situations:
+    1. single value, e.g. sum, max function
+    2. zero row, e.g. no object in an image
+    3. multiple rows, e.g. several objects in an image
+    4. multiple columns in one row, e.g. output of object detection model has columns 'x_min, y_min, x_max, y_max
+    '''
+    expanded_columns_mapping = {}
+    for udf in dataframe_sql['udf_mapping']:
+      res_df['udf_result_col'] = res_df.apply(
+        self._call_user_function,
+        args=(udf['function_name'], udf['col_names']),
+        axis=1
+      )
+
+      # expand dataframe for multiple rows output
+      res_df = res_df.explode('udf_result_col')
+
+      # remove row when the function has no output
+      res_df = res_df.dropna()
+
+      # expand dataframe for multiple columns output
+      expanded_columns = pd.DataFrame(res_df['udf_result_col'].tolist(), index=res_df.index)
+
+      if len(expanded_columns.columns) == len(udf['result_col_name']):
+        expanded_columns.columns = udf['result_col_name']
+      elif len(udf['result_col_name']) == 1:
+        expanded_column_names = [f"{udf['result_col_name'][0]}__{i}" for i in range(len(expanded_columns.columns))]
+        expanded_columns.columns = expanded_column_names
+        expanded_columns_mapping[udf['result_col_name'][0]] = ', '.join(expanded_column_names)
+      else:
+        raise Exception(f"The number of column alias in query doesn't match the number of output columns of "
+                        f"function{udf['function_name']}")
+      res_df = pd.concat([res_df.drop('udf_result_col', axis=1), expanded_columns], axis=1)
+
+    return res_df, expanded_columns_mapping
+
+
+  def execute_user_defined_function(
+      self,
+      res_df: pd.DataFrame,
+      dataframe_sql: Dict,
+      query: Query
+  ) -> List[Tuple]:
+    '''
+    This function receive the query result from database, and then applies user defined function to query result.
+    After getting function results, this function execute query which is extracted from original query and return final
+    result.
+    Args:
+      res_df: Query result from normal db.
+      dataframe_sql: Extracted information of udf query, used to execute udf and run sql query over udf results
+      query: original query
+
+    Returns:
+      res_list_of_tuple: query result
+
+    Raises:
+      ImportError: If duckdb is not installed
+    '''
+
+    # duckdb is used to run sql query over dataframe
+    # FIXME(ttt-77): remove this dependency and implement it by ourselves
+    try:
+      import duckdb
+    except ImportError:
+      raise Exception('Package duckdb is needed for query with UDF. Please install it with version 0.9.2 first,')
+
+    processed_udf_result_df, expanded_columns_mapping = self._get_udf_result(res_df, dataframe_sql)
+
+    select_str = ', '.join(dataframe_sql['select_col'])
+    for k,v in expanded_columns_mapping.items():
+      select_str = select_str.replace(k, v)
+    where_condition = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
+    if where_condition:
+      where_str = f'WHERE {where_condition.sql()}'
+    else:
+      where_str = ''
+    df_query = f'''SELECT {select_str} FROM processed_udf_result_df {where_str}'''
+
+    new_results_df = duckdb.sql(df_query).df()
+    res_list_of_tuple = [tuple(row) for row in new_results_df.itertuples(index=False)]
+
+    return res_list_of_tuple
