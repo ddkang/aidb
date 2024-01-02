@@ -3,6 +3,7 @@ import time
 import unittest
 
 from collections import Counter
+from decimal import Decimal
 from unittest import IsolatedAsyncioTestCase
 
 import pandas as pd
@@ -332,9 +333,9 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: may have problem with decimal number
       assert len(gt_res) == len(aidb_res)
       assert Counter(gt_res) == Counter(aidb_res)
+      assert sorted(gt_res) == sorted(aidb_res)
     del gt_engine
     del aidb_engine
     p.terminate()
@@ -559,9 +560,16 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # # TODO: may have problem with decimal number
         assert len(gt_res) == len(aidb_res)
-        # assert Counter(gt_res) == Counter(aidb_res)
+
+        gt_res = sorted(gt_res)
+        aidb_res = sorted(aidb_res)
+
+        for i in range(len(gt_res)):
+          for element1, element2 in zip(gt_res[i], aidb_res[i]):
+            if isinstance(element1, (int, float, Decimal)):
+              assert abs(int(element1) - int(element2)) <= 1
+
       del gt_engine
       del aidb_engine
     p.terminate()
