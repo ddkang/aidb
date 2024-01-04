@@ -55,11 +55,18 @@ def run_server(data_dir: str, port=8000):
 
       # Performing the merge
       # Note: We're using an inner join, so only rows with matching values in both DataFrames will be in the result
-      merged_df = pd.merge(df, inp_df, how='inner', on=name_to_input_cols[service_name])
+      # merged_df = pd.merge(df, inp_df, how='inner', on=name_to_input_cols[service_name])
+      result_df = pd.merge(inp_df, df, how='left', on=name_to_input_cols[service_name]).convert_dtypes()
+      grouped = result_df.groupby(name_to_input_cols[service_name])
+      res_df_list = []
+      for _, group in grouped:
+        group = group.drop(columns=name_to_input_cols[service_name]).dropna()
+        res_df_list.append(group.to_dict(orient='list'))
 
       # Select and return the output columns
-      res = merged_df[name_to_output_cols[service_name]].to_dict(orient='list')
-      return res
+      # res = merged_df[name_to_output_cols[service_name]].to_dict(orient='list')
+
+      return res_df_list
 
 
   # config = Config(app=app, host="127.0.0.1", port=8000)

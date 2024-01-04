@@ -190,14 +190,13 @@ class HTTPInferenceService(CachedInferenceService):
     body = inputs.to_dict(orient='list')
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-
     # We assume the server returns a list of responses
     # we assume one output must correspond to one input
     # but we actually don't know which input corresponds to which output
     # because one input may correspond to 0 / 1 / multiple outputs
     response = response.json()
-
     for copied_input_col_idx in self.copied_input_columns:
       response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
+    response_df_list = [pd.DataFrame(item) for item in response]
 
-    return [pd.DataFrame(response)]
+    return response_df_list
