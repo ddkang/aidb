@@ -5,6 +5,7 @@ import unittest
 from collections import Counter
 from unittest import IsolatedAsyncioTestCase
 
+import numpy as np
 import pandas as pd
 from sqlalchemy.sql import text
 
@@ -27,15 +28,6 @@ def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataF
   for idx, col in enumerate(inference_service.binding.input_columns):
     input_df.rename(columns={input_df.columns[idx]: col}, inplace=True)
   outputs = inference_service.service.infer_batch(input_df)
-  # print(30, outputs)
-  # for idx, col in enumerate(inference_service.binding.output_columns):
-  #   outputs.rename(columns={outputs.columns[idx]: col}, inplace=True)
-  # print(outputs)
-  # merged_df = pd.merge(input_df, outputs, how='left', left_on='blobs_00.frame', right_on='objects00.frame')
-  # merged_df = pd.merge(input_df, merged_df, on='blobs_00.frame')
-  # # for index, item in merged_df.iterrows():
-  # #   print(item)
-  # print(37, merged_df.dropna())
   return outputs
 
 
@@ -44,31 +36,30 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
   def add_user_defined_function(self, aidb_engine):
     def sum_function(inp_df):
       sum_value = inp_df.sum(axis=1)
-      return sum_value.to_list()
+      return sum_value
 
 
     def is_equal(inp_df):
       equal_value = (inp_df.iloc[:, 0] == inp_df.iloc[:, 1])
-      return equal_value.to_list()
+      return equal_value
 
 
     def max_function(inp_df):
       max_value = inp_df.max(axis=1)
-      return max_value.to_list()
+      return max_value
 
 
     def power_function(inp_df):
       power_value = inp_df.iloc[:, 0] ** inp_df.iloc[:, 1]
-      return power_value.to_list()
+      return power_value
 
 
     def multiply_function(inp_df):
       multiply_value = inp_df.iloc[:, 0] * inp_df.iloc[:, 1]
-      return multiply_value.to_list()
+      return multiply_value
 
 
     def replace_color(inp_df):
-      import numpy as np
       color_value = np.where(inp_df.iloc[:,0] == inp_df.iloc[:,1], inp_df.iloc[:,2], inp_df.iloc[:,0])
       return color_value.tolist()
 
