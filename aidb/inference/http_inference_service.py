@@ -190,12 +190,14 @@ class HTTPInferenceService(CachedInferenceService):
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
     # We assume the server returns a list of responses
-    # we assume one output must correspond to one input
-    # but we actually don't know which input corresponds to which output
-    # because one input may correspond to 0 / 1 / multiple outputs
+    # We assume the length of the list of responses should match that of the inputs
+    # Each element in response list must correspond to the input with the same index
+    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
+    if len(response) != len(inputs):
+      raise Exception('The length of the inference results should match that of the inputs.')
+
     for copied_input_col_idx in self.copied_input_columns:
       response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
     response_df_list = [pd.DataFrame(item) for item in response]
-
     return response_df_list

@@ -378,7 +378,7 @@ class BaseEngine():
       list_function_results = self._config.user_defined_functions[function_name](res_df[args_list])
 
     if len(list_function_results) != len(res_df):
-      raise Exception('User defined function results length should be equal to the inputs')
+      raise Exception('The length of the UDF outputs should match that of the inputs.')
 
     # 1. dataframe
     # 2. List:

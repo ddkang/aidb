@@ -54,17 +54,15 @@ def run_server(data_dir: str, port=8000):
                             for col in name_to_input_cols[service_name]})
 
       # Performing the merge
-      # Note: We're using an inner join, so only rows with matching values in both DataFrames will be in the result
-      # merged_df = pd.merge(df, inp_df, how='inner', on=name_to_input_cols[service_name])
+      # Note: We're using a left join to ensure that all inputs have corresponding outputs,
+      #     with absent outputs represented as None
       result_df = pd.merge(inp_df, df, how='left', on=name_to_input_cols[service_name]).convert_dtypes()
+      # The outputs are grouped by input dataframe's primary key
       grouped = result_df.groupby(name_to_input_cols[service_name])
       res_df_list = []
       for _, group in grouped:
         group = group.drop(columns=name_to_input_cols[service_name]).dropna()
         res_df_list.append(group.to_dict(orient='list'))
-
-      # Select and return the output columns
-      # res = merged_df[name_to_output_cols[service_name]].to_dict(orient='list')
 
       return res_df_list
 
