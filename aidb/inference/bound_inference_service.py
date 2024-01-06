@@ -148,6 +148,7 @@ class CachedBoundInferenceService(BoundInferenceService):
   async def _insert_in_cache_table(self, inp_rows_df: pd.DataFrame, conn):
     inp_rows_df.columns = [self.convert_normalized_col_name_to_cache_col_name(col) for col in inp_rows_df.columns]
     # convert the pandas datatype to python native type
+    # TODO: can we remove /resolve this?
     inp_rows_df = inp_rows_df.astype('object')
     # this doesn't support upsert queries
     await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
