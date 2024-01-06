@@ -37,7 +37,7 @@ In this section, we will walk through an example of configuring an inference ser
         (AIDBListType(), AIDBListType(), 'score')],
       input_columns_types=[str], # optional, input type check
       output_columns_types=[str, float], # optional, output type check
-      preferred_batch_size=100, # upper bound of batch size, all but the last batch will have this size
+      preferred_batch_size=128, # upper bound of batch size, all but the last batch will have this size
       copied_input_columns=[1], # index of input columns to copy to output
       model="LiYuan/amazon-review-sentiment-analysis", # model for hf
       default_args={("options", "wait_for_model"): True} # default args

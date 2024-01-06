@@ -17,7 +17,7 @@ nsfw_detect_service = GoogleVisionAnnotate(
     ('responses', AIDBListType(), 'safeSearchAnnotation', 'racy')],
   input_columns_types=[str],
   output_columns_types=[str, str, str, str, str],
-  preferred_batch_size=100,
+  preferred_batch_size=128,
   copied_input_columns=[1],
   project_id="your-project-id",
   default_args={('requests', AIDBListType(), 'features', 'type'): 'SAFE_SEARCH_DETECTION',

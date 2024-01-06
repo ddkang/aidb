@@ -18,7 +18,7 @@ openai_gpt = OpenAIText(
   response_keys_to_columns=[('choices', AIDBListType(), 'message', 'content')],
   input_columns_types=[str],
   output_columns_types=[str],
-  preferred_batch_size=100,
+  preferred_batch_size=128,
   copied_input_columns=[1],
   default_args={"model": "gpt-4-1106-preview",
                 ('messages', AIDBListType(), 'role'): "user"},
