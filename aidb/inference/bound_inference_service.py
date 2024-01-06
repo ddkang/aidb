@@ -202,7 +202,7 @@ class CachedBoundInferenceService(BoundInferenceService):
       out_cache_inputs, out_cache_inputs_primary = await self._get_inputs_not_in_cache_table(inputs, conn)
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
-      input_batches = [(out_cache_inputs.iloc[i:i + bs] if (i + bs < len(out_cache_inputs)) else out_cache_inputs.iloc[i:]) for i in range(0, len(out_cache_inputs), bs)]
+      input_batches = [out_cache_inputs.iloc[i:i + bs]for i in range(0, len(out_cache_inputs), bs)]
       # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
