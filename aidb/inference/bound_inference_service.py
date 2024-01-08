@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 import pandas as pd
@@ -17,6 +17,7 @@ from aidb.utils.logger import logger
 class BoundInferenceService():
   service: InferenceService
   binding: InferenceBinding
+  copy_map: Dict[str, str]
 
   def infer(self, inputs):
     raise NotImplementedError()
@@ -156,7 +157,7 @@ class CachedBoundInferenceService(BoundInferenceService):
 
   async def _insert_output_results_in_tables(self, output_data: List[pd.DataFrame], input_data: pd.DataFrame, conn):
     if len(output_data) > 0:
-      for input_col, output_col in self.binding.copy_map.items():
+      for input_col, output_col in self.copy_map.items():
         assert len(output_data) == len(input_data), 'Each input row should have 1 corresponding output dataframe, even if it is empty'
         for idx, df in enumerate(output_data):
           if len(df) > 0:

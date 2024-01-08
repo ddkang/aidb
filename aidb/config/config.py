@@ -150,7 +150,7 @@ class Config:
     '''
     column_service = dict()
     for bound_service in self.inference_bindings:
-      actual_output_columns = set(bound_service.binding.output_columns) - set(bound_service.binding.copy_map.values())
+      actual_output_columns = set(bound_service.binding.output_columns) - set(bound_service.copy_map.values())
       for output_col in actual_output_columns:
         if output_col in column_service:
           raise Exception(f'Column {output_col} is bound to multiple services')
@@ -281,7 +281,7 @@ class Config:
       output_table = column.split('.')[0]
       output_tables.add(output_table)
 
-    for input_col, output_col in binding.copy_map.items():
+    for input_col, output_col in bound_inference.copy_map.items():
       if input_col not in self.columns:
         raise Exception(f'Input column in copy map {input_col} doesn\'t exist in database')
       if output_col not in self.columns:

@@ -29,7 +29,6 @@ Graph = nx.DiGraph
 class InferenceBinding(NamedTuple):
   input_columns: Tuple[str]
   output_columns: Tuple[str]
-  copy_map: Dict[str, str] = {}
 
 # TODO: think about this architecture
 @dataclass

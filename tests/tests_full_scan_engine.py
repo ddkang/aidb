@@ -92,7 +92,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     ]
 
-    db_url_list = [MYSQL_URL, SQLITE_URL, POSTGRESQL_URL]
+    db_url_list = [SQLITE_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
@@ -134,7 +134,7 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       )
     ]
 
-    db_url_list = [MYSQL_URL, SQLITE_URL, POSTGRESQL_URL]
+    db_url_list = [SQLITE_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')

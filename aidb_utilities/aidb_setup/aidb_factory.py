@@ -58,6 +58,7 @@ class AIDB:
       aidb_engine.register_inference_service(service)
       aidb_engine.bind_inference_service(
         service.name,
-        InferenceBinding(input_col, output_col, copy_map),
+        InferenceBinding(input_col, output_col),
+        copy_map,
         verbose)
     return aidb_engine
