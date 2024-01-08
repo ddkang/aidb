@@ -194,7 +194,4 @@ class HTTPInferenceService(CachedInferenceService):
     # because one input may correspond to 0 / 1 / multiple outputs
     response = response.json()
 
-    for copied_input_col_idx in self.copied_input_columns:
-      response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
-
     return [pd.DataFrame(response)]
