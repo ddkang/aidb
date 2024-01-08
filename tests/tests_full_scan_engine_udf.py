@@ -5,6 +5,7 @@ import unittest
 from collections import Counter
 from unittest import IsolatedAsyncioTestCase
 
+import numpy as np
 import pandas as pd
 from sqlalchemy.sql import text
 
@@ -26,64 +27,62 @@ MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   for idx, col in enumerate(inference_service.binding.input_columns):
     input_df.rename(columns={input_df.columns[idx]: col}, inplace=True)
-  outputs = inference_service.service.infer_batch(input_df)[0]
-  for idx, col in enumerate(inference_service.binding.output_columns):
-    outputs.rename(columns={outputs.columns[idx]: col}, inplace=True)
+  outputs = inference_service.service.infer_batch(input_df)
   return outputs
 
 
 class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
 
   def add_user_defined_function(self, aidb_engine):
-    def sum_function(*args):
-      return sum(args)
+    def sum_function(inp_df):
+      sum_value = inp_df.sum(axis=1)
+      return sum_value
 
 
-    def is_equal(col1, col2):
-      return col1 == col2
+    def is_equal(inp_df):
+      equal_value = (inp_df.iloc[:, 0] == inp_df.iloc[:, 1])
+      return equal_value
 
 
-    def max_function(*args):
-      return max(args)
+    def max_function(inp_df):
+      max_value = inp_df.max(axis=1)
+      return max_value
 
 
-    def power_function(col1, col2):
-      return col1**col2
+    def power_function(inp_df):
+      power_value = inp_df.iloc[:, 0] ** inp_df.iloc[:, 1]
+      return power_value
 
 
-    def multiply_function(col1, col2):
-      return col1 * col2
+    def multiply_function(inp_df):
+      multiply_value = inp_df.iloc[:, 0] * inp_df.iloc[:, 1]
+      return multiply_value
 
 
-    def replace_color(column1, selected_color, new_color):
-      if column1 == selected_color:
-        return new_color
-      else:
-        return column1
+    def replace_color(inp_df):
+      color_value = np.where(inp_df.iloc[:,0] == inp_df.iloc[:,1], inp_df.iloc[:,2], inp_df.iloc[:,0])
+      return color_value.tolist()
 
 
-    async def async_objects_inference(blob_id):
-      input_df = pd.DataFrame({'blob_id': [blob_id]})
+    async def async_objects_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'objects00':
           return inference(service, input_df)
 
-    async def async_lights_inference(blob_id):
-      input_df = pd.DataFrame({'blob_id': [blob_id]})
+    async def async_lights_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'lights01':
           return inference(service, input_df)
 
 
-    async def async_colors_inference(blob_id, object_id):
-      input_df = pd.DataFrame({'blob_id': [blob_id], 'input_col2': object_id})
+    async def async_colors_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'colors02':
           return inference(service, input_df)
 
 
-    async def async_counts_inference(blob_id):
-      input_df = pd.DataFrame({'blob_id': [blob_id]})
+    async def async_counts_inference(input_df):
+      # input_df = pd.DataFrame({'blob_id': [blob_id]})
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'counts03':
           return inference(service, input_df)
@@ -495,12 +494,12 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
 
     mysql_function = [
         '''
-        CREATE FUNCTION database_multiply_function(col1 FLOAT(32), col2 FLOAT(32)) 
-        RETURNS FLOAT(32) 
-        DETERMINISTIC 
-        BEGIN DECLARE multiply_result FLOAT(32); SET multiply_result = col1 * col2; 
-        RETURN multiply_result; 
-        END 
+        CREATE FUNCTION database_multiply_function(col1 FLOAT(32), col2 FLOAT(32))
+        RETURNS FLOAT(32)
+        DETERMINISTIC
+        BEGIN DECLARE multiply_result FLOAT(32); SET multiply_result = col1 * col2;
+        RETURN multiply_result;
+        END
         ''',
         '''
         CREATE FUNCTION database_add_function(col1 FLOAT(32), col2 FLOAT(32))

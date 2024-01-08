@@ -175,7 +175,9 @@ class HTTPInferenceService(CachedInferenceService):
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     request = self.convert_input_to_request(input)
     response = self.request(request)
-    output = self.convert_response_to_output(response)
+    output = self.convert_response_to_output(response[0])
+    for copied_input_col_idx in self.copied_input_columns:
+      output[len(output)] = input[input.keys()[copied_input_col_idx]]
 
     return pd.DataFrame(output)
 
@@ -187,11 +189,15 @@ class HTTPInferenceService(CachedInferenceService):
     body = inputs.to_dict(orient='list')
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-
     # We assume the server returns a list of responses
-    # we assume one output must correspond to one input
-    # but we actually don't know which input corresponds to which output
-    # because one input may correspond to 0 / 1 / multiple outputs
+    # We assume the length of the list of responses should match that of the inputs
+    # Each element in response list must correspond to the input with the same index
+    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
+    if len(response) != len(inputs):
+      raise Exception('The length of the inference results should match that of the inputs.')
 
-    return [pd.DataFrame(response)]
+    for copied_input_col_idx in self.copied_input_columns:
+      response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
+    response_df_list = [pd.DataFrame(item) for item in response]
+    return response_df_list

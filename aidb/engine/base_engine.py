@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 import inspect
+import numpy as np
 import pandas as pd
 
 from aidb.config.config import Config
@@ -372,31 +373,31 @@ class BaseEngine():
   def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
     function_name = str.lower(function_name)
 
-    parameter_list = []
-    for args in args_list:
-      parameter_list.append(res_df[args])
     if inspect.iscoroutinefunction(self._config.user_defined_functions[function_name]):
-      function_results = asyncio_run(self._config.user_defined_functions[function_name](*parameter_list))
+      list_function_results = asyncio_run(self._config.user_defined_functions[function_name](res_df[args_list]))
     else:
-      function_results = self._config.user_defined_functions[function_name](*parameter_list)
-    # for result that has dataframe format, change it to a list of tuples
-    if isinstance(function_results, pd.DataFrame):
-      res_list_of_tuple = [tuple(row) for row in function_results.itertuples(index=False)]
-      return res_list_of_tuple
-    # list type means the multiple rows result
-    elif isinstance(function_results, list):
-      res_list_of_tuple = []
-      for row in function_results:
-        # this means the multiple columns result
-        if isinstance(row, list):
-          res_list_of_tuple.append(row)
-        # single value or polars
-        else:
-          res_list_of_tuple.append(tuple((row,)))
-    # single value or polars
+      list_function_results = self._config.user_defined_functions[function_name](res_df[args_list])
+
+    if len(list_function_results) != len(res_df):
+      raise Exception('The length of the UDF outputs should match that of the inputs.')
+
+    # 1. dataframe
+    # 2. List:
+    #    a. List -> dataframe
+    #
+    if isinstance(list_function_results, pd.DataFrame):
+      return list_function_results
+    elif isinstance(list_function_results, list):
+      if isinstance(list_function_results[0], list):
+        return [pd.DataFrame(function_result) for function_result in list_function_results]
+      elif isinstance(list_function_results[0], pd.DataFrame):
+        return list_function_results
+      else:
+        return pd.DataFrame(list_function_results)
+    elif isinstance(list_function_results, pd.Series) or isinstance(list_function_results, np.ndarray):
+      return pd.DataFrame(list_function_results)
     else:
-      res_list_of_tuple = [tuple((function_results,))]
-    return res_list_of_tuple
+      raise Exception('Unsupported data type')
 
 
   def _get_udf_result(self, res_df, dataframe_sql):
@@ -410,32 +411,30 @@ class BaseEngine():
     '''
     expanded_columns_mapping = {}
     for udf in dataframe_sql['udf_mapping']:
-      res_df['udf_result_col'] = res_df.apply(
-        self._call_user_function,
-        args=(udf['function_name'], udf['col_names']),
-        axis=1
-      )
 
-      # expand dataframe for multiple rows output
-      res_df = res_df.explode('udf_result_col')
-
-      # remove row when the function has no output
-      res_df = res_df.dropna()
+      udf_results = self._call_user_function(res_df, udf['function_name'], udf['col_names'])
+      # if the result is a list of DataFrames, concatenate all the DataFrames into a single DataFrame.
+      if isinstance(udf_results, list):
+        repeat_counts = [len(df.dropna()) for df in udf_results]
+        res_df = pd.DataFrame(np.repeat(res_df.values, repeat_counts, axis=0), columns=res_df.columns)
+        udf_results = pd.concat(udf_results, axis=0).convert_dtypes().dropna()
 
       # expand dataframe for multiple columns output
-      expanded_columns = pd.DataFrame(res_df['udf_result_col'].tolist(), index=res_df.index)
-
-      if len(expanded_columns.columns) == len(udf['result_col_name']):
-        expanded_columns.columns = udf['result_col_name']
+      if len(udf_results.columns) == len(udf['result_col_name']):
+        udf_results.columns = udf['result_col_name']
       elif len(udf['result_col_name']) == 1:
-        expanded_column_names = [f"{udf['result_col_name'][0]}__{i}" for i in range(len(expanded_columns.columns))]
-        expanded_columns.columns = expanded_column_names
+        expanded_column_names = [f"{udf['result_col_name'][0]}__{i}" for i in range(len(udf_results.columns))]
+        udf_results.columns = expanded_column_names
         expanded_columns_mapping[udf['result_col_name'][0]] = ', '.join(expanded_column_names)
       else:
         raise Exception(f"The number of column alias in query doesn't match the number of output columns of "
                         f"function{udf['function_name']}")
-      res_df = pd.concat([res_df.drop('udf_result_col', axis=1), expanded_columns], axis=1)
 
+      # concatenate input_df with UDF result dataframe
+      for col in udf_results.columns:
+        res_df[col] = udf_results[col].values
+
+      res_df.dropna(inplace=True)
     return res_df, expanded_columns_mapping
 
 
@@ -460,6 +459,9 @@ class BaseEngine():
     Raises:
       ImportError: If duckdb is not installed
     '''
+
+    if res_df.empty:
+      return []
 
     # duckdb is used to run sql query over dataframe
     # FIXME(ttt-77): remove this dependency and implement it by ourselves
