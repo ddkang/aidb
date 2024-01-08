@@ -6,6 +6,7 @@ from collections import Counter
 from decimal import Decimal
 from unittest import IsolatedAsyncioTestCase
 
+import numpy as np
 import pandas as pd
 from sqlalchemy.sql import text
 
@@ -565,10 +566,20 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         gt_res = sorted(gt_res)
         aidb_res = sorted(aidb_res)
 
+        relative_diffs = []
         for i in range(len(gt_res)):
+          relative_diff = []
           for element1, element2 in zip(gt_res[i], aidb_res[i]):
-            if isinstance(element1, (int, float, Decimal)):
-              assert abs(int(element1) - int(element2)) <= 1
+            if isinstance(element1, (int, float, Decimal)) and (element2 != 0 or element1 !=0):
+              x = (2 * abs(element1 - element2)) / (abs(element1) + abs(element2)) * 100
+              assert x <= 0.0001
+              relative_diff.append(x)
+            else:
+              assert element2 == element1
+              relative_diff.append(0)
+          relative_diffs.append(relative_diff)
+        avg_diff = np.mean(np.mean(relative_diffs, axis=1))
+        print(f'Avg relative difference percentage between gt_res and aidb_res: {avg_diff}')
 
       del gt_engine
       del aidb_engine
