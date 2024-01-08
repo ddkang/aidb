@@ -161,7 +161,7 @@ class CachedBoundInferenceService(BoundInferenceService):
         assert len(output_data) == len(input_data), 'Each input row should have 1 corresponding output dataframe, even if it is empty'
         for idx, df in enumerate(output_data):
           if len(df) > 0:
-            df[output_col] = input_data[input_col].iloc(idx)
+            df[output_col] = input_data.iloc[idx][input_col]
       inference_results = pd.concat(output_data, ignore_index=True)
       for idx, col in enumerate(self.binding.output_columns):
         inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
