@@ -150,15 +150,8 @@ class Config:
     '''
     column_service = dict()
     for bound_service in self.inference_bindings:
-      actual_output_columns = bound_service.binding.output_columns
-      len_copied = len(bound_service.service.copied_input_columns)
-      len_input = len(bound_service.binding.input_columns)
-      assert len_copied <= len_input, "The number of copied input columns is larger than the number of input columns"
-      if len_copied > 0:
-        max_copied_idx = max(bound_service.service.copied_input_columns)
-        assert max_copied_idx < len_input, "The copied input column index is larger than the number of input columns"
-        actual_output_columns = actual_output_columns[:-len_copied]
-      for output_col in bound_service.binding.output_columns:
+      actual_output_columns = set(bound_service.binding.output_columns) - set(bound_service.copy_map.values())
+      for output_col in actual_output_columns:
         if output_col in column_service:
           raise Exception(f'Column {output_col} is bound to multiple services')
         else:
@@ -287,6 +280,12 @@ class Config:
         raise Exception(f'Output column {column} doesn\'t exist in database')
       output_table = column.split('.')[0]
       output_tables.add(output_table)
+
+    for input_col, output_col in bound_inference.copy_map.items():
+      if input_col not in self.columns:
+        raise Exception(f'Input column in copy map {input_col} doesn\'t exist in database')
+      if output_col not in self.columns:
+        raise Exception(f'Output column in copy map {output_col} doesn\'t exist in database')
 
     # Check if the output column is bound to only one inference service
     self.column_by_service

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 import pandas as pd
@@ -17,6 +17,7 @@ from aidb.utils.logger import logger
 class BoundInferenceService():
   service: InferenceService
   binding: InferenceBinding
+  copy_map: Dict[str, str]
 
   def infer(self, inputs):
     raise NotImplementedError()
@@ -154,9 +155,14 @@ class CachedBoundInferenceService(BoundInferenceService):
     await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
 
 
-  async def _insert_output_results_in_tables(self, output_results_data: List[pd.DataFrame], conn):
-    if len(output_results_data) > 0:
-      inference_results = pd.concat(output_results_data, ignore_index=True)
+  async def _insert_output_results_in_tables(self, output_data: List[pd.DataFrame], input_data: pd.DataFrame, conn):
+    if len(output_data) > 0:
+      for input_col, output_col in self.copy_map.items():
+        assert len(output_data) == len(input_data), 'Each input row should have 1 corresponding output dataframe, even if it is empty'
+        for idx, df in enumerate(output_data):
+          if len(df) > 0:
+            df[output_col] = input_data.iloc[idx][input_col]
+      inference_results = pd.concat(output_data, ignore_index=True)
       for idx, col in enumerate(self.binding.output_columns):
         inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
       tables = self.get_tables(self.binding.output_columns)
@@ -200,16 +206,16 @@ class CachedBoundInferenceService(BoundInferenceService):
 
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      out_cache_inputs, out_cache_inputs_primary = await self._get_inputs_not_in_cache_table(inputs, conn)
+      inputs_not_in_cache, inputs_not_in_cache_primary_cols = await self._get_inputs_not_in_cache_table(inputs, conn)
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
-      input_batches = [out_cache_inputs.iloc[i:i + bs]for i in range(0, len(out_cache_inputs), bs)]
+      input_batches = [inputs_not_in_cache.iloc[i:i + bs]for i in range(0, len(inputs_not_in_cache), bs)]
       # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
         records_to_insert_in_table.extend(inference_results)
-      await self._insert_in_cache_table(out_cache_inputs_primary, conn)
-      await self._insert_output_results_in_tables(records_to_insert_in_table, conn)
+      await self._insert_in_cache_table(inputs_not_in_cache_primary_cols, conn)
+      await self._insert_output_results_in_tables(records_to_insert_in_table, inputs_not_in_cache, conn)
 
 
   def __hash__(self):
