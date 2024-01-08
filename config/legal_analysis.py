@@ -8,8 +8,7 @@ DB_NAME = 'aidb_test_legal.sqlite'
 
 ocr = DetectronLocalOCR(
   name="ocr",
-  model_path="tests/data/model_final.pth",
-  copied_input_columns=[1],)
+  model_path="tests/data/model_final.pth")
 
 openai_gpt = OpenAIText(
   name="openai_gpt",
@@ -19,7 +18,6 @@ openai_gpt = OpenAIText(
   input_columns_types=[str],
   output_columns_types=[str],
   preferred_batch_size=128,
-  copied_input_columns=[1],
   default_args={"model": "gpt-4-1106-preview",
                 ('messages', AIDBListType(), 'role'): "user"},
   prompt_prefix='"',
@@ -32,12 +30,14 @@ inference_engines = [
   {
     "service": ocr,
     "input_col": ("pdf.path", "pdf.id"),
-    "output_col": ("ocr.text", "ocr.id")
+    "output_col": ("ocr.text", "ocr.id"),
+    "copy": {"pdf.id": "ocr.id"}
   },
   {
     "service": openai_gpt,
     "input_col": ("ocr.text", "ocr.id"),
-    "output_col": ("textualism.label", "textualism.id")
+    "output_col": ("textualism.label", "textualism.id"),
+    "copy": {"ocr.id": "textualism.id"}
   }
 ]
 

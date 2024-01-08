@@ -21,10 +21,9 @@ class DetectronLocalOCR(CachedInferenceService):
       name: str,
       model_path: str,
       device: str="cuda",
-      copied_input_columns: List[int]=[],
       is_single: bool=False,
   ):
-    super().__init__(name=name, preferred_batch_size=1, is_single=is_single, copied_input_columns=copied_input_columns)
+    super().__init__(name=name, preferred_batch_size=1, is_single=is_single)
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
     cfg.MODEL.DEVICE = device
@@ -59,8 +58,6 @@ class DetectronLocalOCR(CachedInferenceService):
       cropped_im = im[margin_y0:margin_y1, margin_x0:margin_x1]
       ocr_text = pytesseract.image_to_string(cropped_im)
     output = {"ocr_text": [ocr_text]}
-    for idx in self.copied_input_columns:
-      output[len(output)] = input[input.keys()[idx]]
     return pd.DataFrame(output)
 
 
