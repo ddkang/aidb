@@ -37,8 +37,7 @@ In this section, we will walk through an example of configuring an inference ser
         (AIDBListType(), AIDBListType(), 'score')],
       input_columns_types=[str], # optional, input type check
       output_columns_types=[str, float], # optional, output type check
-      preferred_batch_size=100, # upper bound of batch size, all but the last batch will have this size
-      copied_input_columns=[1], # index of input columns to copy to output
+      preferred_batch_size=128, # upper bound of batch size, all but the last batch will have this size
       model="LiYuan/amazon-review-sentiment-analysis", # model for hf
       default_args={("options", "wait_for_model"): True} # default args
       rate_limit=100 # number of requests per minute. Fine-tune this to avoid rate limit error
@@ -53,6 +52,7 @@ In this section, we will walk through an example of configuring an inference ser
         "service": sentiment_inference_service, # keep key name as "service", change value according to your service defined above
         "input_col": ("blobs00.review", "blobs00.review_id"), # keep key name as "input_col", change value according to your input binding
         "output_col": ("sentiment.label", "sentiment.score", "sentiment.review_id") # keep key name as "output_col", change value according to your output binding
+        "copy": {"sentiment.review_id": "blobs00.review_id"} # optional, copy input column to output column
       } # you can add multiple inference engines after the above one, following the format above.
     ]
     ```

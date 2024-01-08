@@ -17,8 +17,7 @@ nsfw_detect_service = GoogleVisionAnnotate(
     ('responses', AIDBListType(), 'safeSearchAnnotation', 'racy')],
   input_columns_types=[str],
   output_columns_types=[str, str, str, str, str],
-  preferred_batch_size=100,
-  copied_input_columns=[1],
+  preferred_batch_size=128,
   project_id="your-project-id",
   default_args={('requests', AIDBListType(), 'features', 'type'): 'SAFE_SEARCH_DETECTION',
                 'parent': 'projects/your-project-id'})
@@ -26,7 +25,8 @@ inference_engines = [
   {
     "service": nsfw_detect_service,
     "input_col": ("images_source.image_url", "images_source.image_id"),
-    "output_col": ("images.adult", "images.spoof", "images.medical", "images.violence", "images.racy", "images.image_id")
+    "output_col": ("images.adult", "images.spoof", "images.medical", "images.violence", "images.racy", "images.image_id"),
+    "copy": {"images_source.image_id": "images.image_id"}
   }
 ]
 

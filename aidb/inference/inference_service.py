@@ -27,7 +27,6 @@ class InferenceService(abc.ABC):
   is_single: bool  # Return a single value or a list of values
   cost: Union[float, None] = None
   preferred_batch_size: int = 1
-  copied_input_columns: List[int] = field(default_factory=list)
 
 
   @abc.abstractproperty
