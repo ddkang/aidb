@@ -25,8 +25,7 @@ MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
 
 def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
-  for idx, col in enumerate(inference_service.binding.input_columns):
-    input_df.rename(columns={input_df.columns[idx]: col}, inplace=True)
+  input_df.columns = inference_service.binding.input_columns
   outputs = inference_service.service.infer_batch(input_df)
   return outputs
 
