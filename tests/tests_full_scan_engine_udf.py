@@ -569,17 +569,21 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         relative_diffs = []
         for i in range(len(gt_res)):
           relative_diff = []
-          for element1, element2 in zip(gt_res[i], aidb_res[i]):
-            if isinstance(element1, (int, float, Decimal)) and (element2 != 0 or element1 !=0):
-              x = (2 * abs(element1 - element2)) / (abs(element1) + abs(element2)) * 100
-              assert x <= 0.0001
-              relative_diff.append(x)
+          for gt_res_i, aidb_res_i in zip(gt_res[i], aidb_res[i]):
+            if isinstance(gt_res_i, (int, float, Decimal)):
+              if gt_res_i != 0:
+                dif = abs(gt_res_i - aidb_res_i) / gt_res_i * 100
+                assert dif <= 0.0001
+                relative_diff.append(dif)
+              else:
+                assert aidb_res_i <= 0.00001
+                relative_diff.append(aidb_res_i)
             else:
-              assert element2 == element1
+              assert aidb_res_i == aidb_res_i
               relative_diff.append(0)
           relative_diffs.append(relative_diff)
-        avg_diff = np.mean(np.mean(relative_diffs, axis=1))
-        print(f'Avg relative difference percentage between gt_res and aidb_res: {avg_diff}')
+        avg_diff = np.mean(relative_diffs, axis=0)
+        logger.info(f'Avg relative difference percentage between gt_res and aidb_res: {avg_diff}')
 
       del gt_engine
       del aidb_engine
