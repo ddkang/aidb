@@ -65,6 +65,7 @@ class FullScanEngineTwitterTests(IsolatedAsyncioTestCase):
       aidb_res = aidb_engine.execute(aidb_query)
       logger.info(f'Length ground truth - {len(gt_res)}')
       assert len(gt_res) == len(aidb_res)
+      assert sorted(gt_res) == sorted(aidb_res)
     del gt_engine
     p.terminate()
 
