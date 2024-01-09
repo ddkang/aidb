@@ -143,7 +143,6 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # the root column of 'colors02.object_id' is 'objects00'
     correct_fp = [['blobs_00.frame IN (SELECT * FROM blobs_00)'],
                    ['objects00.object_id > 0']]
-    
     # filter predicates connected by AND are in different set
     correct_service = [set(), {'objects00'}]
     correct_tables = [set(), {'objects00'}]
@@ -257,7 +256,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     correct_fp = [["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]]
 
     correct_service = [{}]
-    correct_tables = [{}]
+    correct_tables = [{}] 
     self._test_query(queries["query_str1"], config, queries["normalized_query_str1"], correct_fp, correct_service, correct_tables, 2)
 
     correct_fp = [["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]]
