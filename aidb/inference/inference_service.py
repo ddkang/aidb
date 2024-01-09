@@ -1,5 +1,5 @@
 import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Union
 
 import pandas as pd
