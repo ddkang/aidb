@@ -176,7 +176,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
             count_list[k] += 1
           k+=1
         logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
-        assert any(count_list)
+        assert sum(count_list) >= len(count_list) * num_runs - 1
         del gt_engine
         del aidb_engine
     p.terminate()
