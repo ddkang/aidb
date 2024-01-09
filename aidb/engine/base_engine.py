@@ -381,10 +381,13 @@ class BaseEngine():
     if len(list_function_results) != len(res_df):
       raise Exception('The length of the UDF outputs should match that of the inputs.')
 
-    # 1. dataframe
+    # Function return format
+    # 1. Dataframe -> directly return
     # 2. List:
-    #    a. List -> dataframe
-    #
+    #    a. Nested List -> convert the inner lists to Dataframes, return a list of Dataframes
+    #    b. List of Dataframes -> directly return
+    #    c. others -> convert the entire list to a Dataframe
+    # 3. pd.Series or np.ndarray -> convert it to a Dataframe
     if isinstance(list_function_results, pd.DataFrame):
       return list_function_results
     elif isinstance(list_function_results, list):
