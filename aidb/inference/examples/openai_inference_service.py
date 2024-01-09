@@ -16,9 +16,10 @@ class OpenAIAudio(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
+      preferred_batch_size: int=1,
+      rate_limit: Union[int, None]=None,
       infer_type: str='transcriptions'):
     assert infer_type in [
         "transcriptions",
@@ -41,6 +42,7 @@ class OpenAIAudio(HTTPInferenceService):
       response_keys_to_columns=response_keys_to_columns,
       input_columns_types=input_columns_types,
       output_columns_types=output_columns_types,
+      preferred_batch_size=preferred_batch_size,
     )
 
 
@@ -53,9 +55,10 @@ class OpenAIImage(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
+      preferred_batch_size: int=1,
+      rate_limit: Union[int, None]=None,
       infer_type: str='generations'
     ):
     assert infer_type in [
@@ -80,6 +83,7 @@ class OpenAIImage(HTTPInferenceService):
       response_keys_to_columns=response_keys_to_columns,
       input_columns_types=input_columns_types,
       output_columns_types=output_columns_types,
+      preferred_batch_size=preferred_batch_size,
     )
 
 
@@ -92,9 +96,10 @@ class OpenAIText(HTTPInferenceService):
       default_args: Dict[str, Union[str, int]]=None,
       columns_to_input_keys: Dict[str, Union[str, tuple]]=None,
       response_keys_to_columns: Dict[Union[str, tuple], str]=None,
-      rate_limit: Union[int, None]=None,
       input_columns_types: Union[List, None]=None,
       output_columns_types: Union[List, None]=None,
+      preferred_batch_size: int=1,
+      rate_limit: Union[int, None]=None,
       prompt_prefix: str='',
       prompt_suffix: str='',
     ):
@@ -115,6 +120,7 @@ class OpenAIText(HTTPInferenceService):
       response_keys_to_columns=response_keys_to_columns,
       input_columns_types=input_columns_types,
       output_columns_types=output_columns_types,
+      preferred_batch_size=preferred_batch_size,
     )
     self.prompt_prefix = prompt_prefix
     self.prompt_suffix = prompt_suffix
