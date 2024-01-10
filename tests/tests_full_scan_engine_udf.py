@@ -333,7 +333,6 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
       assert len(gt_res) == len(aidb_res)
-      assert Counter(gt_res) == Counter(aidb_res)
       assert sorted(gt_res) == sorted(aidb_res)
     del gt_engine
     del aidb_engine
