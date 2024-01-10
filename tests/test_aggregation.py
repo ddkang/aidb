@@ -18,6 +18,9 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
+# note: Adjust the AIDB_NUMBER_OF_TEST_RUNS setting for more extensive local testing,
+# as it's currently configured for only two runs in GitHub Actions,
+# which may not suffice for thorough reliability and functionality checks
 _NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 100))
 
 queries = [
