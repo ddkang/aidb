@@ -42,11 +42,21 @@ class LimitEngine(TastiEngine):
 
     # TODO: rewrite query, use full scan to execute query
     bound_service_list = query.inference_engines_required_for_query
-    for index, _ in sorted_list:
+
+    limit_engine_batch_size = len(sorted_list)
+    for bound_service in bound_service_list:
+      limit_engine_batch_size = min(bound_service.service.preferred_batch_size, limit_engine_batch_size)
+
+    batched_indexes_list = [
+        [item[0] for item in sorted_list[i:i + limit_engine_batch_size]]
+        for i in range(0, len(sorted_list), limit_engine_batch_size)
+    ]
+
+    for batched_indexes in batched_indexes_list:
       for bound_service in bound_service_list:
         inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service,
                                                                                   self.blob_mapping_table_name,
-                                                                                  [index])
+                                                                                  batched_indexes)
         async with self._sql_engine.begin() as conn:
           inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
         inp_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)

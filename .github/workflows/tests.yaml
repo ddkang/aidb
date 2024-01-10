@@ -41,9 +41,7 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Download test data
-      run: |
-        gdown https://drive.google.com/uc?id=1yCtgP-GTKcXtuqiuXlkmXO6Yq-nn52D0
-        unzip data_v2.zip -d tests/
+      run: git clone https://github.com/ttt-77/AIDB_data.git tests/data
 
     - name: Run db setup tests
       run: python3 -m tests.tests_db_setup
