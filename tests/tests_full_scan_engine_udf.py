@@ -3,6 +3,7 @@ import time
 import unittest
 
 from collections import Counter
+from decimal import Decimal
 from unittest import IsolatedAsyncioTestCase
 
 import numpy as np
@@ -331,9 +332,8 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
       # Run the query on the aidb database
       logger.info(f'Running query {aidb_query} in aidb database')
       aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: may have problem with decimal number
       assert len(gt_res) == len(aidb_res)
-      assert Counter(gt_res) == Counter(aidb_res)
+      assert sorted(gt_res) == sorted(aidb_res)
     del gt_engine
     del aidb_engine
     p.terminate()
@@ -558,9 +558,30 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # # TODO: may have problem with decimal number
         assert len(gt_res) == len(aidb_res)
-        # assert Counter(gt_res) == Counter(aidb_res)
+
+        gt_res = sorted(gt_res)
+        aidb_res = sorted(aidb_res)
+
+        relative_diffs = []
+        for i in range(len(gt_res)):
+          relative_diff = []
+          for gt_res_i, aidb_res_i in zip(gt_res[i], aidb_res[i]):
+            if isinstance(gt_res_i, (int, float, Decimal)):
+              if gt_res_i != 0:
+                dif = abs(gt_res_i - aidb_res_i) / gt_res_i * 100
+                assert dif <= 0.0001
+                relative_diff.append(dif)
+              else:
+                assert aidb_res_i <= 0.00001
+                relative_diff.append(aidb_res_i)
+            else:
+              assert aidb_res_i == aidb_res_i
+              relative_diff.append(0)
+          relative_diffs.append(relative_diff)
+        avg_diff = np.mean(relative_diffs, axis=0)
+        logger.info(f'Avg relative difference percentage between gt_res and aidb_res: {avg_diff}')
+
       del gt_engine
       del aidb_engine
     p.terminate()
