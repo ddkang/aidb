@@ -6,12 +6,12 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
 
+env:
+  AIDB_NUMBER_OF_TEST_RUNS: 2
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      AIDB_NUMBER_OF_TEST_RUNS: 2
     services:
       mysql:
         image: mysql:5.7
