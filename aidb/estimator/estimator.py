@@ -87,7 +87,7 @@ class WeightedCountSetEstimator(Estimator):
   def estimate(self, samples: pd.DataFrame, num_samples: int, conf: float, **kwargs) -> Estimate:
 
     # all weights are same, add weights for blobs that don't have outputs
-    weights = np.array([samples[WEIGHT_COL_NAME][0]] * num_samples)
+    weights = np.array([samples[WEIGHT_COL_NAME].to_numpy()[0]] * num_samples)
 
     # Statistics are already counts
     statistics = np.array(samples.iloc[:, 0].tolist() + [0.0] * (num_samples - len(samples)))

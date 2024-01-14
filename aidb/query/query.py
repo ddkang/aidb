@@ -528,6 +528,10 @@ class Query(object):
         if input_table in self.config.blob_tables:
           blob_tables.add(input_table)
 
+    for table in self.tables_in_query:
+      if table in self.config.blob_tables:
+        blob_tables.add(table)
+
     return list(blob_tables)
 
 

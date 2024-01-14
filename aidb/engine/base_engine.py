@@ -445,8 +445,9 @@ class BaseEngine():
       self,
       res_df: pd.DataFrame,
       dataframe_sql: Dict,
-      query: Query
-  ) -> List[Tuple]:
+      query: Query,
+      additional_select_col: List[str] = []
+  ) -> pd.DataFrame:
     '''
     This function receive the query result from database, and then applies user defined function to query result.
     After getting function results, this function execute query which is extracted from original query and return final
@@ -455,6 +456,7 @@ class BaseEngine():
       res_df: Query result from normal db.
       dataframe_sql: Extracted information of udf query, used to execute udf and run sql query over udf results
       query: original query
+      additional_select_col: additional select columns
 
     Returns:
       res_list_of_tuple: query result
@@ -475,7 +477,7 @@ class BaseEngine():
 
     processed_udf_result_df, expanded_columns_mapping = self._get_udf_result(res_df, dataframe_sql)
 
-    select_str = ', '.join(dataframe_sql['select_col'])
+    select_str = ', '.join(dataframe_sql['select_col'] + additional_select_col)
     for k,v in expanded_columns_mapping.items():
       select_str = select_str.replace(k, v)
     where_condition = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
@@ -486,6 +488,7 @@ class BaseEngine():
     df_query = f'''SELECT {select_str} FROM processed_udf_result_df {where_str}'''
 
     new_results_df = duckdb.sql(df_query).df()
+    return new_results_df
     res_list_of_tuple = [tuple(row) for row in new_results_df.itertuples(index=False)]
 
     return res_list_of_tuple

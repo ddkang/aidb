@@ -43,9 +43,10 @@ class FullScanEngine(BaseEngine):
           query = query.add_limit_keyword(RETRIEVAL_BATCH_SIZE)
           query = query.add_offset_keyword(offset)
           res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(query.sql_query_text), conn))
+          row_length = len(res_df)
           res_satisfy_udf = self.execute_user_defined_function(res_df, dataframe_sql, query)
-          res.extend(res_satisfy_udf)
-          if len(res_df) != RETRIEVAL_BATCH_SIZE:
+          res.extend([tuple(row) for row in res_satisfy_udf.itertuples(index=False)])
+          if row_length != RETRIEVAL_BATCH_SIZE:
             return res
           offset += RETRIEVAL_BATCH_SIZE
 
