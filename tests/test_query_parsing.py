@@ -539,26 +539,6 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     }
     test_query_list.append(test_query)
 
-    # test user defined function for exact aggregation query
-    test_query = {
-      'query_str':
-        '''
-        SELECT sum_function(SUM(x_min), SUM(y_max))
-        FROM objects00
-        ''',
-      'query_after_extraction':
-        "SELECT SUM(objects00.x_min) AS col__0, SUM(objects00.y_max) AS col__1 "
-        "FROM objects00",
-      'dataframe_sql': {
-        'udf_mapping': [
-          {'col_names': ['col__0', 'col__1'],
-           'function_name': 'sum_function',
-           'result_col_name': ['function__0']}
-        ],
-        'select_col': ['function__0'],
-        'filter_predicate': None
-      }
-    }
     test_query_list.append(test_query)
 
     # test user defined function with alias
@@ -783,7 +763,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       '''SELECT function1(x_min) FROM objects00 RECALL_TARGET 90% CONFIDENCE 95%;''',
       '''SELECT function1(x_min) FROM objects00 LIMIT 100;''',
       '''SELECT function1(x_min) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
-      '''SELECT function1(function2(x_min)) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);'''
+      '''SELECT function1(function2(x_min)) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
+      '''SELECT function1(SUM(x_min), SUM(y_max)) FROM objects00;'''
     ]
     for query_str in invalid_query_str:
       query = Query(query_str, config)
