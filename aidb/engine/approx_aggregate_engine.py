@@ -221,6 +221,33 @@ class ApproximateAggregateEngine(FullScanEngine):
     return results_for_each_blob
 
 
+  def _calculate_required_num_samples(
+      self,
+      extracted_sample_results: pd.DataFrame,
+      sample_size: int,
+      agg_type,
+      alpha,
+      error_target
+  ):
+    conf = 1 - alpha
+    estimator = self._get_estimator(agg_type)
+    pilot_estimate = estimator.estimate(extracted_sample_results, sample_size, conf)
+
+    if agg_type == exp.Avg:
+      p_lb = statsmodels.stats.proportion.proportion_confint(
+        len(extracted_sample_results),
+        sample_size,
+        alpha
+      )[0]
+    else:
+      p_lb = 1
+
+    return int(
+        (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
+        (1. / p_lb)
+    )
+
+
   def get_additional_required_num_samples(
       self,
       query: Query,
@@ -228,28 +255,20 @@ class ApproximateAggregateEngine(FullScanEngine):
       alpha
   ) -> int:
     error_target = query.error_target
-    conf = 1. - alpha
     num_samples = []
 
     fixed_cols = sample_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
-    for index, agg_type in enumerate(query.aggregation_type_list_in_query):
-      estimator = self._get_estimator(agg_type)
+    for index, (agg_type, _) in enumerate(query.aggregation_type_list_in_query):
       selected_index_col = sample_results.iloc[:, [index]]
       extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
-      pilot_estimate = estimator.estimate(extracted_sample_results, _NUM_PILOT_SAMPLES, conf)
-
-      if agg_type == exp.Avg:
-        p_lb = statsmodels.stats.proportion.proportion_confint(
-          len(sample_results),
+      num_samples.append(
+        self._calculate_required_num_samples(
+          extracted_sample_results,
           _NUM_PILOT_SAMPLES,
-          alpha
-        )[0]
-      else:
-        p_lb = 1
-
-      num_samples.append(int(
-        (scipy.stats.norm.ppf(alpha / 2) * pilot_estimate.std_ub / (error_target * pilot_estimate.lower_bound)) ** 2 * \
-        (1. / p_lb)
-      ))
+          agg_type,
+          alpha,
+          error_target
+        )
+      )
 
     return max(max(num_samples), 100)

@@ -182,22 +182,24 @@ class HTTPInferenceService(CachedInferenceService):
     return pd.DataFrame(output)
 
 
-  def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
+  def infer_batch(self, inputs: pd.DataFrame):
     if not self._batch_supported:
       return super().infer_batch(inputs)
     
     body = inputs.to_dict(orient='list')
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-    # We assume the server returns a list of responses
-    # We assume the length of the list of responses should match that of the inputs
-    # Each element in response list must correspond to the input with the same index
-    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
-    if len(response) != len(inputs):
-      raise Exception('The length of the inference results should match that of the inputs.')
 
-    for copied_input_col_idx in self.copied_input_columns:
-      response[len(response)] = inputs[inputs.keys()[copied_input_col_idx]]
-    response_df_list = [pd.DataFrame(item) for item in response]
-    return response_df_list
+    # for join query, directly convert the result into a dataframe and return it
+    if self._url.endswith('__join'):
+      return pd.DataFrame(response)
+    else:
+      # We assume the server returns a list of responses
+      # We assume the length of the list of responses should match that of the inputs
+      # Each element in response list must correspond to the input with the same index
+      # and an element can represent 0 / 1 / multiple outputs
+      if len(response) != len(inputs):
+        raise Exception('The length of the inference results should match that of the inputs.')
+      response_df_list = [pd.DataFrame(item) for item in response]
+      return response_df_list

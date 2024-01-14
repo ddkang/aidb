@@ -379,7 +379,7 @@ class Query(object):
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
     udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
 
-    for node, _, _ in copied_expression.walk():
+    for node, parent, key in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Column):
@@ -400,6 +400,8 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
         elif isinstance(node.args['this'], exp.Star):
+          if isinstance(parent, exp.AggFunc):
+            continue
           select_exp_list = []
           for table_name in self.tables_in_query:
             for col_name, _ in self._tables[table_name].items():
@@ -528,6 +530,11 @@ class Query(object):
         if input_table in self.config.blob_tables:
           blob_tables.add(input_table)
 
+    # FIXME(ttt-77): separate it to another PR
+
+    for table in self.tables_in_query:
+      if table in self.config.blob_tables:
+        blob_tables.add(table)
     return list(blob_tables)
 
 
@@ -582,12 +589,16 @@ class Query(object):
     agg_type_with_cols = []
     for expression in select_exp:
       aggregate_expression = expression.find(exp.AggFunc)
+      if aggregate_expression is not None:
+        agg_col = aggregate_expression.args['this'].sql()
+      else:
+        agg_col = None
       if isinstance(aggregate_expression, exp.Avg):
-        agg_type_with_cols.append(exp.Avg)
+        agg_type_with_cols.append((exp.Avg, agg_col))
       elif isinstance(aggregate_expression, exp.Count):
-        agg_type_with_cols.append(exp.Count)
+        agg_type_with_cols.append((exp.Count, agg_col))
       elif isinstance(aggregate_expression, exp.Sum):
-        agg_type_with_cols.append(exp.Sum)
+        agg_type_with_cols.append((exp.Sum, agg_col))
       else:
         raise Exception('We only support approximation for Avg, Sum and Count query currently.')
     return agg_type_with_cols
@@ -606,11 +617,6 @@ class Query(object):
           Try running without the error target and confidence.'''
       )
 
-    if self._expression.find(exp.Join) is not None:
-      raise Exception(
-          '''We do not support Join for approximate aggregation queries. 
-          Try running without the error target and confidence.'''
-      )
 
     # check aggregation function in SELECT clause
     _ = self.aggregation_type_list_in_query
@@ -619,6 +625,11 @@ class Query(object):
       raise Exception('Aggregation query should contain error target and confidence')
 
     return True
+
+
+  @cached_property
+  def is_aqp_join_query(self):
+    return self._expression.find(exp.Join) is not None and self._expression.find(exp.UserFunction) is not None
 
 
   @cached_property
@@ -748,7 +759,7 @@ class Query(object):
             and expression.args['this'] in self.config.user_defined_functions):
           raise Exception("We don't support nested user defined function currently")
 
-    if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
+    if  self.is_approx_select_query or self.is_limit_query():
       raise Exception('We only support user defined function for exact query currently.')
     if len(self.all_queries_in_expressions) > 1:
       raise Exception("We don't support user defined function with nested query currently")
@@ -807,18 +818,19 @@ class Query(object):
 
 
       def add_column_with_alias(self, node, is_select_col = False, predefined_alias = None):
-        if node not in self.added_select:
-          self.added_select.add(node)
-          if predefined_alias:
-            alias = predefined_alias
-          else:
-            alias = f'col__{self.new_select_col_index}'
-          select_col_with_alias = exp.Alias(this=node, alias=alias)
-          self.new_select_exp_list.append(select_col_with_alias)
-          self.col_index_mapping[node] = alias
-          self.new_select_col_index += 1
-        if is_select_col:
-          self.dataframe_select_col_list.append(self.col_index_mapping[node])
+        if isinstance(node, exp.Column):
+          if node not in self.added_select:
+            self.added_select.add(node)
+            if predefined_alias:
+              alias = predefined_alias
+            else:
+              alias = f'col__{self.new_select_col_index}'
+            select_col_with_alias = exp.Alias(this=node, alias=alias)
+            self.new_select_exp_list.append(select_col_with_alias)
+            self.col_index_mapping[node] = alias
+            self.new_select_col_index += 1
+          if is_select_col:
+            self.dataframe_select_col_list.append(self.col_index_mapping[node])
 
 
       def add_udf(self, user_defined_function, udf_output_to_alias_mapping, is_select_col = False):
