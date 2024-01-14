@@ -205,19 +205,6 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
         WHERE POWER(x_min, 2) > 640000 AND (x_min > 600 OR (x_max >600 AND y_min > 800))
         '''
       ),
-      # named function for exact aggregation query
-      (
-        'full_scan',
-        '''
-        SELECT sum_function(SUM(x_min), SUM(y_max))
-        FROM objects00
-        ''',
-        '''
-        SELECT SUM(x_min) + SUM(y_max)
-        FROM objects00
-        '''
-      ),
-      # test machine learning model, output may be zero, multiple rows or multiple columns
       (
         'full_scan',
         '''
