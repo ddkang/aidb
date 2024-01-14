@@ -752,7 +752,7 @@ class Query(object):
             and expression.args['this'] in self.config.user_defined_functions):
           raise Exception("We don't support nested user defined function currently")
 
-    if self._expression.find_all(exp.AggFunc):
+    if self._expression.find(exp.AggFunc) is not None:
       raise Exception("We don't support user defined function for aggregation query")
 
     if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
@@ -814,19 +814,21 @@ class Query(object):
 
 
       def add_column_with_alias(self, node, is_select_col = False, predefined_alias = None):
-        if isinstance(node, exp.Column) or isinstance(node, exp.Literal):
-          if node not in self.added_select:
-            self.added_select.add(node)
-            if predefined_alias:
-              alias = predefined_alias
-            else:
-              alias = f'col__{self.new_select_col_index}'
-            select_col_with_alias = exp.Alias(this=node, alias=alias)
-            self.new_select_exp_list.append(select_col_with_alias)
-            self.col_index_mapping[node] = alias
-            self.new_select_col_index += 1
-          if is_select_col:
-            self.dataframe_select_col_list.append(self.col_index_mapping[node])
+        if isinstance(node, exp.AggFunc):
+          return
+
+        if node not in self.added_select:
+          self.added_select.add(node)
+          if predefined_alias:
+            alias = predefined_alias
+          else:
+            alias = f'col__{self.new_select_col_index}'
+          select_col_with_alias = exp.Alias(this=node, alias=alias)
+          self.new_select_exp_list.append(select_col_with_alias)
+          self.col_index_mapping[node] = alias
+          self.new_select_col_index += 1
+        if is_select_col:
+          self.dataframe_select_col_list.append(self.col_index_mapping[node])
 
 
       def add_udf(self, user_defined_function, udf_output_to_alias_mapping, is_select_col = False):
