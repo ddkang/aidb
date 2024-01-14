@@ -16,8 +16,7 @@ sentiment_inference_service = HuggingFaceNLP(
                             (AIDBListType(), AIDBListType(), 'score')],
   input_columns_types=[str],
   output_columns_types=[str, float],
-  preferred_batch_size=100,
-  copied_input_columns=[1],
+  preferred_batch_size=128,
   model="LiYuan/amazon-review-sentiment-analysis",
   default_args={("options", "wait_for_model"): True},
   rate_limit=100)
@@ -26,7 +25,8 @@ inference_engines = [
   {
     "service": sentiment_inference_service,
     "input_col": ("blobs00.review", "blobs00.review_id"),
-    "output_col": ("sentiment.label", "sentiment.score", "sentiment.review_id")
+    "output_col": ("sentiment.label", "sentiment.score", "sentiment.review_id"),
+    "copy": {"blobs00.review_id": "sentiment.review_id"}
   }
 ]
 

@@ -41,7 +41,7 @@ def register_inference_services(engine: Engine, data_dir: str, port=8000, batch_
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns,
       batch_supported=batch_supported,
-      preferred_batch_size=100,
+      preferred_batch_size=128,
     )
 
     engine.register_inference_service(service)

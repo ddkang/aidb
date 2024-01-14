@@ -7,7 +7,6 @@ from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
 from aidb.utils.constants import VECTOR_ID_COLUMN
 
-LIMIT_ENGINE_BATCH_SIZE = 32
 class LimitEngine(TastiEngine):
   # TODO: design a better algorithm
   def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
@@ -44,8 +43,14 @@ class LimitEngine(TastiEngine):
     # TODO: rewrite query, use full scan to execute query
     bound_service_list = query.inference_engines_required_for_query
 
-    batched_indexes_list = [[item[0] for item in sorted_list[i:i + LIMIT_ENGINE_BATCH_SIZE]]
-                            for i in range(0, len(sorted_list), LIMIT_ENGINE_BATCH_SIZE)]
+    limit_engine_batch_size = len(sorted_list)
+    for bound_service in bound_service_list:
+      limit_engine_batch_size = min(bound_service.service.preferred_batch_size, limit_engine_batch_size)
+
+    batched_indexes_list = [
+        [item[0] for item in sorted_list[i:i + limit_engine_batch_size]]
+        for i in range(0, len(sorted_list), limit_engine_batch_size)
+    ]
 
     for batched_indexes in batched_indexes_list:
       for bound_service in bound_service_list:

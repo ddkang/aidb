@@ -176,8 +176,6 @@ class HTTPInferenceService(CachedInferenceService):
     request = self.convert_input_to_request(input)
     response = self.request(request)
     output = self.convert_response_to_output(response[0])
-    for copied_input_col_idx in self.copied_input_columns:
-      output[len(output)] = input[input.keys()[copied_input_col_idx]]
 
     return pd.DataFrame(output)
 
