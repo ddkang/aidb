@@ -42,151 +42,159 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     config = aidb_engine._config
     
     queries = {
-      "query_str1": '''
+    "test_query_1":{
+        "query_str": '''
                     SELECT color as alias_color
                     FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame
                     WHERE alias_color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)
                       OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100);
                     ''',
-      "normalized_query_str1": ("SELECT colors02.color "
+        "normalized_query_str": ("SELECT colors02.color "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE colors02.color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2) "
                                   "OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100)"),
-      # test table alias
-      "query_str2": '''
+        # test replacing column with root column in filtering predicate,
+        # the root column of 'colors02.object_id' is 'objects00'
+        "correct_fp" : [['colors02.color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)',
+                    'objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100)']],
+        # filter predicates connected by OR are in same set
+        "correct_service" : [{'colors02', 'objects00'}],
+        "correct_tables" : [{'colors02', 'objects00'}],
+        "num_query":3
+    },
+    # test table alias
+    "test_query_2":{
+        "query_str": '''
                     SELECT table1.color FROM colors02 AS table1 WHERE frame IN (SELECT * FROM blobs_00)
                     AND object_id > 0
                     ''',
-      "normalized_query_str2": ("SELECT colors02.color FROM colors02 "
+        # test table alias
+        "normalized_query_str": ("SELECT colors02.color FROM colors02 "
                                 "WHERE colors02.frame IN (SELECT * FROM blobs_00) "
                                 "AND colors02.object_id > 0"),
-      # test sub-subquery
-      "query_str3": '''SELECT frame, object_id FROM colors02 AS cl
+        # test replacing column with root column in filtering predicate,
+        # the root column of 'colors02.object_id' is 'objects00'
+        "correct_fp" :[['blobs_00.frame IN (SELECT * FROM blobs_00)'],
+                   ['objects00.object_id > 0']],
+        # filter predicates connected by AND are in different set
+        "correct_service" : [set(), {'objects00'}],
+        "correct_tables" : [set(), {'objects00'}],
+        "num_query":2
+    },
+    # test sub-subquery
+     "test_query_3":{
+        "query_str":'''SELECT frame, object_id FROM colors02 AS cl
                         WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00
                                               WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))
                     ''',
-      "normalized_query_str3":  ("SELECT colors02.frame, colors02.object_id FROM colors02 "
+        "normalized_query_str": ("SELECT colors02.frame, colors02.object_id FROM colors02 "
                                 "WHERE colors02.object_id > (SELECT AVG(object_id) FROM objects00 WHERE frame > "
                                 "(SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"),
-      # test multiple aliases
-      "query_str4": '''
+        # test replacing column with root column in filtering predicate,
+        # the root column of 'colors02.object_id' is 'objects00'
+        "correct_fp" : [["objects00.object_id > (SELECT AVG(object_id) FROM objects00 "
+                   "WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"]],
+        # filter predicates connected by AND are in different set
+        "correct_service" : [{'objects00'}],
+        "correct_tables" :  [{'objects00'}],
+        "num_query":3
+    },
+    # test multiple aliases
+     "test_query_4":{
+        "query_str":'''
                     SELECT color, table2.x_min
                     FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
                     WHERE color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)
                       AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                     ''',
-      "normalized_query_str4": ("SELECT colors02.color, objects00.x_min "
+        "normalized_query_str": ("SELECT colors02.color, objects00.x_min "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3) "
                                 "AND objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"),
-      # comparison between subquery
-      "query_str5": '''
+        "correct_fp" :[["colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)"],
+                   ["objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]],
+        "correct_service" : [{'colors02'}, {'objects00'}],
+        "correct_tables" : [{'colors02'}, {'objects00'}],
+        "num_query":3
+    },
+     # comparison between subquery
+     "test_query_5":{
+        "query_str": '''
                     SELECT color, table2.x_min
                     FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
                     WHERE (SELECT table3.color AS alias_color2 FROM colors02 AS table3)
                         > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                     ''',
-      "normalized_query_str5": ("SELECT colors02.color, objects00.x_min "
+        # test table alias
+        "normalized_query_str": ("SELECT colors02.color, objects00.x_min "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE (SELECT table3.color AS alias_color2 FROM colors02 AS table3) "
                                 "> (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"),
-      "query_str6": '''
+        "correct_fp" :[["(SELECT table3.color AS alias_color2 FROM colors02 AS table3) > "
+                   "(SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]],
+      
+        "correct_service" : [{}],
+        "correct_tables" :[{}],
+        "num_query":3
+    },
+     "test_query_6":{
+        "query_str":'''
                     SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
                     FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;
                     ''',
-      "normalized_query_str6": ("SELECT colors02.color, objects00.x_min, objects00.y_min "
+        "normalized_query_str": ("SELECT colors02.color, objects00.x_min, objects00.y_min "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame"),
-      "query_str7": '''
+        "correct_fp" :[[]],
+        "correct_service" : [{}],
+        "correct_tables" : [{}],
+        "num_query":1
+    },
+     "test_query_7":{
+        "query_str": '''
                     SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
                     FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
                     JOIN blobs_00 table3 ON table2.frame = table3.frame;
                     ''',
-      "query_str7": '''
-                    SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
-                    FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
-                    JOIN blobs_00 table3 ON table2.frame = table3.frame;
-                    ''',
-      "normalized_query_str7": ("SELECT colors02.color, objects00.x_min, blobs_00.frame "
+        "normalized_query_str": ("SELECT colors02.color, objects00.x_min, blobs_00.frame "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "JOIN blobs_00 ON objects00.frame = blobs_00.frame"),
-      "query_str8": '''
+        "correct_fp" :[[]],
+        "correct_service" : [{}],
+        "correct_tables" : [{}],
+        "num_query":1
+    },
+     "test_query_8":{
+        "query_str": '''
                     SELECT color, x_min AS col2, colors02.frame AS col3
                     FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
                     WHERE color = 'blue' AND x_min > 600;
                     ''',
-      "normalized_query_str8": ("SELECT colors02.color, objects00.x_min, colors02.frame "
+        "normalized_query_str":  ("SELECT colors02.color, objects00.x_min, colors02.frame "
                                 "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE colors02.color = 'blue' AND objects00.x_min > 600"),
-      "query_str9": '''
+        "correct_fp" :[["colors02.color = 'blue'"], ['objects00.x_min > 600']],
+        "correct_service" : [{'colors02'}, {'objects00'}],
+        "correct_tables" : [{'colors02'}, {'objects00'}],
+        "num_query":1
+    },
+     "test_query_9":{
+        "query_str":'''
                     SELECT color, userfunction(x_min, y_min, x_max, y_max)
                     FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
                     WHERE table2.frame > 10000 OR y_max < 800;
                     ''',
-      "normalized_query_str9": ("SELECT colors02.color, userfunction(objects00.x_min, objects00.y_min, "
+        "normalized_query_str": ("SELECT colors02.color, userfunction(objects00.x_min, objects00.y_min, "
                                 "objects00.x_max, objects00.y_max) "
                                 "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
-                                "WHERE objects00.frame > 10000 OR objects00.y_max < 800")
+                                "WHERE objects00.frame > 10000 OR objects00.y_max < 800"),
+        "correct_fp" : [['blobs_00.frame > 10000', 'objects00.y_max < 800']],
+        "correct_service" : [{'objects00'}],
+        "correct_tables" : [{'objects00'}],
+        "num_query":1
     }
-
-    # test replacing column with root column in filtering predicate,
-    # the root column of 'colors02.object_id' is 'objects00'
-    correct_fp = [['colors02.color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)',
-                    'objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100)']]
-
-    # filter predicates connected by OR are in same set
-    correct_service = [{'colors02', 'objects00'}]
-    correct_tables = [{'colors02', 'objects00'}]
-    self._test_query(queries["query_str1"], config, queries["normalized_query_str1"], correct_fp, correct_service, correct_tables, 3)
-
-
-    # test replacing column with root column in filtering predicate,
-    # the root column of 'colors02.object_id' is 'objects00'
-    correct_fp = [['blobs_00.frame IN (SELECT * FROM blobs_00)'],
-                   ['objects00.object_id > 0']]
-    # filter predicates connected by AND are in different set
-    correct_service = [set(), {'objects00'}]
-    correct_tables = [set(), {'objects00'}]
-    self._test_query(queries["query_str2"], config, queries["normalized_query_str2"], correct_fp, correct_service, correct_tables, 2)
-
-    correct_fp = [["objects00.object_id > (SELECT AVG(object_id) FROM objects00 "
-                   "WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"]]
-    correct_service = [{'objects00'}]
-    correct_tables = [{'objects00'}]
-    self._test_query(queries["query_str3"], config, queries["normalized_query_str3"], correct_fp, correct_service, correct_tables, 3)
-
-
-    correct_fp = [["colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)"],
-                   ["objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]]
-    correct_service = [{'colors02'}, {'objects00'}]
-    correct_tables = [{'colors02'}, {'objects00'}]
-    self._test_query(queries["query_str4"], config, queries["normalized_query_str4"], correct_fp, correct_service, correct_tables, 3)
-
-    correct_fp = [["(SELECT table3.color AS alias_color2 FROM colors02 AS table3) > "
-                   "(SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]]
-    correct_service = [{}]
-    correct_tables = [{}]
-    self._test_query(queries["query_str5"], config, queries["normalized_query_str5"], correct_fp, correct_service, correct_tables, 3)
-
-    correct_fp = [[]]
-    correct_service = [{}]
-    correct_tables = [{}]
-    self._test_query(queries["query_str6"], config, queries["normalized_query_str6"], correct_fp, correct_service, correct_tables, 1)
-
-    correct_fp = [[]]
-    correct_service = [{}]
-    correct_tables = [{}]
-    self._test_query(queries["query_str7"], config, queries["normalized_query_str7"], correct_fp, correct_service, correct_tables, 1)
-
-
-    correct_fp = [["colors02.color = 'blue'"], ['objects00.x_min > 600']]
-    correct_service = [{'colors02'}, {'objects00'}]
-    correct_tables = [{'colors02'}, {'objects00'}]
-    self._test_query(queries["query_str8"], config, queries["normalized_query_str8"], correct_fp, correct_service, correct_tables, 1)
-
-    correct_fp = [['blobs_00.frame > 10000', 'objects00.y_max < 800']]
-    correct_service = [{'objects00'}]
-    correct_tables = [{'objects00'}]
-    self._test_query(queries["query_str9"], config, queries["normalized_query_str9"], correct_fp, correct_service, correct_tables, 1)
+}
+    for i in range(1,10):
+      self._test_query(queries["test_query_"+str(i)]["query_str"], config, queries["test_query_"+str(i)]["normalized_query_str"], queries["test_query_"+str(i)]["correct_fp"],queries["test_query_"+str(i)]["correct_service"], queries["test_query_"+str(i)]["correct_tables"], queries["test_query_"+str(i)]["num_query"])
 
 
   # We don't support using approximate query as a subquery
@@ -232,39 +240,43 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     config = aidb_engine._config
     
     queries = {
-      "query_str1":'''
+    # approx aggregation as a subquery
+    "test_query_1":{
+        "query_str":'''
                  SELECT AVG(x_min) FROM  objects00
                  WHERE frame > (SELECT AVG(frame) FROM blobs_00)
                  ERROR_TARGET 10% CONFIDENCE 95%;
                  ''',
-      "normalized_query_str1": ("SELECT AVG(objects00.x_min) "
+        "normalized_query_str":("SELECT AVG(objects00.x_min) "
                              "FROM objects00 "
                              "WHERE objects00.frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%"),
-      # approx select as a subquery
-      "query_str2": '''
+ 
+        "correct_fp" :[["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]],
+        
+        # filter predicates connected by OR are in same set
+        "correct_service" : [{}],
+        "correct_tables" : [{}],
+        "num_query":2
+    },
+     "test_query_2":{
+        "query_str": '''
                  SELECT frame FROM colors02
                  WHERE color IN (SELECT color FROM colors02 WHERE frame > 10000)
                  RECALL_TARGET 80%
                  CONFIDENCE 95%;
                  ''',
-      "normalized_query_str2": ("SELECT colors02.frame FROM colors02 "
+        "normalized_query_str": ("SELECT colors02.frame FROM colors02 "
                              "WHERE colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000) "
                              "RECALL_TARGET 80% "
-                             "CONFIDENCE 95%")
+                             "CONFIDENCE 95%"),
+        "correct_fp" :[["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]],
+        "correct_service" : [{'colors02'}],
+        "correct_tables" : [{'colors02'}],
+        "num_query":2
     }
-    
-    correct_fp = [["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]]
-
-    correct_service = [{}]
-    correct_tables = [{}] 
-    self._test_query(queries["query_str1"], config, queries["normalized_query_str1"], correct_fp, correct_service, correct_tables, 2)
-
-    correct_fp = [["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]]
-
-    correct_service = [{'colors02'}]
-    correct_tables = [{'colors02'}]
-    self._test_query(queries["query_str2"], config, queries["normalized_query_str2"], correct_fp, correct_service, correct_tables, 2)
-
+}
+    for i in range(1,3):
+      self._test_query(queries["test_query_"+str(i)]["query_str"], config, queries["test_query_"+str(i)]["normalized_query_str"], queries["test_query_"+str(i)]["correct_fp"],queries["test_query_"+str(i)]["correct_service"], queries["test_query_"+str(i)]["correct_tables"], queries["test_query_"+str(i)]["num_query"])
 
   async def test_udf_query(self):
     def _test_equality(test_query_list, config):
