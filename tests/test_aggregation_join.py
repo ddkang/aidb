@@ -19,11 +19,12 @@ from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 setup_test_logger('aggregation_join')
 
+# note: When running tests locally, use your own URL, and modify line 95 to select the type of database you wish to use.
 POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 1))
+_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 100))
 
 def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
@@ -91,7 +92,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
     time.sleep(1)
-    db_url_list = [SQLITE_URL, POSTGRESQL_URL, MYSQL_URL]
+    db_url_list = [SQLITE_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
@@ -120,8 +121,9 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
             count_list[k] += 1
           k+=1
         logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
-        del gt_engine
-        del aidb_engine
+      assert sum(count_list) >= len(count_list) * _NUMBER_OF_RUNS - 1
+      del gt_engine
+      del aidb_engine
     p.terminate()
 
 
