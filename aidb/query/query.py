@@ -616,12 +616,6 @@ class Query(object):
           Try running without the error target and confidence.'''
       )
 
-    if self._expression.find(exp.Join) is not None:
-      raise Exception(
-          '''AIDB does not support Join for approximate aggregation queries. 
-          Try running without the error target and confidence.'''
-      )
-
     # check aggregation function in SELECT clause
     _ = self.aggregation_type_list_in_query
 
@@ -764,11 +758,13 @@ class Query(object):
           raise Exception("AIDB does not support nested user defined function currently")
 
     if self._expression.find(exp.AggFunc) is not None:
-      raise Exception("AIDB does not support user defined function for aggregation query")
+      if not self.is_aqp_join_query:
+        raise Exception("AIDB does not support user defined function for exact aggregation query")
 
     if  self.is_approx_select_query or self.is_limit_query():
       raise Exception('AIDB only support user defined function for exact query '
                       'and approximate aggregation query currently.')
+
     if len(self.all_queries_in_expressions) > 1:
       raise Exception("AIDB does not support user defined function with nested query currently")
 

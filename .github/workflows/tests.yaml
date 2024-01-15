@@ -90,6 +90,9 @@ jobs:
 
     - name: Run aggregation query Gaussian multiple keys tests
       run: python3 -m tests.test_aggregation_gaussian_mk
+
+    - name: Run approx aggregation join query tests
+      run: python3 -m tests.test_aggregation_join
       
     - name: Run aggregation query tests
       run: python3 -m tests.test_aggregation

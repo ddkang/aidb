@@ -5,7 +5,7 @@ from aidb.engine.non_select_query_engine import NonSelectQueryEngine
 from aidb.utils.asyncio import asyncio_run
 from aidb.query.query import Query
 
-from aidb.engine.approx_aggregate_engine_join import ApproximateAggregateJoinEngine
+from aidb.engine.approx_aggregate_join_engine import ApproximateAggregateJoinEngine
 
 class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateAggregateJoinEngine):
   def execute(self, query: str, **kwargs):

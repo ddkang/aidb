@@ -78,7 +78,7 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     estimates = []
     fixed_cols = concatenated_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
-    for index, agg_type in enumerate(aggregation_type_list):
+    for index, (agg_type,_) in enumerate(aggregation_type_list):
       selected_index_col = concatenated_results.iloc[:, [index]]
       extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
 

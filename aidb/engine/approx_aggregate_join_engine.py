@@ -1,12 +1,14 @@
+from typing import Dict, List
+
 import numpy as np
 import pandas as pd
-from sqlalchemy.sql import text
 import sqlglot.expressions as exp
-from typing import List, Dict
+from sqlalchemy.sql import text
 
 from aidb.engine.approx_aggregate_engine import ApproximateAggregateEngine
 from aidb.query.query import Query
-from aidb.utils.constants import MASS_COL_NAME, NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME
+from aidb.utils.constants import (MASS_COL_NAME, NUM_ITEMS_COL_NAME,
+                                  WEIGHT_COL_NAME)
 from aidb.utils.logger import logger
 
 _NUM_PILOT_SAMPLES = 3000000

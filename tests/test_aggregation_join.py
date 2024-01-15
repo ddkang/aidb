@@ -1,17 +1,20 @@
-import random
-from multiprocessing import Process
 import os
-from sqlalchemy.sql import text
 import time
 import unittest
+from decimal import Decimal
+from multiprocessing import Process
 from unittest import IsolatedAsyncioTestCase
-import pandas as pd
 
-from aidb.query.query import Query
+import pandas as pd
+from sqlalchemy.sql import text
+
 from aidb.inference.bound_inference_service import CachedBoundInferenceService
+from aidb.query.query import Query
 from aidb.utils.logger import logger
-from tests.inference_service_utils.inference_service_setup import register_inference_services
-from tests.inference_service_utils.http_inference_service_setup import run_server
+from tests.inference_service_utils.http_inference_service_setup import \
+    run_server
+from tests.inference_service_utils.inference_service_setup import \
+    register_inference_services
 from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 setup_test_logger('aggregation_join')
@@ -20,6 +23,7 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
+_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 1))
 
 def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
@@ -30,7 +34,7 @@ def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataF
 queries = [
   (
     'approx_aggregate',
-    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE 
+    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
            AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
     '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
   ),
@@ -70,6 +74,8 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     error_rate_list = []
     valid_estimation = True
     for aidb_item, gt_item in zip(aidb_res, gt_res):
+      if isinstance(gt_item, Decimal):
+        gt_item = float(gt_item)
       relative_diff = abs(aidb_item - gt_item) / (gt_item)
       error_rate_list.append(relative_diff * 100)
       if relative_diff > error_target:
@@ -85,23 +91,18 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
     time.sleep(1)
-    db_url_list = [SQLITE_URL]
+    db_url_list = [POSTGRESQL_URL, SQLITE_URL, MYSQL_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
-      # randomly choose 3 queries to test PostgreSQL and MySQL
-      if dialect != 'sqlite':
-        selected_queries = random.sample(queries, 3)
-      else:
-        selected_queries = queries
-      count_list = [0] * len(selected_queries)
-      for i in range(100):
+      count_list = [0] * len(queries)
+      for i in range(_NUMBER_OF_RUNS):
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
         self.add_user_defined_function(aidb_engine)
 
         register_inference_services(aidb_engine, data_dir)
         k = 0
-        for query_type, aidb_query, aggregate_query in selected_queries:
+        for query_type, aidb_query, aggregate_query in queries:
           logger.info(f'Running query {aggregate_query} in ground truth database')
           try:
             async with gt_engine.begin() as conn:
@@ -109,6 +110,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
               gt_res = gt_res.fetchall()[0]
           finally:
             await gt_engine.dispose()
+
           logger.info(f'Running query {aidb_query} in aidb database')
           aidb_res = aidb_engine.execute(aidb_query)[0]
           logger.info(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
