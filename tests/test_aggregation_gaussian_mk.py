@@ -137,6 +137,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       del gt_engine
       del aidb_engine
       p.terminate()
+      time.sleep(1)
 
 
 if __name__ == '__main__':
