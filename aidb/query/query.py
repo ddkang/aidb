@@ -379,7 +379,7 @@ class Query(object):
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
     udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
 
-    for node, _, _ in copied_expression.walk():
+    for node, parent, _ in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Column):
@@ -400,6 +400,8 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
         elif isinstance(node.args['this'], exp.Star):
+          if isinstance(parent, exp.AggFunc):
+            continue
           select_exp_list = []
           for table_name in self.tables_in_query:
             for col_name, _ in self._tables[table_name].items():
@@ -586,12 +588,16 @@ class Query(object):
     agg_type_with_cols = []
     for expression in select_exp:
       aggregate_expression = expression.find(exp.AggFunc)
+      if aggregate_expression is not None:
+        agg_col = aggregate_expression.args['this'].sql()
+      else:
+        agg_col = None
       if isinstance(aggregate_expression, exp.Avg):
-        agg_type_with_cols.append(exp.Avg)
+        agg_type_with_cols.append((exp.Avg, agg_col))
       elif isinstance(aggregate_expression, exp.Count):
-        agg_type_with_cols.append(exp.Count)
+        agg_type_with_cols.append((exp.Count, agg_col))
       elif isinstance(aggregate_expression, exp.Sum):
-        agg_type_with_cols.append(exp.Sum)
+        agg_type_with_cols.append((exp.Sum, agg_col))
       else:
         raise Exception('AIDB only support approximation for Avg, Sum and Count query currently.')
     return agg_type_with_cols
@@ -623,6 +629,11 @@ class Query(object):
       raise Exception('Aggregation query should contain error target and confidence')
 
     return True
+
+
+  @cached_property
+  def is_aqp_join_query(self):
+    return self._expression.find(exp.Join) is not None and self._expression.find(exp.UserFunction) is not None
 
 
   @cached_property
@@ -755,8 +766,9 @@ class Query(object):
     if self._expression.find(exp.AggFunc) is not None:
       raise Exception("AIDB does not support user defined function for aggregation query")
 
-    if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
-      raise Exception('AIDB only support user defined function for exact query currently.')
+    if  self.is_approx_select_query or self.is_limit_query():
+      raise Exception('AIDB only support user defined function for exact query '
+                      'and approximate aggregation query currently.')
     if len(self.all_queries_in_expressions) > 1:
       raise Exception("AIDB does not support user defined function with nested query currently")
 
@@ -871,7 +883,7 @@ class Query(object):
 
     filter_predicates = []
 
-    # find user defined function in JOIN condition, if exists, add them into filter predicates, 
+    # find user defined function in JOIN condition, if exists, add them into filter predicates,
     # then remove this join condition
     if expression.find(exp.Join) is not None:
       for join_exp in expression.args['joins']:

@@ -29,10 +29,14 @@ def register_inference_services(engine: Engine, data_dir: str, port=8000, batch_
       else:
         raise Exception("Invalid column name, column name should start with in__ or out__")
 
+    service_url = f'http://127.0.0.1:{port}/{service_name}'
+    if service_name.endswith('__join'):
+      service_name = service_name.split('__')[0]
+
     service = HTTPInferenceService(
       service_name,
       False,
-      url=f'http://127.0.0.1:{port}/{service_name}',
+      url=service_url,
       headers={'Content-Type': 'application/json'},
       columns_to_input_keys=columns_to_input_keys,
       response_keys_to_columns=output_keys_to_columns,

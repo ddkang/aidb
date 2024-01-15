@@ -23,19 +23,19 @@ def convert_response_to_output(
         if idx != len(k) - 1:
           new_response_copy = []
           for r in response_copy:
-            new_key = k[(idx+1):]
+            new_key = k[(idx + 1):]
             current_response = convert_response_to_output(r, {new_key: new_key})
             if current_response is not None and new_key in current_response:
-              if isinstance(current_response[new_key], list): 
+              if isinstance(current_response[new_key], list):
                 new_response_copy.extend(current_response[new_key])
               else:
                 new_response_copy.append(current_response[new_key])
           response_copy = new_response_copy if len(new_response_copy) > 0 else None
           break
       elif (isinstance(key, int) and \
-           (isinstance(response_copy, list) and key < len(response_copy)) or \
-           (isinstance(response_copy, dict) and key in response_copy)) or \
-           (isinstance(key, str) and isinstance(response_copy, dict) and key in response_copy):
+            (isinstance(response_copy, list) and key < len(response_copy)) or \
+            (isinstance(response_copy, dict) and key in response_copy)) or \
+          (isinstance(key, str) and isinstance(response_copy, dict) and key in response_copy):
         response_copy = response_copy[key]
       else:
         response_copy = None
@@ -50,15 +50,15 @@ class HTTPInferenceService(CachedInferenceService):
   def __init__(
       self,
       *args,
-      url: str=None,
-      headers: Union[Dict, None]=None,
-      default_args: Union[Dict, None]=None,
-      batch_supported: bool=False,
-      columns_to_input_keys: List[Union[str, tuple]]=None,
-      input_columns_types: Union[List, None]=None,
-      response_keys_to_columns: List[Union[str, tuple]]=None,
-      output_columns_types: Union[List, None]=None,
-      rate_limit: Union[int, None]=None,
+      url: str = None,
+      headers: Union[Dict, None] = None,
+      default_args: Union[Dict, None] = None,
+      batch_supported: bool = False,
+      columns_to_input_keys: List[Union[str, tuple]] = None,
+      input_columns_types: Union[List, None] = None,
+      response_keys_to_columns: List[Union[str, tuple]] = None,
+      output_columns_types: Union[List, None] = None,
+      rate_limit: Union[int, None] = None,
       **kwargs
   ):
     '''
@@ -87,7 +87,7 @@ class HTTPInferenceService(CachedInferenceService):
 
   def signature(self) -> Tuple[List, List]:
     raise NotImplementedError()
-  
+
 
   def convert_input_to_request(self, input: Union[pd.Series, pd.DataFrame]) -> Dict:
     request = {}
@@ -95,7 +95,7 @@ class HTTPInferenceService(CachedInferenceService):
     if isinstance(input, pd.Series):
       num_rows = 1
       dict_input = {k: [v] for k, v in input.to_dict().items()}
-    else: # isinstance(input, pd.DataFrame)
+    else:  # isinstance(input, pd.DataFrame)
       num_rows = len(input)
       dict_input = input.to_dict(orient='list')
 
@@ -132,13 +132,13 @@ class HTTPInferenceService(CachedInferenceService):
           for i in range(num_rows):
             key = tuple(f'{i}' if isinstance(_k, AIDBListType) else f'{_k}' for _k in v)
             if isinstance(v[0], AIDBListType):
-              key = ('_', ) + key # all converted keys should start with AIDBListType
+              key = ('_',) + key  # all converted keys should start with AIDBListType
               remove_ghost_key = True
             key = self._separator.join(key)
             request[key] = dict_input[k][i]
         else:
           raise ValueError(f'Cannot have more than 1 AIDBListType in columns_to_input_keys')
-      else: # isinstance(v, str)
+      else:  # isinstance(v, str)
         request[v] = dict_input[k][0]
     request = unflatten_list(request, self._separator)
     if remove_ghost_key:
@@ -180,20 +180,24 @@ class HTTPInferenceService(CachedInferenceService):
     return pd.DataFrame(output)
 
 
-  def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
+  def infer_batch(self, inputs: pd.DataFrame):
     if not self._batch_supported:
       return super().infer_batch(inputs)
-    
+
     body = inputs.to_dict(orient='list')
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-    # We assume the server returns a list of responses
-    # We assume the length of the list of responses should match that of the inputs
-    # Each element in response list must correspond to the input with the same index
-    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
-    if len(response) != len(inputs):
-      raise Exception('The length of the inference results should match that of the inputs.')
 
-    response_df_list = [pd.DataFrame(item) for item in response]
-    return response_df_list
+    # for join query, directly convert the result into a dataframe and return it
+    if self._url.endswith('__join'):
+      return pd.DataFrame(response)
+    else:
+      # We assume the server returns a list of responses
+      # We assume the length of the list of responses should match that of the inputs
+      # Each element in response list must correspond to the input with the same index
+      # and an element can represent 0 / 1 / multiple outputs
+      if len(response) != len(inputs):
+        raise Exception('The length of the inference results should match that of the inputs.')
+      response_df_list = [pd.DataFrame(item) for item in response]
+      return response_df_list
