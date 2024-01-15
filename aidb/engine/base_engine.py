@@ -456,7 +456,8 @@ class BaseEngine():
       res_df: Query result from normal db.
       dataframe_sql: Extracted information of udf query, used to execute udf and run sql query over udf results
       query: original query
-      additional_select_col: additional select columns
+      additional_select_col: used to specifically choose '__weight' and '__mass' columns,
+        which are not included in the standard query
 
     Returns:
       res_list_of_tuple: query result
@@ -489,6 +490,3 @@ class BaseEngine():
 
     new_results_df = duckdb.sql(df_query).df()
     return new_results_df
-    res_list_of_tuple = [tuple(row) for row in new_results_df.itertuples(index=False)]
-
-    return res_list_of_tuple
