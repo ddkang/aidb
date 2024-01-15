@@ -5,7 +5,7 @@ from typing import List
 from aidb.engine.base_engine import BaseEngine
 from aidb.query.query import Query
 
-RETRIEVAL_BATCH_SIZE = 100000
+RETRIEVAL_BATCH_SIZE = 10000
 
 
 class FullScanEngine(BaseEngine):

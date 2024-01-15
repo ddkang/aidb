@@ -85,11 +85,12 @@ jobs:
     - name: Run Query Parsing Tests for nested queries
       run: python3 -m tests.test_query_parsing
 
-    - name: Run aggregation query tests
-      run: python3 -m tests.test_aggregation
-
     - name: Run aggregation query Gaussian tests
       run: python3 -m tests.test_aggregation_gaussian
 
     - name: Run aggregation query Gaussian multiple keys tests
       run: python3 -m tests.test_aggregation_gaussian_mk
+      
+    - name: Run aggregation query tests
+      run: python3 -m tests.test_aggregation
+
