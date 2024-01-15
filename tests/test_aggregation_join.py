@@ -91,7 +91,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
     time.sleep(1)
-    db_url_list = [POSTGRESQL_URL, SQLITE_URL, MYSQL_URL]
+    db_url_list = [SQLITE_URL, POSTGRESQL_URL, MYSQL_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')

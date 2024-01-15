@@ -138,14 +138,18 @@ class ApproximateAggregateJoinEngine(ApproximateAggregateEngine):
         blob_keys.append(blob_key)
 
     res_store_list = []
-    retrieval_batch_list = [RETRIEVAL_BATCH_SIZE for _ in range(num_samples // RETRIEVAL_BATCH_SIZE)]
-    if num_samples % RETRIEVAL_BATCH_SIZE:
-      retrieval_batch_list += [num_samples % RETRIEVAL_BATCH_SIZE]
 
     # selectively sample data to avoid large memory usage
     total_sampled_count = 0
     while total_sampled_count < num_samples:
-      sample_res_df = self.execute_join_query_sampling(sample_df_list, RETRIEVAL_BATCH_SIZE, col_to_alias, agg_col_to_alias)
+      sample_res_df = self.execute_join_query_sampling(
+          sample_df_list,
+          RETRIEVAL_BATCH_SIZE,
+          col_to_alias,
+          agg_col_to_alias
+      )
+      if total_sampled_count + len(sample_res_df) > num_samples:
+        sample_res_df = sample_res_df.iloc[:num_samples-total_sampled_count]
       total_sampled_count += len(sample_res_df)
 
       agg_res_list = await self.execute_inference_services_join(query, sample_res_df, blob_keys, agg_list)
