@@ -14,20 +14,20 @@ DB_URL = "sqlite+aiosqlite://"
 # normal query extraction parameters
 QUERY_STR = 'query_str'
 NORMALIZED_QUERY_STR = 'normalized_query_str'
-CORRECT_FP='correct_fp'
-CORRECT_SERVICE='correct_service'
-CORRECT_TABLES='correct_tables'
-NUM_QUERY='num_query'
+CORRECT_FP= 'correct_fp'
+CORRECT_SERVICE= 'correct_service'
+CORRECT_TABLES= 'correct_tables'
+NUM_QUERY= 'num_query'
 
 # udf query extraction parameters
-QUERY_EXTRACTED='query_after_extraction'
-DATAFRAME_SQL='dataframe_sql'
-UDF_MAPPING='udf_mapping'
-COL_NAMES='col_names'
-FUNCTION_NAME='function_name'
-RESULT_COL_NAME='result_col_name'
-SELECT_COL='select_col'
-FILTER_PREDICATE='filter_predicate'
+QUERY_EXTRACTED= 'query_after_extraction'
+DATAFRAME_SQL= 'dataframe_sql'
+UDF_MAPPING= 'udf_mapping'
+COL_NAMES= 'col_names'
+FUNCTION_NAME= 'function_name'
+RESULT_COL_NAME= 'result_col_name'
+SELECT_COL= 'select_col'
+FILTER_PREDICATE= 'filter_predicate'
 
 class QueryParsingTests(IsolatedAsyncioTestCase):
   def are_lists_equal(self, list1, list2):
@@ -61,7 +61,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     
        
     queries = {
-    "test_query_0":{
+    "test_query_0": {
         QUERY_STR: '''
                     SELECT color as alias_color
                     FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame
@@ -74,15 +74,15 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                   "OR colors02.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100)"),
         # test replacing column with root column in filtering predicate,
         # the root column of 'colors02.object_id' is 'objects00'
-        CORRECT_FP : [['colors02.color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)',
+        CORRECT_FP: [['colors02.color IN (SELECT table2.color AS alias_color2 FROM colors02 AS table2)',
                     'objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 100)']],
         # filter predicates connected by OR are in same set
-        CORRECT_SERVICE : [{'colors02', 'objects00'}],
-        CORRECT_TABLES : [{'colors02', 'objects00'}],
-        NUM_QUERY:3
+        CORRECT_SERVICE: [{'colors02', 'objects00'}],
+        CORRECT_TABLES: [{'colors02', 'objects00'}],
+        NUM_QUERY: 3
     },
     # test table alias
-    "test_query_1":{
+    "test_query_1": {
         QUERY_STR: '''
                     SELECT table1.color FROM colors02 AS table1 WHERE frame IN (SELECT * FROM blobs_00)
                     AND object_id > 0
@@ -93,16 +93,16 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                 "AND colors02.object_id > 0"),
         # test replacing column with root column in filtering predicate,
         # the root column of 'colors02.object_id' is 'objects00'
-        CORRECT_FP :[['blobs_00.frame IN (SELECT * FROM blobs_00)'],
+        CORRECT_FP: [['blobs_00.frame IN (SELECT * FROM blobs_00)'],
                    ['objects00.object_id > 0']],
         # filter predicates connected by AND are in different set
-        CORRECT_SERVICE : [set(), {'objects00'}],
-        CORRECT_TABLES : [set(), {'objects00'}],
-        NUM_QUERY:2
+        CORRECT_SERVICE: [set(), {'objects00'}],
+        CORRECT_TABLES: [set(), {'objects00'}],
+        NUM_QUERY: 2
     },
     # test sub-subquery
-     "test_query_2":{
-        QUERY_STR:'''SELECT frame, object_id FROM colors02 AS cl
+     "test_query_2": {
+        QUERY_STR: '''SELECT frame, object_id FROM colors02 AS cl
                         WHERE cl.object_id > (SELECT AVG(object_id) FROM objects00
                                               WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))
                     ''',
@@ -111,16 +111,16 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                 "(SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"),
         # test replacing column with root column in filtering predicate,
         # the root column of 'colors02.object_id' is 'objects00'
-        CORRECT_FP : [["objects00.object_id > (SELECT AVG(object_id) FROM objects00 "
+        CORRECT_FP: [["objects00.object_id > (SELECT AVG(object_id) FROM objects00 "
                    "WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"]],
         # filter predicates connected by AND are in different set
-        CORRECT_SERVICE : [{'objects00'}],
-        CORRECT_TABLES :  [{'objects00'}],
-        NUM_QUERY:3
+        CORRECT_SERVICE: [{'objects00'}],
+        CORRECT_TABLES:  [{'objects00'}],
+        NUM_QUERY: 3
     },
     # test multiple aliases
-     "test_query_3":{
-        QUERY_STR:'''
+     "test_query_3": {
+        QUERY_STR: '''
                     SELECT color, table2.x_min
                     FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
                     WHERE color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)
@@ -130,11 +130,11 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3) "
                                 "AND objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"),
-        CORRECT_FP :[["colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)"],
+        CORRECT_FP: [["colors02.color IN (SELECT table3.color AS alias_color2 FROM colors02 AS table3)"],
                    ["objects00.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]],
-        CORRECT_SERVICE : [{'colors02'}, {'objects00'}],
-        CORRECT_TABLES : [{'colors02'}, {'objects00'}],
-        NUM_QUERY:3
+        CORRECT_SERVICE: [{'colors02'}, {'objects00'}],
+        CORRECT_TABLES: [{'colors02'}, {'objects00'}],
+        NUM_QUERY: 3
     },
      # comparison between subquery
      "test_query_4":{
@@ -149,12 +149,12 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE (SELECT table3.color AS alias_color2 FROM colors02 AS table3) "
                                 "> (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"),
-        CORRECT_FP :[["(SELECT table3.color AS alias_color2 FROM colors02 AS table3) > "
+        CORRECT_FP: [["(SELECT table3.color AS alias_color2 FROM colors02 AS table3) > "
                    "(SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500)"]],
       
-        CORRECT_SERVICE : [{}],
-        CORRECT_TABLES :[{}],
-        NUM_QUERY:3
+        CORRECT_SERVICE: [{}],
+        CORRECT_TABLES:[{}],
+        NUM_QUERY: 3
     },
      "test_query_5":{
         QUERY_STR:'''
@@ -163,10 +163,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                     ''',
         NORMALIZED_QUERY_STR: ("SELECT colors02.color, objects00.x_min, objects00.y_min "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame"),
-        CORRECT_FP :[[]],
-        CORRECT_SERVICE : [{}],
-        CORRECT_TABLES : [{}],
-        NUM_QUERY:1
+        CORRECT_FP: [[]],
+        CORRECT_SERVICE: [{}],
+        CORRECT_TABLES: [{}],
+        NUM_QUERY: 1
     },
      "test_query_6":{
         QUERY_STR: '''
@@ -177,10 +177,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         NORMALIZED_QUERY_STR: ("SELECT colors02.color, objects00.x_min, blobs_00.frame "
                                 "FROM colors02 LEFT JOIN objects00 ON colors02.frame = objects00.frame "
                                 "JOIN blobs_00 ON objects00.frame = blobs_00.frame"),
-        CORRECT_FP :[[]],
-        CORRECT_SERVICE : [{}],
-        CORRECT_TABLES : [{}],
-        NUM_QUERY:1
+        CORRECT_FP: [[]],
+        CORRECT_SERVICE: [{}],
+        CORRECT_TABLES: [{}],
+        NUM_QUERY: 1
     },
      "test_query_7":{
         QUERY_STR: '''
@@ -191,10 +191,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         NORMALIZED_QUERY_STR:  ("SELECT colors02.color, objects00.x_min, colors02.frame "
                                 "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE colors02.color = 'blue' AND objects00.x_min > 600"),
-        CORRECT_FP :[["colors02.color = 'blue'"], ['objects00.x_min > 600']],
-        CORRECT_SERVICE : [{'colors02'}, {'objects00'}],
-        CORRECT_TABLES : [{'colors02'}, {'objects00'}],
-        NUM_QUERY:1
+        CORRECT_FP: [["colors02.color = 'blue'"], ['objects00.x_min > 600']],
+        CORRECT_SERVICE: [{'colors02'}, {'objects00'}],
+        CORRECT_TABLES: [{'colors02'}, {'objects00'}],
+        NUM_QUERY: 1
     },
      "test_query_8":{
         QUERY_STR:'''
@@ -206,10 +206,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                                 "objects00.x_max, objects00.y_max) "
                                 "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
                                 "WHERE objects00.frame > 10000 OR objects00.y_max < 800"),
-        CORRECT_FP : [['blobs_00.frame > 10000', 'objects00.y_max < 800']],
-        CORRECT_SERVICE : [{'objects00'}],
-        CORRECT_TABLES : [{'objects00'}],
-        NUM_QUERY:1
+        CORRECT_FP: [['blobs_00.frame > 10000', 'objects00.y_max < 800']],
+        CORRECT_SERVICE: [{'objects00'}],
+        CORRECT_TABLES: [{'objects00'}],
+        NUM_QUERY: 1
     }
 }
     for i in range(len(queries)):
@@ -227,13 +227,13 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     config = aidb_engine._config
     queries = {
       # approx aggregation as a subquery
-      "query_str1":'''
+      "query_str1": '''
                  SELECT x_min FROM  objects00
                  WHERE x_min > (SELECT AVG(x_min) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%)
                  AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
                  ''',
       # approx select as a subquery
-      "query_str2":'''
+      "query_str2": '''
                  SELECT x_min FROM  objects00
                  WHERE frame IN (SELECT frame FROM colors02 where color LIKE 'blue'
                     RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%;)
@@ -260,22 +260,22 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     
     queries = {
     # approx aggregation as a subquery
-    "test_query_0":{
-        QUERY_STR:'''
+    "test_query_0": {
+        QUERY_STR: '''
                  SELECT AVG(x_min) FROM  objects00
                  WHERE frame > (SELECT AVG(frame) FROM blobs_00)
                  ERROR_TARGET 10% CONFIDENCE 95%;
                  ''',
-        NORMALIZED_QUERY_STR:("SELECT AVG(objects00.x_min) "
+        NORMALIZED_QUERY_STR: ("SELECT AVG(objects00.x_min) "
                              "FROM objects00 "
                              "WHERE objects00.frame > (SELECT AVG(frame) FROM blobs_00) ERROR_TARGET 10% CONFIDENCE 95%"),
  
-        CORRECT_FP :[["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]],
+        CORRECT_FP : [["blobs_00.frame > (SELECT AVG(frame) FROM blobs_00)"]],
         
         # filter predicates connected by OR are in same set
-        CORRECT_SERVICE : [{}],
-        CORRECT_TABLES : [{}],
-        NUM_QUERY:2
+        CORRECT_SERVICE: [{}],
+        CORRECT_TABLES: [{}],
+        NUM_QUERY: 2
     },
      "test_query_1":{
         QUERY_STR: '''
@@ -288,10 +288,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
                              "WHERE colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000) "
                              "RECALL_TARGET 80% "
                              "CONFIDENCE 95%"),
-        CORRECT_FP :[["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]],
-        CORRECT_SERVICE : [{'colors02'}],
-        CORRECT_TABLES : [{'colors02'}],
-        NUM_QUERY:2
+        CORRECT_FP:[["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]],
+        CORRECT_SERVICE: [{'colors02'}],
+        CORRECT_TABLES: [{'colors02'}],
+        NUM_QUERY: 2
     }
 }
     for i in range(len(queries)):
@@ -342,7 +342,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, objects00.y_max AS col__2 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600)",
-      DATAFRAME_SQL:{
+      DATAFRAME_SQL: {
         UDF_MAPPING: [
           {COL_NAMES: ['col__0', 'col__1'],
            FUNCTION_NAME: 'function1',
@@ -357,7 +357,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       },
     
     # test function with constant parameters
-    "test_query_1" : {
+    "test_query_1": {
       QUERY_STR:
         '''
         SELECT x_min, function1(y_min, 2, 3)
@@ -380,7 +380,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
 
     # user defined function in JOIN clause
-    "test_query_2" : {
+    "test_query_2": {
       QUERY_STR:
         '''
         SELECT objects00.frame, x_min, y_max, color
@@ -408,7 +408,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       },
       
     # user defined function in WHERE clause
-    "test_query_3" : {
+    "test_query_3": {
       QUERY_STR:
         '''
         SELECT objects00.frame, x_min, y_max, color
@@ -439,7 +439,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
 
     # user defined function in SELECT, JOIN, WHERE clause
-    "test_query_4" : {
+    "test_query_4": {
       QUERY_STR:
         '''
         SELECT multiply_function(x_min, y_max), color
@@ -473,7 +473,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
 
     # OR operator in WHERE clause
-    "test_query_5" :{
+    "test_query_5": {
       QUERY_STR:
         '''
         SELECT x_min, y_max, color
@@ -504,7 +504,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
   
     # comparison between user defined function
-    "test_query_6" : {
+    "test_query_6": {
       QUERY_STR:
         '''
         SELECT x_min, y_max, color
@@ -538,7 +538,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
     
     # test user defined function with alias
-    "test_query_7" : {
+    "test_query_7": {
       QUERY_STR:
         '''
         SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min, y_max
@@ -560,7 +560,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
       }
     },
-    "test_query_8" : {
+    "test_query_8": {
       QUERY_STR:
         '''
         SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min AS col1, y_max AS col2
@@ -584,7 +584,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
 
     # single output user defined function with alias
-    "test_query_9" : {
+    "test_query_9": {
       QUERY_STR:
         '''
         SELECT max_function(y_max, y_min) AS output1, power_function(x_min, 2) AS output2, y_min, color
@@ -619,7 +619,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
     
     # test user defined functions both within the database and within AIDB
-    "test_query_10" :{
+    "test_query_10": {
       QUERY_STR:
         '''
         SELECT multiply_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
@@ -642,7 +642,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       }
     },
   
-    "test_query_11" : {
+    "test_query_11": {
       QUERY_STR:
         '''
         SELECT database_add_function(y_max, x_min), multiply_function(y_min, y_max), color
@@ -673,7 +673,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       }
     },    
     
-    "test_query_12" : {
+    "test_query_12": {
       QUERY_STR:
         '''
         SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max)
