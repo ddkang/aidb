@@ -91,7 +91,7 @@ class Query(object):
         extracted_query = Query(node.sql(), self.config)
         if depth != 0 :
           if extracted_query.is_approx_agg_query or extracted_query.is_approx_select_query:
-            raise Exception("We don't support using approx query as a subquery")
+            raise Exception("AIDB does not support using approx query as a subquery")
 
         all_queries.append((Query(node.sql(), self.config), depth))
 
@@ -528,6 +528,10 @@ class Query(object):
         if input_table in self.config.blob_tables:
           blob_tables.add(input_table)
 
+    for table in self.tables_in_query:
+      if table in self.config.blob_tables:
+        blob_tables.add(table)
+
     return list(blob_tables)
 
 
@@ -589,7 +593,7 @@ class Query(object):
       elif isinstance(aggregate_expression, exp.Sum):
         agg_type_with_cols.append(exp.Sum)
       else:
-        raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+        raise Exception('AIDB only support approximation for Avg, Sum and Count query currently.')
     return agg_type_with_cols
 
 
@@ -602,13 +606,13 @@ class Query(object):
 
     if self._expression.find(exp.Group) is not None:
       raise Exception(
-          '''We do not support GROUP BY for approximate aggregation queries. 
+          '''AIDB does not support GROUP BY for approximate aggregation queries. 
           Try running without the error target and confidence.'''
       )
 
     if self._expression.find(exp.Join) is not None:
       raise Exception(
-          '''We do not support Join for approximate aggregation queries. 
+          '''AIDB does not support Join for approximate aggregation queries. 
           Try running without the error target and confidence.'''
       )
 
@@ -642,7 +646,7 @@ class Query(object):
   @cached_property
   def is_approx_select_query(self):
     if self.precision_target is not None:
-      raise Exception("We haven't support approx select query with precision target.")
+      raise Exception("AIDB has not support approx select query with precision target.")
     return self.recall_target is not None
 
 
@@ -746,12 +750,15 @@ class Query(object):
       if isinstance(expression.parent, exp.UserFunction):
         if (expression.parent.args['this'] in self.config.user_defined_functions
             and expression.args['this'] in self.config.user_defined_functions):
-          raise Exception("We don't support nested user defined function currently")
+          raise Exception("AIDB does not support nested user defined function currently")
+
+    if self._expression.find(exp.AggFunc) is not None:
+      raise Exception("AIDB does not support user defined function for aggregation query")
 
     if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
-      raise Exception('We only support user defined function for exact query currently.')
+      raise Exception('AIDB only support user defined function for exact query currently.')
     if len(self.all_queries_in_expressions) > 1:
-      raise Exception("We don't support user defined function with nested query currently")
+      raise Exception("AIDB does not support user defined function with nested query currently")
 
 
 
@@ -807,6 +814,9 @@ class Query(object):
 
 
       def add_column_with_alias(self, node, is_select_col = False, predefined_alias = None):
+        if isinstance(node, exp.AggFunc):
+          return
+
         if node not in self.added_select:
           self.added_select.add(node)
           if predefined_alias:
