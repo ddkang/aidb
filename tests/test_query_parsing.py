@@ -14,20 +14,20 @@ DB_URL = "sqlite+aiosqlite://"
 # normal query extraction parameters
 QUERY_STR = 'query_str'
 NORMALIZED_QUERY_STR = 'normalized_query_str'
-CORRECT_FP= 'correct_fp'
-CORRECT_SERVICE= 'correct_service'
-CORRECT_TABLES= 'correct_tables'
-NUM_QUERY= 'num_query'
+CORRECT_FP = 'correct_fp'
+CORRECT_SERVICE = 'correct_service'
+CORRECT_TABLES = 'correct_tables'
+NUM_QUERY = 'num_query'
 
 # udf query extraction parameters
-QUERY_EXTRACTED= 'query_after_extraction'
-DATAFRAME_SQL= 'dataframe_sql'
-UDF_MAPPING= 'udf_mapping'
-COL_NAMES= 'col_names'
-FUNCTION_NAME= 'function_name'
-RESULT_COL_NAME= 'result_col_name'
-SELECT_COL= 'select_col'
-FILTER_PREDICATE= 'filter_predicate'
+QUERY_EXTRACTED = 'query_after_extraction'
+DATAFRAME_SQL = 'dataframe_sql'
+UDF_MAPPING = 'udf_mapping'
+COL_NAMES = 'col_names'
+FUNCTION_NAME = 'function_name'
+RESULT_COL_NAME = 'result_col_name'
+SELECT_COL = 'select_col'
+FILTER_PREDICATE = 'filter_predicate'
 
 class QueryParsingTests(IsolatedAsyncioTestCase):
   def are_lists_equal(self, list1, list2):
