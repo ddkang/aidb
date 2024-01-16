@@ -168,28 +168,32 @@ class HTTPInferenceService(CachedInferenceService):
         if len(output[k]) > 0:
           assert isinstance(output[k][0], _type), f'Output column {k} must be of type {_type}'
 
-    return pd.DataFrame(output)
+    return output
 
 
   @call_counter
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     request = self.convert_input_to_request(input)
     response = self.request(request)
-    output = self.convert_response_to_output(response)
+    output = self.convert_response_to_output(response[0])
 
-    return output
+    return pd.DataFrame(output)
 
 
   def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
     if not self._batch_supported:
       return super().infer_batch(inputs)
     
-    body = inputs.to_json(orient='records')
-    response = requests.post(self._url, data=body, headers=self._headers)
+    body = inputs.to_dict(orient='list')
+    response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-
     # We assume the server returns a list of responses
+    # We assume the length of the list of responses should match that of the inputs
+    # Each element in response list must correspond to the input with the same index
+    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
-    outputs = [pd.read_json(r, orient='records') for r in response]
+    if len(response) != len(inputs):
+      raise Exception('The length of the inference results should match that of the inputs.')
 
-    return outputs
+    response_df_list = [pd.DataFrame(item) for item in response]
+    return response_df_list
