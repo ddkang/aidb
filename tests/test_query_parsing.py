@@ -20,7 +20,11 @@ class QueryParameters(str, Enum):
   CORRECT_SERVICE = 'correct_service'
   CORRECT_TABLES = 'correct_tables'
   NUM_OF_SELECT_CLAUSES = 'num_of_select_clauses'
+  
+  def __str__(self) -> str:
+        return self.value
 
+class UDFQueryParameters(str, Enum):
   # udf query extraction parameters
   QUERY_EXTRACTED = 'query_after_extraction'
   DATAFRAME_SQL = 'dataframe_sql'
@@ -306,16 +310,16 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     def _test_equality(test_query, config):
       query = Query(test_query[QueryParameters.QUERY_STR], config)
       dataframe_sql, query_after_extraction = query.udf_query
-      self.assertEqual(query_after_extraction.sql_str, test_query[QueryParameters.QUERY_EXTRACTED])
-      assert len(dataframe_sql[QueryParameters.UDF_MAPPING]) == len(test_query[QueryParameters.DATAFRAME_SQL][QueryParameters.UDF_MAPPING])
-      assert all(any(e1 == e2 for e2 in dataframe_sql[QueryParameters.UDF_MAPPING])
-                for e1 in test_query[QueryParameters.DATAFRAME_SQL][QueryParameters.UDF_MAPPING])
-      assert dataframe_sql[QueryParameters.SELECT_COL] == test_query[QueryParameters.DATAFRAME_SQL][QueryParameters.SELECT_COL]
-      filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql[QueryParameters.FILTER_PREDICATE])
+      self.assertEqual(query_after_extraction.sql_str, test_query[UDFQueryParameters.QUERY_EXTRACTED])
+      assert len(dataframe_sql[UDFQueryParameters.UDF_MAPPING]) == len(test_query[UDFQueryParameters.DATAFRAME_SQL][UDFQueryParameters.UDF_MAPPING])
+      assert all(any(e1 == e2 for e2 in dataframe_sql[UDFQueryParameters.UDF_MAPPING])
+                for e1 in test_query[UDFQueryParameters.DATAFRAME_SQL][UDFQueryParameters.UDF_MAPPING])
+      assert dataframe_sql[UDFQueryParameters.SELECT_COL] == test_query[UDFQueryParameters.DATAFRAME_SQL][UDFQueryParameters.SELECT_COL]
+      filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql[UDFQueryParameters.FILTER_PREDICATE])
       if filter_predicate:
         filter_predicate = filter_predicate.sql()
 
-      assert filter_predicate == test_query[QueryParameters.DATAFRAME_SQL][QueryParameters.FILTER_PREDICATE]
+      assert filter_predicate == test_query[UDFQueryParameters.DATAFRAME_SQL][UDFQueryParameters.FILTER_PREDICATE]
 
 
     dirname = os.path.dirname(__file__)
@@ -343,21 +347,21 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00
         WHERE x_min > 600
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, objects00.y_max AS col__2 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'function1',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: [],
-           QueryParameters.FUNCTION_NAME: 'function2',
-           QueryParameters.RESULT_COL_NAME: ['function__1']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'function1',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: [],
+           UDFQueryParameters.FUNCTION_NAME: 'function2',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'function__0', 'col__2', 'function__1'],
-        QueryParameters.FILTER_PREDICATE: None
+        UDFQueryParameters.SELECT_COL: ['col__0', 'function__0', 'col__2', 'function__1'],
+        UDFQueryParameters.FILTER_PREDICATE: None
         }
       },
     
@@ -369,18 +373,18 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00
         WHERE x_min > 600
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, 2 AS col__2, 3 AS col__3 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__1', 'col__2', 'col__3'],
-           QueryParameters.FUNCTION_NAME: 'function1',
-           QueryParameters.RESULT_COL_NAME: ['function__0']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__1', 'col__2', 'col__3'],
+           UDFQueryParameters.FUNCTION_NAME: 'function1',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'function__0'],
-        QueryParameters.FILTER_PREDICATE: None
+        UDFQueryParameters.SELECT_COL: ['col__0', 'function__0'],
+        UDFQueryParameters.FILTER_PREDICATE: None
       }
     },
 
@@ -393,22 +397,22 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE color = 'blue'
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
         "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6 "
         "FROM objects00 CROSS JOIN colors02 "
         "WHERE (colors02.color = 'blue')",
-      QueryParameters.DATAFRAME_SQL:{
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__4'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']}
+      UDFQueryParameters.DATAFRAME_SQL:{
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__4'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2', 'col__3'],
-        QueryParameters.FILTER_PREDICATE: '(function__0 = TRUE) AND (function__1 = TRUE)'
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2', 'col__3'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__0 = TRUE) AND (function__1 = TRUE)'
         }
       },
       
@@ -421,25 +425,25 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         WHERE is_equal(objects00.frame, colors02.frame) = TRUE
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE AND sum_function(x_max, y_min) > 1500
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
         "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.x_max AS col__7, objects00.y_min AS col__8 "
         "FROM objects00 CROSS JOIN colors02",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__4'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
-          {QueryParameters.COL_NAMES: ['col__7', 'col__8'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['function__2']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__4'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
+          {UDFQueryParameters.COL_NAMES: ['col__7', 'col__8'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2', 'col__3'],
-        QueryParameters.FILTER_PREDICATE: '(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500)'
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2', 'col__3'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500)'
       }
     },
 
@@ -452,28 +456,28 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE sum_function(x_min, y_min) > 1500
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
         "FROM objects00 CROSS JOIN colors02",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__3', 'col__4'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__2']},
-          {QueryParameters.COL_NAMES: ['col__0', 'col__7'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['function__3']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__3', 'col__4'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']},
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__7'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__3']}
         ],
-        QueryParameters.SELECT_COL: ['function__0', 'col__2'],
-        QueryParameters.FILTER_PREDICATE: '(function__1 = TRUE) AND (function__2 = TRUE) AND (function__3 > 1500)'
+        UDFQueryParameters.SELECT_COL: ['function__0', 'col__2'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__1 = TRUE) AND (function__2 = TRUE) AND (function__3 > 1500)'
       }
     },
 
@@ -486,25 +490,25 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE sum_function(x_min, y_min) > 1500 OR color = 'blue'
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
         "FROM objects00 CROSS JOIN colors02",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__3', 'col__4'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
-          {QueryParameters.COL_NAMES: ['col__0', 'col__7'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['function__2']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__3', 'col__4'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__7'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2'],
-        QueryParameters.FILTER_PREDICATE: "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500 OR col__2 = 'blue')"
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2'],
+        UDFQueryParameters.FILTER_PREDICATE: "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > 1500 OR col__2 = 'blue')"
       }
     },
   
@@ -517,28 +521,28 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE sum_function(x_min, y_min) > multiply_function(x_min, y_min)
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
         "FROM objects00 CROSS JOIN colors02",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__3', 'col__4'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
-          {QueryParameters.COL_NAMES: ['col__0', 'col__7'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['function__2']},
-          {QueryParameters.COL_NAMES: ['col__0', 'col__7'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__3']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__3', 'col__4'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__7'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']},
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__7'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__3']}
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2'],
-        QueryParameters.FILTER_PREDICATE: "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > function__3)"
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'col__2'],
+        UDFQueryParameters.FILTER_PREDICATE: "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > function__3)"
       }
     },
     
@@ -550,19 +554,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00
         WHERE (x_min > 600 AND output1 LIKE 'blue') OR (y_max < 1000 AND x_max < 1000)
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, objects00.object_id AS col__1, objects00.x_min AS col__2, "
         "objects00.y_max AS col__3, objects00.x_max AS col__4 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600 OR objects00.y_max < 1000) AND (objects00.x_min > 600 OR objects00.x_max < 1000)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'colors_inference',
-           QueryParameters.RESULT_COL_NAME: ['output1', 'output2', 'output3']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'colors_inference',
+           UDFQueryParameters.RESULT_COL_NAME: ['output1', 'output2', 'output3']}
         ],
-        QueryParameters.SELECT_COL: ['output1', 'output2', 'output3', 'col__2', 'col__3'],
-        QueryParameters.FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
+        UDFQueryParameters.SELECT_COL: ['output1', 'output2', 'output3', 'col__2', 'col__3'],
+        UDFQueryParameters.FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
       }
     },
     "test_query_8": {
@@ -572,19 +576,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00
         WHERE (col1 > 600 AND output1 LIKE 'blue') OR (col2 < 1000 AND x_max < 1000)
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, objects00.object_id AS col__1, objects00.x_min AS col__2, "
         "objects00.y_max AS col__3, objects00.x_max AS col__4 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600 OR objects00.y_max < 1000) AND (objects00.x_min > 600 OR objects00.x_max < 1000)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'colors_inference',
-           QueryParameters.RESULT_COL_NAME: ['output1', 'output2', 'output3']}
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'colors_inference',
+           UDFQueryParameters.RESULT_COL_NAME: ['output1', 'output2', 'output3']}
         ],
-        QueryParameters.SELECT_COL: ['output1', 'output2', 'output3', 'col__2', 'col__3'],
-        QueryParameters.FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
+        UDFQueryParameters.SELECT_COL: ['output1', 'output2', 'output3', 'col__2', 'col__3'],
+        UDFQueryParameters.FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
       }
     },
 
@@ -597,29 +601,29 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         WHERE is_equal(objects00.frame, colors02.frame) = TRUE AND is_equal(objects00.object_id, colors02.object_id)
             = TRUE AND (x_min > 600 OR (x_max >600 AND y_min > 800)) AND output1 > 1000 AND output2 > 640000
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.y_max AS col__0, objects00.y_min AS col__1, objects00.x_min AS col__2, 2 AS col__3, "
         "colors02.color AS col__4, objects00.frame AS col__5, colors02.frame AS col__6, objects00.object_id AS col__7, "
         "colors02.object_id AS col__8 "
         "FROM objects00 CROSS JOIN colors02 "
         "WHERE (objects00.x_min > 600 OR objects00.x_max > 600) AND (objects00.x_min > 600 OR objects00.y_min > 800)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'max_function',
-           QueryParameters.RESULT_COL_NAME: ['output1']},
-          {QueryParameters.COL_NAMES: ['col__2', 'col__3'],
-           QueryParameters.FUNCTION_NAME: 'power_function',
-           QueryParameters.RESULT_COL_NAME: ['output2']},
-          {QueryParameters.COL_NAMES: ['col__5', 'col__6'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__2']},
-          {QueryParameters.COL_NAMES: ['col__7', 'col__8'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__3']},
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'max_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['output1']},
+          {UDFQueryParameters.COL_NAMES: ['col__2', 'col__3'],
+           UDFQueryParameters.FUNCTION_NAME: 'power_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['output2']},
+          {UDFQueryParameters.COL_NAMES: ['col__5', 'col__6'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']},
+          {UDFQueryParameters.COL_NAMES: ['col__7', 'col__8'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__3']},
         ],
-        QueryParameters.SELECT_COL: ['output1', 'output2', 'col__1', 'col__4'],
-        QueryParameters.FILTER_PREDICATE: "(function__2 = TRUE) AND (function__3 = TRUE) AND (output1 > 1000) AND (output2 > 640000)"
+        UDFQueryParameters.SELECT_COL: ['output1', 'output2', 'col__1', 'col__4'],
+        UDFQueryParameters.FILTER_PREDICATE: "(function__2 = TRUE) AND (function__3 = TRUE) AND (output1 > 1000) AND (output2 > 640000)"
       }
     },
     
@@ -631,19 +635,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00
         WHERE x_min > 600 AND y_max < 1000
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, database_multiply_function(objects00.x_min, "
         "objects00.y_min) AS col__2, objects00.x_max AS col__3, objects00.y_max AS col__4 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600) AND (objects00.y_max < 1000)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__0', 'col__1'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__0', 'col__1'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
         ],
-        QueryParameters.SELECT_COL: ['function__0', 'col__2', 'col__3', 'col__4'],
-        QueryParameters.FILTER_PREDICATE: None
+        UDFQueryParameters.SELECT_COL: ['function__0', 'col__2', 'col__3', 'col__4'],
+        UDFQueryParameters.FILTER_PREDICATE: None
       }
     },
   
@@ -655,26 +659,26 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT database_add_function(objects00.y_max, objects00.x_min) AS col__0, objects00.y_min AS col__1, "
         "objects00.y_max AS col__2, colors02.color AS col__3, objects00.frame AS col__4, colors02.frame AS col__5, "
         "objects00.object_id AS col__6, colors02.object_id AS col__7 "
         "FROM objects00 CROSS JOIN colors02 "
         "WHERE (objects00.x_min > 600 OR objects00.x_max > 600) AND (objects00.x_min > 600 OR objects00.y_min > 800)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__1', 'col__2'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__4', 'col__5'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
-          {QueryParameters.COL_NAMES: ['col__6', 'col__7'],
-           QueryParameters.FUNCTION_NAME: 'is_equal',
-           QueryParameters.RESULT_COL_NAME: ['function__2']},
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__1', 'col__2'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__4', 'col__5'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
+          {UDFQueryParameters.COL_NAMES: ['col__6', 'col__7'],
+           UDFQueryParameters.FUNCTION_NAME: 'is_equal',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__2']},
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'function__0', 'col__3'],
-        QueryParameters.FILTER_PREDICATE: '(function__1 = TRUE) AND (function__2 = TRUE)'
+        UDFQueryParameters.SELECT_COL: ['col__0', 'function__0', 'col__3'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__1 = TRUE) AND (function__2 = TRUE)'
       }
     },    
     
@@ -686,23 +690,23 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         WHERE (multiply_function(x_min, y_min) > 400000 AND database_add_function(y_max, x_min) < 1600)
             OR database_multiply_function(x_min, y_min) > 500000
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
         "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
         "FROM objects00 "
         "WHERE (database_add_function(objects00.y_max, objects00.x_min) < 1600 OR "
         "database_multiply_function(objects00.x_min, objects00.y_min) > 500000)",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__2', 'col__3'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['function__0']},
-          {QueryParameters.COL_NAMES: ['col__4', 'col__5'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__2', 'col__3'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__0']},
+          {UDFQueryParameters.COL_NAMES: ['col__4', 'col__5'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'function__0'],
-        QueryParameters.FILTER_PREDICATE: '(function__1 > 400000 OR col__1 > 500000)'
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'function__0'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__1 > 400000 OR col__1 > 500000)'
       }
     },
     
@@ -714,21 +718,21 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         WHERE (multiply_function(x_min, y_min) > 400000 AND output1 < 1600)
             OR database_multiply_function(x_min, y_min) > 500000
         ''',
-      QueryParameters.QUERY_EXTRACTED:
+      UDFQueryParameters.QUERY_EXTRACTED:
         "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
         "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
         "FROM objects00",
-      QueryParameters.DATAFRAME_SQL: {
-        QueryParameters.UDF_MAPPING: [
-          {QueryParameters.COL_NAMES: ['col__2', 'col__3'],
-           QueryParameters.FUNCTION_NAME: 'sum_function',
-           QueryParameters.RESULT_COL_NAME: ['output1']},
-          {QueryParameters.COL_NAMES: ['col__4', 'col__5'],
-           QueryParameters.FUNCTION_NAME: 'multiply_function',
-           QueryParameters.RESULT_COL_NAME: ['function__1']},
+      UDFQueryParameters.DATAFRAME_SQL: {
+        UDFQueryParameters.UDF_MAPPING: [
+          {UDFQueryParameters.COL_NAMES: ['col__2', 'col__3'],
+           UDFQueryParameters.FUNCTION_NAME: 'sum_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['output1']},
+          {UDFQueryParameters.COL_NAMES: ['col__4', 'col__5'],
+           UDFQueryParameters.FUNCTION_NAME: 'multiply_function',
+           UDFQueryParameters.RESULT_COL_NAME: ['function__1']},
         ],
-        QueryParameters.SELECT_COL: ['col__0', 'col__1', 'output1'],
-        QueryParameters.FILTER_PREDICATE: '(function__1 > 400000 OR col__1 > 500000) AND (output1 < 1600 OR col__1 > 500000)'
+        UDFQueryParameters.SELECT_COL: ['col__0', 'col__1', 'output1'],
+        UDFQueryParameters.FILTER_PREDICATE: '(function__1 > 400000 OR col__1 > 500000) AND (output1 < 1600 OR col__1 > 500000)'
       }
     }
   }
