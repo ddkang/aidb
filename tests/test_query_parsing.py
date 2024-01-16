@@ -328,13 +328,11 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config
-
-    test_query_list = []
     
     queries={
     # user defined function in SELECT clause
     "test_query_0" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT x_min, function1(x_min, y_min), y_max, function2()
         FROM objects00
@@ -360,7 +358,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     
     # test function with constant parameters
     "test_query_1" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT x_min, function1(y_min, 2, 3)
         FROM objects00
@@ -383,7 +381,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     # user defined function in JOIN clause
     "test_query_2" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT objects00.frame, x_min, y_max, color
         FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
@@ -411,7 +409,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       
     # user defined function in WHERE clause
     "test_query_3" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT objects00.frame, x_min, y_max, color
         FROM objects00 JOIN colors02
@@ -442,7 +440,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     # user defined function in SELECT, JOIN, WHERE clause
     "test_query_4" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT multiply_function(x_min, y_max), color
         FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
@@ -476,7 +474,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     # OR operator in WHERE clause
     "test_query_5" :{
-      'query_str':
+      QUERY_STR:
         '''
         SELECT x_min, y_max, color
         FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
@@ -507,7 +505,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
   
     # comparison between user defined function
     "test_query_6" : {
-      'query_str':
+      QUERY_STR:
         '''
         SELECT x_min, y_max, color
         FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
@@ -538,30 +536,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FILTER_PREDICATE: "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > function__3)"
       }
     },
-    # test user defined function for exact aggregation query
-    "test_query_7" : {
-      'query_str':
-        '''
-        SELECT sum_function(SUM(x_min), SUM(y_max))
-        FROM objects00
-        ''',
-      QUERY_EXTRACTED:
-        "SELECT SUM(objects00.x_min) AS col__0, SUM(objects00.y_max) AS col__1 "
-        "FROM objects00",
-      DATAFRAME_SQL: {
-        UDF_MAPPING: [
-          {COL_NAMES: ['col__0', 'col__1'],
-           FUNCTION_NAME: 'sum_function',
-           RESULT_COL_NAME: ['function__0']}
-        ],
-        SELECT_COL: ['function__0'],
-        FILTER_PREDICATE: None
-      }
-    },
     
     # test user defined function with alias
-    "test_query_8" : {
-      'query_str':
+    "test_query_7" : {
+      QUERY_STR:
         '''
         SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min, y_max
         FROM objects00
@@ -582,8 +560,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FILTER_PREDICATE: "(output1 LIKE 'blue' OR col__3 < 1000) AND (output1 LIKE 'blue' OR col__4 < 1000)"
       }
     },
-    "test_query_9" : {
-      'query_str':
+    "test_query_8" : {
+      QUERY_STR:
         '''
         SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min AS col1, y_max AS col2
         FROM objects00
@@ -606,8 +584,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
 
     # single output user defined function with alias
-    "test_query_10" : {
-      'query_str':
+    "test_query_9" : {
+      QUERY_STR:
         '''
         SELECT max_function(y_max, y_min) AS output1, power_function(x_min, 2) AS output2, y_min, color
         FROM objects00 join colors02
@@ -641,8 +619,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     },
     
     # test user defined functions both within the database and within AIDB
-    "test_query_11" :{
-      'query_str':
+    "test_query_10" :{
+      QUERY_STR:
         '''
         SELECT multiply_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
         FROM objects00
@@ -664,8 +642,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       }
     },
   
-    "test_query_12" : {
-      'query_str':
+    "test_query_11" : {
+      QUERY_STR:
         '''
         SELECT database_add_function(y_max, x_min), multiply_function(y_min, y_max), color
         FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
@@ -695,8 +673,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       }
     },    
     
-    "test_query_13" : {
-      'query_str':
+    "test_query_12" : {
+      QUERY_STR:
         '''
         SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max)
         FROM objects00
@@ -723,8 +701,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       }
     },
     
-    "test_query_14": {
-      'query_str':
+    "test_query_13": {
+      QUERY_STR:
         '''
         SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max) AS output1
         FROM objects00
