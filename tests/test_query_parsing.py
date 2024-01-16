@@ -11,7 +11,7 @@ from tests.utils import setup_gt_and_aidb_engine
 
 DB_URL = "sqlite+aiosqlite://"
 
-#normal query extraction parameters
+# normal query extraction parameters
 QUERY_STR = 'query_str'
 NORMALIZED_QUERY_STR = 'normalized_query_str'
 CORRECT_FP='correct_fp'
@@ -19,7 +19,7 @@ CORRECT_SERVICE='correct_service'
 CORRECT_TABLES='correct_tables'
 NUM_QUERY='num_query'
 
-#udf query extraction parameters
+# udf query extraction parameters
 QUERY_EXTRACTED='query_after_extraction'
 DATAFRAME_SQL='dataframe_sql'
 UDF_MAPPING='udf_mapping'
