@@ -32,7 +32,7 @@ def convert_response_to_output(
                 new_response_copy.append(current_response[new_key])
           response_copy = new_response_copy if len(new_response_copy) > 0 else None
           break
-      elif (isinstance(key, int) and
+      elif (isinstance(key, int) and \
            (isinstance(response_copy, list) and key < len(response_copy)) or \
            (isinstance(response_copy, dict) and key in response_copy)) or \
            (isinstance(key, str) and isinstance(response_copy, dict) and key in response_copy):
@@ -132,7 +132,7 @@ class HTTPInferenceService(CachedInferenceService):
           for i in range(num_rows):
             key = tuple(f'{i}' if isinstance(_k, AIDBListType) else f'{_k}' for _k in v)
             if isinstance(v[0], AIDBListType):
-              key = ('_',) + key # all converted keys should start with AIDBListType
+              key = ('_', ) + key # all converted keys should start with AIDBListType
               remove_ghost_key = True
             key = self._separator.join(key)
             request[key] = dict_input[k][i]
