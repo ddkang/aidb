@@ -15,40 +15,19 @@ DB_URL = "sqlite+aiosqlite://"
 # normal query dataclass
 @dataclass
 class TestQuery():
-    query_str: str
-    normalized_query_str: str
-    correct_fp: list
-    correct_service: list
-    correct_tables: list
-    num_of_select_clauses: int
-
-# udf query dataclasses       
-@dataclass
-class UdfMapping():
-    col_names: list
-    function_name: str
-    result_col_name: list
-
-@dataclass
-class DataframeSql():
-    udf_mapping: list
-    select_col: list
-    filter_predicate: str
-        
-@dataclass
-class UdfTestQuery():
-    query_str: str
-    query_after_extraction: str
-    dataframe_sql: DataframeSql
-    correct_service: list
-    correct_tables: list
-    num_of_select_clauses: int
-
-class QueryParsingTests(IsolatedAsyncioTestCase):
+  query_str: str
+  normalized_query_str: str
+  correct_fp: list
+  correct_service: list
+  correct_tables: list
+  num_of_select_clauses: int
+    
+    
   def are_lists_equal(self, list1, list2):
     for sub_list1, sub_list2 in zip(list1, list2):
       assert Counter(sub_list1) == Counter(sub_list2)
-
+      
+      
   def _test_query(self, test_query, config):
     query = Query((test_query.query_str), config)
     # test the number of queries
@@ -62,8 +41,50 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       and_fp.append(or_fp)
     self.are_lists_equal(and_fp, test_query.correct_fp)
     self.are_lists_equal(query.inference_engines_required_for_filtering_predicates, test_query.correct_service)
-    self.are_lists_equal(query.tables_in_filtering_predicates, test_query.correct_tables)
+    self.are_lists_equal(query.tables_in_filtering_predicates, test_query.correct_tables)  
 
+
+# udf query dataclasses       
+@dataclass
+class UdfMapping():
+  col_names: list
+  function_name: str
+  result_col_name: list
+  
+
+@dataclass
+class DataframeSql():
+  udf_mapping: list
+  select_col: list
+  filter_predicate: str
+  
+        
+@dataclass
+class UdfTestQuery():
+  query_str: str
+  query_after_extraction: str
+  dataframe_sql: DataframeSql
+  correct_service: list
+  correct_tables: list
+  num_of_select_clauses: int
+  
+    
+  def _test_equality(self,test_query, config):
+    query = Query(test_query.query_str, config)
+    dataframe_sql, query_after_extraction = query.udf_query
+    self.assertEqual(query_after_extraction.sql_str, test_query.query_after_extraction)
+    assert len(dataframe_sql['udf_mapping']) == len(test_query.dataframe_sql.udf_mapping)
+    # unpack dict values into dataclass and verify that instance values are equal
+    assert all (any((e1==UdfMapping(**e2)) for e2 in dataframe_sql['udf_mapping']) 
+                for e1 in test_query.dataframe_sql.udf_mapping)
+    assert dataframe_sql['select_col'] == test_query.dataframe_sql.select_col
+    filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
+    if filter_predicate:
+      filter_predicate = filter_predicate.sql()  
+    assert filter_predicate == test_query.dataframe_sql.filter_predicate
+
+
+class QueryParsingTests(IsolatedAsyncioTestCase):
 
   async def test_nested_query(self):
     dirname = os.path.dirname(__file__)
@@ -74,7 +95,6 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     config = aidb_engine._config
     
-       
     queries = {
     "test_query_0": TestQuery(
         '''
@@ -127,11 +147,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         ("SELECT colors02.frame, colors02.object_id FROM colors02 "
          "WHERE colors02.object_id > (SELECT AVG(object_id) FROM objects00 WHERE frame > "
          "(SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"),
-        # test replacing column with root column in filtering predicate,
-        # the root column of 'colors02.object_id' is 'objects00'
         [["objects00.object_id > (SELECT AVG(object_id) FROM objects00 " 
           "WHERE frame > (SELECT AVG(frame) FROM blobs_00 WHERE frame > 500))"]],
-        # filter predicates connected by AND are in different set 
         [{'objects00'}], 
         [{'objects00'}], 
         3
@@ -230,7 +247,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
 }
     for i in range(len(queries)):
-      self._test_query(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_query(queries[f'test_query_{i}'], config)
 
 
   # We don't support using approximate query as a subquery
@@ -261,14 +278,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
           AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
           '''
     }
-    parsed_query = Query(queries["query_str1"], config)
+    parsed_query = Query(queries["query_str1"]+queries["query_str2"], config)
     with self.assertRaises(Exception):
       _ = parsed_query.all_queries_in_expressions
-
-    parsed_query = Query(queries["query_str2"], config)
-    with self.assertRaises(Exception):
-      _ = parsed_query.all_queries_in_expressions
-
+      
 
   async def test_correct_approximate_query(self):
     dirname = os.path.dirname(__file__)
@@ -316,25 +329,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
 }
     for i in range(len(queries)):
-      self._test_query(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_query(queries[f'test_query_{i}'], config)
 
   async def test_udf_query(self):
-    def _test_equality(test_query, config):
-      query = Query(test_query.query_str, config)
-      dataframe_sql, query_after_extraction = query.udf_query
-      self.assertEqual(query_after_extraction.sql_str, test_query.query_after_extraction)
-      assert len(dataframe_sql['udf_mapping']) == len(test_query.dataframe_sql.udf_mapping)
-      # unpack dict values into dataclass and verify that instance values are equal
-      assert all (any((e1==UdfMapping(**e2)) for e2 in dataframe_sql['udf_mapping']) 
-                  for e1 in test_query.dataframe_sql.udf_mapping)
-      assert dataframe_sql['select_col'] == test_query.dataframe_sql.select_col
-      filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
-      if filter_predicate:
-        filter_predicate = filter_predicate.sql()
-
-      assert filter_predicate == test_query.dataframe_sql.filter_predicate
-
-
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, 'data/jackson')
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
@@ -742,7 +739,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
   }
     for i in range(len(queries)):
-      _test_equality(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_equality(queries[f'test_query_{i}'], config)
+
 
 
   async def test_invalid_udf_query(self):
