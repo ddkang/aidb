@@ -14,7 +14,7 @@ DB_URL = "sqlite+aiosqlite://"
 
 # normal query dataclass
 @dataclass
-class TestQuery():
+class TestQuery(IsolatedAsyncioTestCase):
   query_str: str
   normalized_query_str: str
   correct_fp: list
@@ -50,22 +50,22 @@ class UdfMapping():
   col_names: list
   function_name: str
   result_col_name: list
-  
+
 
 @dataclass
 class DataframeSql():
   udf_mapping: list
   select_col: list
   filter_predicate: str
-  
-        
+
+
 @dataclass
-class UdfTestQuery():
+class UdfTestQuery(IsolatedAsyncioTestCase):
   query_str: str
   query_after_extraction: str
   dataframe_sql: DataframeSql
-  
-    
+
+
   def _test_equality(self, config):
     query = Query(self.query_str, config)
     dataframe_sql, query_after_extraction = query.udf_query
@@ -79,8 +79,8 @@ class UdfTestQuery():
     if filter_predicate:
       filter_predicate = filter_predicate.sql()  
     assert filter_predicate == self.dataframe_sql.filter_predicate
-
-
+          
+          
 class QueryParsingTests(IsolatedAsyncioTestCase):
 
   async def test_nested_query(self):
@@ -323,7 +323,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         [["colors02.color IN (SELECT color FROM colors02 WHERE frame > 10000)"]],
         [{'colors02'}],
         [{'colors02'}],
-      
+        2
     )
 }
     for i in range(len(queries)):
@@ -524,7 +524,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
             AND is_equal(objects00.object_id, colors02.object_id) = TRUE
         WHERE sum_function(x_min, y_min) > multiply_function(x_min, y_min)
-        '''
+        ''',
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
         "objects00.y_min AS col__7 "
