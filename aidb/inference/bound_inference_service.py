@@ -122,7 +122,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           if col.name == normal_name:
             condition.append(getattr(self._cache_table.c, cache_col.name)
                              == getattr(self._tables[table_name]._table.c, col.name))
-      if condition:
+      if len(condition) != 0:
         # Connected by 'AND' when the key is composite
         join_condition = sqlalchemy.sql.and_(*condition)
       else:
