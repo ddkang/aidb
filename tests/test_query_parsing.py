@@ -28,20 +28,20 @@ class TestQuery():
       assert Counter(sub_list1) == Counter(sub_list2)
       
       
-  def _test_query(self, test_query, config):
-    query = Query((test_query.query_str), config)
+  def _test_query(self, config):
+    query = Query((self.query_str), config)
     # test the number of queries
-    assert len(query.all_queries_in_expressions) == test_query.num_of_select_clauses
-    self.assertEqual(query.query_after_normalizing.sql_str, test_query.normalized_query_str)
+    assert len(query.all_queries_in_expressions) == self.num_of_select_clauses
+    self.assertEqual(query.query_after_normalizing.sql_str, self.normalized_query_str)
     and_fp = []
     for and_connected in query.filtering_predicates:
       or_fp = []
       for or_connected in and_connected:
         or_fp.append(or_connected.sql())
       and_fp.append(or_fp)
-    self.are_lists_equal(and_fp, test_query.correct_fp)
+    self.are_lists_equal(and_fp, self.correct_fp)
     self.are_lists_equal(query.inference_engines_required_for_filtering_predicates, test_query.correct_service)
-    self.are_lists_equal(query.tables_in_filtering_predicates, test_query.correct_tables)  
+    self.are_lists_equal(query.tables_in_filtering_predicates, self.correct_tables)  
 
 
 # udf query dataclasses       
@@ -69,19 +69,19 @@ class UdfTestQuery():
   num_of_select_clauses: int
   
     
-  def _test_equality(self,test_query, config):
-    query = Query(test_query.query_str, config)
+  def _test_equality(self, config):
+    query = Query(self.query_str, config)
     dataframe_sql, query_after_extraction = query.udf_query
-    self.assertEqual(query_after_extraction.sql_str, test_query.query_after_extraction)
-    assert len(dataframe_sql['udf_mapping']) == len(test_query.dataframe_sql.udf_mapping)
+    self.assertEqual(query_after_extraction.sql_str, self.query_after_extraction)
+    assert len(dataframe_sql['udf_mapping']) == len(self.dataframe_sql.udf_mapping)
     # unpack dict values into dataclass and verify that instance values are equal
     assert all (any((e1==UdfMapping(**e2)) for e2 in dataframe_sql['udf_mapping']) 
-                for e1 in test_query.dataframe_sql.udf_mapping)
-    assert dataframe_sql['select_col'] == test_query.dataframe_sql.select_col
+                for e1 in self.dataframe_sql.udf_mapping)
+    assert dataframe_sql['select_col'] == self.dataframe_sql.select_col
     filter_predicate = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
     if filter_predicate:
       filter_predicate = filter_predicate.sql()  
-    assert filter_predicate == test_query.dataframe_sql.filter_predicate
+    assert filter_predicate == self.dataframe_sql.filter_predicate
 
 
 class QueryParsingTests(IsolatedAsyncioTestCase):
@@ -329,7 +329,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
 }
     for i in range(len(queries)):
-      queries[f'test_query_{i}']._test_query(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_query(config)
 
   async def test_udf_query(self):
     dirname = os.path.dirname(__file__)
@@ -739,7 +739,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
   }
     for i in range(len(queries)):
-      queries[f'test_query_{i}']._test_equality(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_equality(config)
 
 
 
