@@ -157,7 +157,6 @@ class CachedBoundInferenceService(BoundInferenceService):
     # convert the pandas datatype to python native type
     # TODO: can we remove /resolve this?
     inp_rows_df = inp_rows_df.astype('object')
-    inp_rows_df = inp_rows_df.drop_duplicates()
     # this doesn't support upsert queries
     await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
 
@@ -170,7 +169,6 @@ class CachedBoundInferenceService(BoundInferenceService):
           if len(df) > 0:
             df[output_col] = input_data.iloc[idx][input_col]
       inference_results = pd.concat(output_data, ignore_index=True)
-      inference_results = inference_results.drop_duplicates()
       for idx, col in enumerate(self.binding.output_columns):
         inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
       tables = self.get_tables(self.binding.output_columns)
@@ -212,12 +210,15 @@ class CachedBoundInferenceService(BoundInferenceService):
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
 
+    # Drop duplicate inputs
+    inputs_drop_duplicates = inputs.drop_duplicates()
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      inputs_not_in_cache, inputs_not_in_cache_primary_cols = await self._get_inputs_not_in_cache_table(inputs, conn)
+      inputs_not_in_cache, inputs_not_in_cache_primary_cols = \
+          await self._get_inputs_not_in_cache_table(inputs_drop_duplicates, conn)
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
-      input_batches = [inputs_not_in_cache.iloc[i:i + bs]for i in range(0, len(inputs_not_in_cache), bs)]
+      input_batches = [inputs_not_in_cache.iloc[i:i + bs] for i in range(0, len(inputs_not_in_cache), bs)]
       # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
