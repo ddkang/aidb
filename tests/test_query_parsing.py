@@ -247,7 +247,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     )
 }
     for i in range(len(queries)):
-      queries[f'test_query_{i}']._test_query(queries[f'test_query_{i}'], config)
+      queries[f'test_query_{i}']._test_query(config)
 
 
   # We don't support using approximate query as a subquery
@@ -261,7 +261,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     config = aidb_engine._config
     queries = {
       # approx aggregation as a subquery
-      "query_str1": 
+      "query_str0": 
           '''
           SELECT x_min 
           FROM  objects00
@@ -269,7 +269,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
           AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
           ''',
       # approx select as a subquery
-      "query_str2": 
+      "query_str1": 
           '''
           SELECT x_min 
           FROM  objects00
@@ -278,9 +278,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
           AND table2.object_id > (SELECT AVG(ob.object_id) FROM objects00 AS ob WHERE frame > 500);
           '''
     }
-    parsed_query = Query(queries["query_str1"]+queries["query_str2"], config)
-    with self.assertRaises(Exception):
-      _ = parsed_query.all_queries_in_expressions
+    for i in range(len(queries)):
+        parsed_query = Query(queries[f'query_str{i}'], config)
+        with self.assertRaises(Exception):
+        _ = parsed_query.all_queries_in_expressions
       
 
   async def test_correct_approximate_query(self):
