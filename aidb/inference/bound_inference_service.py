@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List
 
@@ -11,7 +12,7 @@ from aidb.inference.inference_service import InferenceService
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.constants import cache_table_name_from_inputs
 from aidb.utils.logger import logger
-
+from aidb.utils.type_conversion import pandas_dtype_to_native_type
 
 @dataclass
 class BoundInferenceService():
@@ -194,28 +195,30 @@ class CachedBoundInferenceService(BoundInferenceService):
     if len(normalized_cache_cols) == 1:
         # For a single column, use `isin` and negate the condition
         col = normalized_cache_cols[0]
-        out_cache_df = inputs[~inputs[col].isin(cache_entries.index)]
-        out_cache_df_primary = out_cache_df[[col]]
-        in_cache_df = inputs[inputs[col].isin(cache_entries.index)]
+        is_in_cache = inputs[col].isin(cache_entries.index)
     else:
         # For multiple columns, create tuples and use set operations
         inputs_tuples = inputs[normalized_cache_cols].apply(tuple, axis=1)
         cache_tuples = set(cache_entries.index)
-        out_cache_df = inputs[~inputs_tuples.isin(cache_tuples)]
-        out_cache_df_primary = out_cache_df[normalized_cache_cols]
-        in_cache_df = inputs[inputs_tuples.isin(cache_tuples)]
+        is_in_cache = inputs_tuples.isin(cache_tuples)
 
-    return out_cache_df, in_cache_df
+    in_cache_df_primary = inputs[is_in_cache][normalized_cache_cols]
+    out_cache_df = inputs[~is_in_cache]
+    out_cache_df_primary = out_cache_df[normalized_cache_cols]
+
+    return out_cache_df, out_cache_df_primary, in_cache_df_primary
 
 
-  async def infer(self, inputs: pd.DataFrame):
+  async def infer(self, inputs: pd.DataFrame, if_return=False):
     # FIXME: figure out where to put the column renaming
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
 
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      inputs_not_in_cache, inputs_not_in_cache_primary_cols = await self._get_inputs_not_in_cache_table(inputs, conn)
+      inputs_not_in_cache, inputs_not_in_cache_primary_cols, inputs_in_cache_primary_df = \
+          await self._get_inputs_not_in_cache_table(inputs, conn)
+
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
       input_batches = [inputs_not_in_cache.iloc[i:i + bs]for i in range(0, len(inputs_not_in_cache), bs)]
@@ -226,57 +229,36 @@ class CachedBoundInferenceService(BoundInferenceService):
       await self._insert_in_cache_table(inputs_not_in_cache_primary_cols, conn)
       await self._insert_output_results_in_tables(records_to_insert_in_table, inputs_not_in_cache, conn)
 
-
-  async def infer_join(self, inputs: pd.DataFrame):
-    # FIXME: figure out where to put the column renaming
-    for idx, col in enumerate(self.binding.input_columns):
-      inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
-
-    return_res = []
-    # Note: the input columns are assumed to be in order
-    async with self._engine.begin() as conn:
-      inputs_not_in_cache, in_cache_df = await self._get_inputs_not_in_cache_table(inputs, conn)
-      records_to_insert_in_table = []
-      bs = self.service.preferred_batch_size
-      input_batches = [inputs_not_in_cache.iloc[i:i + bs]for i in range(0, len(inputs_not_in_cache), bs)]
-      # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
-      for input_batch in self.optional_tqdm(input_batches):
-        inference_results = self.service.infer_batch(input_batch)
-        records_to_insert_in_table.extend(inference_results)
-        return_res.extend(inference_results)
-      await self._insert_in_cache_table(inputs_not_in_cache, conn)
-      await self._insert_output_results_in_tables(records_to_insert_in_table, inputs_not_in_cache, conn)
-      from aidb.utils.type_conversion import pandas_dtype_to_native_type
-
-      all_conditions = []
-
-
-      conditions = {}
-
-      # Initialize conditions dictionary with empty lists for each column
-      for col in self.binding.input_columns:
-        cache_col_name = self.convert_normalized_col_name_to_cache_col_name(col)
-        conditions[cache_col_name] = []
-
-      # Populate the conditions dictionary
-      for _, inp_row in in_cache_df.iterrows():
-        for col in self.binding.input_columns:
+    if if_return:
+      return_res = records_to_insert_in_table.copy()
+      conditions = defaultdict(list)
+      for _, inp_row in inputs_in_cache_primary_df.iterrows():
+        for col in inputs_in_cache_primary_df.columns:
           cache_col_name = self.convert_normalized_col_name_to_cache_col_name(col)
           value = pandas_dtype_to_native_type(getattr(inp_row, col))
           conditions[cache_col_name].append(value)
-      print(297, in_cache_df)
-      # Create SQL conditions using IN operator
-      sql_conditions = [getattr(self._cache_table.c, col_name).in_(values) for col_name, values in conditions.items() if
-                        values]
-      if sql_conditions:
-        final_condition = sqlalchemy.sql.and_(*sql_conditions)
-        query = self._result_query_stub.where(final_condition)
 
-        df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
-        test_df = pd.merge(in_cache_df, df, left_on=['blobs_00.id0', 'blobs_01.id1'], right_on=['match00.id0', 'match00.id1'])
-        df = test_df.drop(columns=['blobs_00.id0', 'blobs_01.id1'])
-        return_res.append(df)
-        print(286, df)
+      # Create SQL conditions using IN operator
+      in_conditions = [getattr(self._cache_table.c, col_name).in_(values) for col_name, values in conditions.items() if
+                        values]
+
+      if len(in_conditions) != 0:
+        where_condition = sqlalchemy.sql.and_(*in_conditions)
+        query = self._result_query_stub.where(where_condition)
+        async with self._engine.begin() as conn:
+          cached_df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
+
+        left_on_cols = []
+        right_on_cols = []
+        for left_col in inputs_in_cache_primary_df.columns:
+          for right_col in cached_df.columns:
+            if left_col.split('.')[1] == right_col.split('.')[1]:
+              left_on_cols.append(left_col)
+              right_on_cols.append(right_col)
+        # If a value is repeated multiple times in the 'IN' clause, only a single row being returned for that value.
+        # To obtain a result set that matches the size of the list in the 'IN' clause, use a LEFT JOIN
+        merged_df = pd.merge(inputs_in_cache_primary_df, cached_df, left_on=left_on_cols, right_on=right_on_cols)
+        return_res.append(merged_df.drop(columns=left_on_cols))
       inference_results = pd.concat(return_res, ignore_index=True)
       return inference_results
 

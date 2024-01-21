@@ -87,25 +87,25 @@ def run_server(data_dir: str, port=8000):
       #     with absent outputs represented as None
       # For JOIN query, each input pair has exact one output
       result_df = pd.merge(inp_df, df, how='left', on=name_to_input_cols[service_name]).convert_dtypes()
-      # output_cols = [col for col in result_df.columns if col not in inp_df.columns]
-      # result_df = result_df[output_cols + list(inp_df.columns)]
-      output_col = []
-      input_cols = {col.split('.')[1] : col for col in name_to_input_cols[service_name]}
-      cols = []
-      test = []
+
+      # For the JOIN service, the table stores only True values. We need to populate it with False values for the remaining inputs.
+      inference_cols = []
+      service_output_cols = []
+      output_col_rename = []
+      output_to_input_mapping = {col.split('.')[1]: col for col in name_to_input_cols[service_name]}
       for col in df.columns:
         if col not in inp_df.columns:
-          if col.split('.')[1] in input_cols:
-            cols.append(input_cols[col.split('.')[1]])
+          if col.split('.')[1] in output_to_input_mapping:
+            service_output_cols.append(output_to_input_mapping[col.split('.')[1]])
           else:
-            output_col.append(col)
-            cols.append(col)
-          test.append(col)
+            inference_cols.append(col)
+            service_output_cols.append(col)
+          output_col_rename.append(col)
 
-      result_df = result_df[cols]
-
-      result_df.columns = test
-      for col in output_col:
+      # Copy the keys from the inputs, as they will default to None if the inference result is False.
+      result_df = result_df[service_output_cols]
+      result_df.columns = output_col_rename
+      for col in inference_cols:
         if pd.api.types.is_bool_dtype(result_df[col]):
           result_df[col] = result_df[col].fillna(False)
         else:
