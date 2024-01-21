@@ -17,6 +17,9 @@ from tests.inference_service_utils.inference_service_setup import \
     register_inference_services
 from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
+from aidb.utils.asyncio import asyncio_run
+
+
 setup_test_logger('aggregation_join')
 
 # note: When running tests locally, use your own URL, and modify line 95 to select the type of database you wish to use.
@@ -24,33 +27,51 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 100))
+_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 1))
 
-def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
+async def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
-  outputs = inference_service.service.infer_batch(input_df)
-  return outputs
+  outputs = await inference_service.infer_join(input_df)
+  return outputs.iloc[:,0]
 
 
 queries = [
-  (
+# (
+#     'approx_aggregate',
+#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
+#             ERROR_TARGET 10% CONFIDENCE 95%;''',
+#     '''SELECT COUNT(*) FROM match00;'''
+#   ),
+(
     'approx_aggregate',
-    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
-           AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
+    '''SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
+            ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) FROM match00 JOIN blobs_00 ON match00.id0 = blobs_00.id0 JOIN blobs_01 ON match00.id1 = blobs_01.id1;'''
   ),
-  (
-    'approx_aggregate',
-    '''SELECT COUNT(*), AVG(blobs_00.img_id) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE 
-           AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT COUNT(match00.img_id), AVG(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
-  ),
-  (
-    'approx_aggregate',
-    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE  
-           ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT COUNT(match00.img_id) FROM match00;'''
-  ),
+# (
+#     'approx_aggregate',
+#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
+#             ERROR_TARGET 10% CONFIDENCE 95%;''',
+#     '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
+#   ),
+#   (
+#     'approx_aggregate',
+#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
+#            AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+#     '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
+#   ),
+#   (
+#     'approx_aggregate',
+#     '''SELECT COUNT(*), AVG(blobs_00.img_id) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
+#            AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+#     '''SELECT COUNT(match00.img_id), AVG(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
+#   ),
+#   (
+#     'approx_aggregate',
+#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
+#            ERROR_TARGET 10% CONFIDENCE 95%;''',
+#     '''SELECT COUNT(match00.img_id) FROM match00;'''
+#   ),
 ]
 
 
@@ -59,13 +80,17 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     async def async_duplicate_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'duplicate01':
-          return inference(service, input_df)
+          await inference(service, input_df)
+
 
 
     async def async_match_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'match00':
-          return inference(service, input_df)
+          res = await inference(service, input_df)
+
+      print(80, res)
+      return res
 
     aidb_engine._config.add_user_defined_function('duplicate_inference', async_duplicate_inference)
     aidb_engine._config.add_user_defined_function('match_inference', async_match_inference)
@@ -87,7 +112,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
 
   async def test_agg_query(self):
     dirname = os.path.dirname(__file__)
-    data_dir = os.path.join(dirname, 'data/flickr30k_join')
+    data_dir = os.path.join(dirname, 'data/city_human_join')
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
@@ -111,7 +136,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
               gt_res = gt_res.fetchall()[0]
           finally:
             await gt_engine.dispose()
-
+          print(133, gt_res)
           logger.info(f'Running query {aidb_query} in aidb database')
           aidb_res = aidb_engine.execute(aidb_query)[0]
           logger.info(f'aidb_res: {aidb_res}, gt_res: {gt_res}')

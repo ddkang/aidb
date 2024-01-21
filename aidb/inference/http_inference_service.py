@@ -191,7 +191,7 @@ class HTTPInferenceService(CachedInferenceService):
 
     # for join query, directly convert the result into a dataframe and return it
     if self._url.endswith('__join'):
-      return pd.DataFrame(response)
+      return [pd.DataFrame(response)]
     else:
       # We assume the server returns a list of responses
       # We assume the length of the list of responses should match that of the inputs

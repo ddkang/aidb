@@ -87,8 +87,30 @@ def run_server(data_dir: str, port=8000):
       #     with absent outputs represented as None
       # For JOIN query, each input pair has exact one output
       result_df = pd.merge(inp_df, df, how='left', on=name_to_input_cols[service_name]).convert_dtypes()
+      # output_cols = [col for col in result_df.columns if col not in inp_df.columns]
+      # result_df = result_df[output_cols + list(inp_df.columns)]
+      output_col = []
+      input_cols = {col.split('.')[1] : col for col in name_to_input_cols[service_name]}
+      cols = []
+      test = []
+      for col in df.columns:
+        if col not in inp_df.columns:
+          if col.split('.')[1] in input_cols:
+            cols.append(input_cols[col.split('.')[1]])
+          else:
+            output_col.append(col)
+            cols.append(col)
+          test.append(col)
 
-      return result_df.drop(columns=name_to_input_cols[service_name]).to_dict(orient='list')
+      result_df = result_df[cols]
+
+      result_df.columns = test
+      for col in output_col:
+        if pd.api.types.is_bool_dtype(result_df[col]):
+          result_df[col] = result_df[col].fillna(False)
+        else:
+          result_df[col] = result_df[col].fillna(0).astype(bool)
+      return result_df.to_dict(orient='list')
 
 
   # config = Config(app=app, host="127.0.0.1", port=8000)

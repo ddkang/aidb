@@ -11,9 +11,9 @@ from aidb.utils.constants import (MASS_COL_NAME, NUM_ITEMS_COL_NAME,
                                   WEIGHT_COL_NAME)
 from aidb.utils.logger import logger
 
-_NUM_PILOT_SAMPLES = 3000000
+_NUM_PILOT_SAMPLES = 100000
 
-RETRIEVAL_BATCH_SIZE = 100000
+RETRIEVAL_BATCH_SIZE = 50000
 
 class ApproximateAggregateJoinEngine(ApproximateAggregateEngine):
   async def get_rows_in_join_tables(self, blob_tables: List[str], blob_key_filtering_predicates):
