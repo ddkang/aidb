@@ -279,8 +279,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
           '''
     }
     for i in range(len(queries)):
-        parsed_query = Query(queries[f'query_str{i}'], config)
-        with self.assertRaises(Exception):
+      parsed_query = Query(queries[f'query_str{i}'], config)
+      with self.assertRaises(Exception):
         _ = parsed_query.all_queries_in_expressions
       
 
