@@ -122,7 +122,13 @@ class CachedBoundInferenceService(BoundInferenceService):
           if col.name == normal_name:
             condition.append(getattr(self._cache_table.c, cache_col.name)
                              == getattr(self._tables[table_name]._table.c, col.name))
-      joined = sqlalchemy.join(joined, self._tables[table_name]._table, *condition)
+      if condition:
+        # Connected by 'AND' when the key is composite
+        join_condition = sqlalchemy.sql.and_(*condition)
+      else:
+        # Use CROSS JOIN in the absence of a specific condition.
+        join_condition = sqlalchemy.sql.true()
+      joined = sqlalchemy.join(joined, self._tables[table_name]._table, join_condition)
     self._result_query_stub = sqlalchemy.sql.select(output_cols_with_label).select_from(joined)
 
 
@@ -151,6 +157,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     # convert the pandas datatype to python native type
     # TODO: can we remove /resolve this?
     inp_rows_df = inp_rows_df.astype('object')
+    inp_rows_df = inp_rows_df.drop_duplicates()
     # this doesn't support upsert queries
     await conn.run_sync(lambda conn: inp_rows_df.to_sql(self._cache_table.name, conn, if_exists='append', index=False))
 
@@ -163,6 +170,7 @@ class CachedBoundInferenceService(BoundInferenceService):
           if len(df) > 0:
             df[output_col] = input_data.iloc[idx][input_col]
       inference_results = pd.concat(output_data, ignore_index=True)
+      inference_results = inference_results.drop_duplicates()
       for idx, col in enumerate(self.binding.output_columns):
         inference_results.rename(columns={inference_results.columns[idx]: col}, inplace=True)
       tables = self.get_tables(self.binding.output_columns)
