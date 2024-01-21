@@ -64,9 +64,6 @@ class UdfTestQuery():
   query_str: str
   query_after_extraction: str
   dataframe_sql: DataframeSql
-  correct_service: list
-  correct_tables: list
-  num_of_select_clauses: int
   
     
   def _test_equality(self, config):
