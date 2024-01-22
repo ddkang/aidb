@@ -4,6 +4,7 @@ from typing import Dict, List
 
 import pandas as pd
 import sqlalchemy.ext.asyncio
+from sqlalchemy import tuple_
 from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.sql import text
 
@@ -231,36 +232,37 @@ class CachedBoundInferenceService(BoundInferenceService):
 
     if if_return:
       return_res = records_to_insert_in_table.copy()
-      conditions = defaultdict(list)
+
+      # Retrieve cached results
+      tuples_for_condition = []
       for _, inp_row in inputs_in_cache_primary_df.iterrows():
-        for col in inputs_in_cache_primary_df.columns:
-          cache_col_name = self.convert_normalized_col_name_to_cache_col_name(col)
-          value = pandas_dtype_to_native_type(getattr(inp_row, col))
-          conditions[cache_col_name].append(value)
+        row_tuple = tuple(
+          pandas_dtype_to_native_type(getattr(inp_row, col)) for col in inputs_in_cache_primary_df.columns
+        )
+        tuples_for_condition.append(row_tuple)
 
-      # Create SQL conditions using IN operator
-      in_conditions = [getattr(self._cache_table.c, col_name).in_(values) for col_name, values in conditions.items() if
-                        values]
-
-      if len(in_conditions) != 0:
-        where_condition = sqlalchemy.sql.and_(*in_conditions)
+      if tuples_for_condition:
+        columns = [self.convert_normalized_col_name_to_cache_col_name(col)
+                   for col in inputs_in_cache_primary_df.columns]
+        sql_columns = [getattr(self._cache_table.c, col_name) for col_name in columns]
+        where_condition = tuple_(*sql_columns).in_(tuples_for_condition)
         query = self._result_query_stub.where(where_condition)
         async with self._engine.begin() as conn:
           cached_df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
+        return_res.append(cached_df)
 
-        left_on_cols = []
-        right_on_cols = []
-        for left_col in inputs_in_cache_primary_df.columns:
-          for right_col in cached_df.columns:
-            if left_col.split('.')[1] == right_col.split('.')[1]:
-              left_on_cols.append(left_col)
-              right_on_cols.append(right_col)
-        # If a value is repeated multiple times in the 'IN' clause, only a single row being returned for that value.
-        # To obtain a result set that matches the size of the list in the 'IN' clause, use a LEFT JOIN
-        merged_df = pd.merge(inputs_in_cache_primary_df, cached_df, left_on=left_on_cols, right_on=right_on_cols)
-        return_res.append(merged_df.drop(columns=left_on_cols))
-      inference_results = pd.concat(return_res, ignore_index=True)
-      return inference_results
+      inference_df = pd.concat(return_res, ignore_index=True)
+      left_on_cols = []
+      right_on_cols = []
+      for left_col in inputs.columns:
+        for right_col in inference_df.columns:
+          if left_col.split('.')[1] == right_col.split('.')[1]:
+            left_on_cols.append(left_col)
+            right_on_cols.append(right_col)
+      # Duplicated inputs will be dropped when running inference.
+      # To obtain a result set that matches the size of inputs, use a LEFT JOIN
+      merged_df = pd.merge(inputs, inference_df, left_on=left_on_cols, right_on=right_on_cols)
+      return merged_df.drop(columns=left_on_cols)
 
 
   def __hash__(self):

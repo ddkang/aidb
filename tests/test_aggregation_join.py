@@ -27,7 +27,7 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 1))
+_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 2))
 
 async def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
@@ -36,42 +36,25 @@ async def inference(inference_service: CachedBoundInferenceService, input_df: pd
 
 
 queries = [
-# (
-#     'approx_aggregate',
-#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
-#             ERROR_TARGET 10% CONFIDENCE 95%;''',
-#     '''SELECT COUNT(*) FROM match00;'''
-#   ),
-(
+  (
     'approx_aggregate',
-    '''SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
+    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
             ERROR_TARGET 10% CONFIDENCE 95%;''',
-    '''SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) FROM match00 JOIN blobs_00 ON match00.id0 = blobs_00.id0 JOIN blobs_01 ON match00.id1 = blobs_01.id1;'''
+    '''SELECT COUNT(*) FROM match00;'''
   ),
-# (
-#     'approx_aggregate',
-#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
-#             ERROR_TARGET 10% CONFIDENCE 95%;''',
-#     '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
-#   ),
-#   (
-#     'approx_aggregate',
-#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
-#            AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
-#     '''SELECT COUNT(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
-#   ),
-#   (
-#     'approx_aggregate',
-#     '''SELECT COUNT(*), AVG(blobs_00.img_id) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
-#            AND blobs_00.img_id > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
-#     '''SELECT COUNT(match00.img_id), AVG(match00.img_id) FROM match00 WHERE match00.img_id > 10000;'''
-#   ),
-#   (
-#     'approx_aggregate',
-#     '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.img_id, blobs_01.text_id) = TRUE
-#            ERROR_TARGET 10% CONFIDENCE 95%;''',
-#     '''SELECT COUNT(match00.img_id) FROM match00;'''
-#   ),
+  (
+    'approx_aggregate',
+    '''
+      SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) 
+      FROM blobs_00 CROSS JOIN blobs_01 
+      WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
+      ERROR_TARGET 10% CONFIDENCE 95%;
+    ''',
+    '''
+      SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) 
+      FROM match00 JOIN blobs_00 ON match00.id0 = blobs_00.id0 JOIN blobs_01 ON match00.id1 = blobs_01.id1;
+    '''
+  ),
 ]
 
 
@@ -89,7 +72,6 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
         if service.service.name == 'match00':
           res = await inference(service, input_df)
 
-      print(80, res)
       return res
 
     aidb_engine._config.add_user_defined_function('duplicate_inference', async_duplicate_inference)
@@ -126,7 +108,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
         self.add_user_defined_function(aidb_engine)
 
-        register_inference_services(aidb_engine, data_dir)
+        register_inference_services(aidb_engine, data_dir, preferred_batch_size=1024)
         k = 0
         for query_type, aidb_query, aggregate_query in queries:
           logger.info(f'Running query {aggregate_query} in ground truth database')
@@ -136,7 +118,6 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
               gt_res = gt_res.fetchall()[0]
           finally:
             await gt_engine.dispose()
-          print(133, gt_res)
           logger.info(f'Running query {aidb_query} in aidb database')
           aidb_res = aidb_engine.execute(aidb_query)[0]
           logger.info(f'aidb_res: {aidb_res}, gt_res: {gt_res}')
