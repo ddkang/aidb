@@ -122,7 +122,13 @@ class CachedBoundInferenceService(BoundInferenceService):
           if col.name == normal_name:
             condition.append(getattr(self._cache_table.c, cache_col.name)
                              == getattr(self._tables[table_name]._table.c, col.name))
-      joined = sqlalchemy.join(joined, self._tables[table_name]._table, *condition)
+      if len(condition) != 0:
+        # Connected by 'AND' when the key is composite
+        join_condition = sqlalchemy.sql.and_(*condition)
+      else:
+        # Use CROSS JOIN in the absence of a specific condition.
+        join_condition = sqlalchemy.sql.true()
+      joined = sqlalchemy.join(joined, self._tables[table_name]._table, join_condition)
     self._result_query_stub = sqlalchemy.sql.select(output_cols_with_label).select_from(joined)
 
 
@@ -204,12 +210,15 @@ class CachedBoundInferenceService(BoundInferenceService):
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
 
+    # Drop duplicate inputs
+    inputs_drop_duplicates = inputs.drop_duplicates()
     # Note: the input columns are assumed to be in order
     async with self._engine.begin() as conn:
-      inputs_not_in_cache, inputs_not_in_cache_primary_cols = await self._get_inputs_not_in_cache_table(inputs, conn)
+      inputs_not_in_cache, inputs_not_in_cache_primary_cols = \
+          await self._get_inputs_not_in_cache_table(inputs_drop_duplicates, conn)
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
-      input_batches = [inputs_not_in_cache.iloc[i:i + bs]for i in range(0, len(inputs_not_in_cache), bs)]
+      input_batches = [inputs_not_in_cache.iloc[i:i + bs] for i in range(0, len(inputs_not_in_cache), bs)]
       # Batch inference service: move copy input logic to inference service and add "copy_input" to binding
       for input_batch in self.optional_tqdm(input_batches):
         inference_results = self.service.infer_batch(input_batch)
