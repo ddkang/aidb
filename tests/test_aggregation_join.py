@@ -27,7 +27,7 @@ POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
 MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 2))
+_NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 100))
 
 async def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
@@ -44,14 +44,34 @@ queries = [
   ),
   (
     'approx_aggregate',
+    '''SELECT COUNT(*) FROM blobs_00 CROSS JOIN blobs_01 WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE 
+           AND blobs_00.id0 > 10000 ERROR_TARGET 10% CONFIDENCE 95%;''',
+    '''SELECT COUNT(*) FROM match00 WHERE match00.id0 > 10000;'''
+  ),
+  (
+    'approx_aggregate',
     '''
       SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) 
+      FROM blobs_00 CROSS JOIN blobs_01 
+      WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE AND blobs_01.id1 > 10000
+      ERROR_TARGET 10% CONFIDENCE 95%;
+    ''',
+    '''
+      SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) 
+      FROM match00 JOIN blobs_00 ON match00.id0 = blobs_00.id0 JOIN blobs_01 ON match00.id1 = blobs_01.id1
+      WHERE blobs_01.id1 > 10000;
+    '''
+  ),
+  (
+    'approx_aggregate',
+    '''
+      SELECT AVG(blobs_00.h0), SUM(blobs_01.h1) 
       FROM blobs_00 CROSS JOIN blobs_01 
       WHERE match_inference(blobs_00.id0, blobs_01.id1) = TRUE
       ERROR_TARGET 10% CONFIDENCE 95%;
     ''',
     '''
-      SELECT SUM(blobs_00.x0), AVG(blobs_01.x1) 
+      SELECT AVG(blobs_00.h0), SUM(blobs_01.h1) 
       FROM match00 JOIN blobs_00 ON match00.id0 = blobs_00.id0 JOIN blobs_01 ON match00.id1 = blobs_01.id1;
     '''
   ),
@@ -60,21 +80,14 @@ queries = [
 
 class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
   def add_user_defined_function(self, aidb_engine):
-    async def async_duplicate_inference(input_df):
-      for service in aidb_engine._config.inference_bindings:
-        if service.service.name == 'duplicate01':
-          await inference(service, input_df)
-
-
-
     async def async_match_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'match00':
           res = await inference(service, input_df)
+          return res
+        else:
+          raise Exception('No required service found.')
 
-      return res
-
-    aidb_engine._config.add_user_defined_function('duplicate_inference', async_duplicate_inference)
     aidb_engine._config.add_user_defined_function('match_inference', async_match_inference)
 
   def _equality_check(self, aidb_res, gt_res, error_target):
