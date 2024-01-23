@@ -14,7 +14,7 @@ DB_URL = "sqlite+aiosqlite://"
 
 # normal query dataclass
 @dataclass
-class TestQuery(IsolatedAsyncioTestCase):
+class TestQuery:
   query_str: str
   normalized_query_str: str
   correct_fp: list
@@ -29,10 +29,10 @@ class TestQuery(IsolatedAsyncioTestCase):
       
       
   def _test_query(self, config):
-    query = Query((self.query_str), config)
+    query = Query(self.query_str, config)
     # test the number of queries
     assert len(query.all_queries_in_expressions) == self.num_of_select_clauses
-    self.assertEqual(query.query_after_normalizing.sql_str, self.normalized_query_str)
+    assert query.query_after_normalizing.sql_str == self.normalized_query_str
     and_fp = []
     for and_connected in query.filtering_predicates:
       or_fp = []
@@ -40,27 +40,27 @@ class TestQuery(IsolatedAsyncioTestCase):
         or_fp.append(or_connected.sql())
       and_fp.append(or_fp)
     self.are_lists_equal(and_fp, self.correct_fp)
-    self.are_lists_equal(query.inference_engines_required_for_filtering_predicates, test_query.correct_service)
+    self.are_lists_equal(query.inference_engines_required_for_filtering_predicates, self.correct_service)
     self.are_lists_equal(query.tables_in_filtering_predicates, self.correct_tables)  
 
 
 # udf query dataclasses       
 @dataclass
-class UdfMapping():
+class UdfMapping:
   col_names: list
   function_name: str
   result_col_name: list
 
 
 @dataclass
-class DataframeSql():
+class DataframeSql:
   udf_mapping: list
   select_col: list
   filter_predicate: str
 
 
 @dataclass
-class UdfTestQuery(IsolatedAsyncioTestCase):
+class UdfTestQuery:
   query_str: str
   query_after_extraction: str
   dataframe_sql: DataframeSql
@@ -69,7 +69,7 @@ class UdfTestQuery(IsolatedAsyncioTestCase):
   def _test_equality(self, config):
     query = Query(self.query_str, config)
     dataframe_sql, query_after_extraction = query.udf_query
-    self.assertEqual(query_after_extraction.sql_str, self.query_after_extraction)
+    assert query_after_extraction.sql_str==self.query_after_extraction
     assert len(dataframe_sql['udf_mapping']) == len(self.dataframe_sql.udf_mapping)
     # unpack dict values into dataclass and verify that instance values are equal
     assert all (any((e1==UdfMapping(**e2)) for e2 in dataframe_sql['udf_mapping']) 
@@ -610,7 +610,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
            [UdfMapping(
                ['col__0', 'col__1'],
-               'max_function'
+               'max_function',
                ['output1']),
             UdfMapping(        
                ['col__2', 'col__3'],
