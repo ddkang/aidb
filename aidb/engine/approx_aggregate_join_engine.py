@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -167,7 +167,7 @@ class ApproximateAggregateJoinEngine(ApproximateAggregateEngine):
       self,
       query: Query,
       sample_results: List[pd.DataFrame],
-      agg_type_with_cols,
+      agg_type_with_cols: List[Tuple[exp.AggFunc, str]],
       alpha
   ) -> int:
     error_target = query.error_target
