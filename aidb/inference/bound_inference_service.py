@@ -208,7 +208,7 @@ class CachedBoundInferenceService(BoundInferenceService):
     return out_cache_df, out_cache_df_primary, in_cache_df_primary
 
 
-  async def infer(self, inputs: pd.DataFrame, if_return=False):
+  async def infer(self, inputs: pd.DataFrame, return_inference_results=False):
     # FIXME: figure out where to put the column renaming
     for idx, col in enumerate(self.binding.input_columns):
       inputs.rename(columns={inputs.columns[idx]: col}, inplace=True)
@@ -229,22 +229,22 @@ class CachedBoundInferenceService(BoundInferenceService):
       await self._insert_in_cache_table(inputs_not_in_cache_primary_cols, conn)
       await self._insert_output_results_in_tables(records_to_insert_in_table, inputs_not_in_cache, conn)
 
-    if if_return:
+    if return_inference_results:
       return_res = records_to_insert_in_table.copy()
 
       # Retrieve cached results
-      tuples_for_condition = []
+      sampled_key_tuples = []
       for _, inp_row in inputs_in_cache_primary_df.iterrows():
         row_tuple = tuple(
           pandas_dtype_to_native_type(getattr(inp_row, col)) for col in inputs_in_cache_primary_df.columns
         )
-        tuples_for_condition.append(row_tuple)
+        sampled_key_tuples.append(row_tuple)
 
-      if tuples_for_condition:
+      if sampled_key_tuples:
         columns = [self.convert_normalized_col_name_to_cache_col_name(col)
                    for col in inputs_in_cache_primary_df.columns]
         sql_columns = [getattr(self._cache_table.c, col_name) for col_name in columns]
-        where_condition = tuple_(*sql_columns).in_(tuples_for_condition)
+        where_condition = tuple_(*sql_columns).in_(sampled_key_tuples)
         query = self._result_query_stub.where(where_condition)
         async with self._engine.begin() as conn:
           cached_df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))

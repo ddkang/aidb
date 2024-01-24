@@ -31,7 +31,7 @@ _NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 100))
 
 async def inference(inference_service: CachedBoundInferenceService, input_df: pd.DataFrame):
   input_df.columns = inference_service.binding.input_columns
-  outputs = await inference_service.infer(input_df, if_return=True)
+  outputs = await inference_service.infer(input_df, return_inference_results=True)
   return outputs.iloc[:,0]
 
 
