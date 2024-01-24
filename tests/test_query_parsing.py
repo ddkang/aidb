@@ -345,7 +345,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
 
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config
-    
+
     queries={
     # user defined function in SELECT clause
     "test_query_0" : UdfTestQuery( 
@@ -419,7 +419,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             '(function__0 = TRUE) AND (function__1 = TRUE)'
         )
     ),
-        
+
     # user defined function in WHERE clause
     "test_query_3": UdfTestQuery(
         '''
@@ -551,7 +551,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
             "(function__0 = TRUE) AND (function__1 = TRUE) AND (function__2 > function__3)"
         )
     ),
-    
+
     # test user defined function with alias
     "test_query_7": UdfTestQuery(
         '''
