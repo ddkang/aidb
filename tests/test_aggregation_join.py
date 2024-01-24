@@ -83,7 +83,7 @@ class AggregateJoinEngineTests(IsolatedAsyncioTestCase):
     async def async_match_inference(input_df):
       for service in aidb_engine._config.inference_bindings:
         if service.service.name == 'match00':
-          res = await inference(service, input_df)
+          res = await inference(service, input_df.copy())
           return res
         else:
           raise Exception('No required service found.')
