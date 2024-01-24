@@ -26,7 +26,7 @@ def convert_response_to_output(
             new_key = k[(idx+1):]
             current_response = convert_response_to_output(r, {new_key: new_key})
             if current_response is not None and new_key in current_response:
-              if isinstance(current_response[new_key], list): 
+              if isinstance(current_response[new_key], list):
                 new_response_copy.extend(current_response[new_key])
               else:
                 new_response_copy.append(current_response[new_key])
@@ -87,7 +87,7 @@ class HTTPInferenceService(CachedInferenceService):
 
   def signature(self) -> Tuple[List, List]:
     raise NotImplementedError()
-  
+
 
   def convert_input_to_request(self, input: Union[pd.Series, pd.DataFrame]) -> Dict:
     request = {}
@@ -180,20 +180,24 @@ class HTTPInferenceService(CachedInferenceService):
     return pd.DataFrame(output)
 
 
-  def infer_batch(self, inputs: pd.DataFrame) -> List[pd.DataFrame]:
+  def infer_batch(self, inputs: pd.DataFrame):
     if not self._batch_supported:
       return super().infer_batch(inputs)
-    
+
     body = inputs.to_dict(orient='list')
     response = requests.post(self._url, json=body, headers=self._headers)
     response.raise_for_status()
-    # We assume the server returns a list of responses
-    # We assume the length of the list of responses should match that of the inputs
-    # Each element in response list must correspond to the input with the same index
-    # and an element can represent 0 / 1 / multiple outputs
     response = response.json()
-    if len(response) != len(inputs):
-      raise Exception('The length of the inference results should match that of the inputs.')
 
-    response_df_list = [pd.DataFrame(item) for item in response]
-    return response_df_list
+    # for join query, directly convert the result into a dataframe and return it
+    if self._url.endswith('__join'):
+      return [pd.DataFrame(response)]
+    else:
+      # We assume the server returns a list of responses
+      # We assume the length of the list of responses should match that of the inputs
+      # Each element in response list must correspond to the input with the same index
+      # and an element can represent 0 / 1 / multiple outputs
+      if len(response) != len(inputs):
+        raise Exception('The length of the inference results should match that of the inputs.')
+      response_df_list = [pd.DataFrame(item) for item in response]
+      return response_df_list
