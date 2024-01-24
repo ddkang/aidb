@@ -233,18 +233,18 @@ class CachedBoundInferenceService(BoundInferenceService):
       return_res = records_to_insert_in_table.copy()
 
       # Retrieve cached results
-      sampled_key_tuples = []
+      sampled_key_list= []
       for _, inp_row in inputs_in_cache_primary_df.iterrows():
-        row_tuple = tuple(
+        key_tuple = tuple(
           pandas_dtype_to_native_type(getattr(inp_row, col)) for col in inputs_in_cache_primary_df.columns
         )
-        sampled_key_tuples.append(row_tuple)
+        sampled_key_list.append(key_tuple)
 
-      if sampled_key_tuples:
+      if sampled_key_list:
         columns = [self.convert_normalized_col_name_to_cache_col_name(col)
                    for col in inputs_in_cache_primary_df.columns]
         sql_columns = [getattr(self._cache_table.c, col_name) for col_name in columns]
-        where_condition = tuple_(*sql_columns).in_(sampled_key_tuples)
+        where_condition = tuple_(*sql_columns).in_(sampled_key_list)
         query = self._result_query_stub.where(where_condition)
         async with self._engine.begin() as conn:
           cached_df = await conn.run_sync(lambda conn: pd.read_sql(query, conn))
