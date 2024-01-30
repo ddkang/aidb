@@ -223,17 +223,21 @@ class Query(object):
       return None, predicate_count
     elif isinstance(node, exp.Paren) or isinstance(node, exp.Where):
       assert "this" in node.args
-      return self._get_sympify_form(node.args["this"], predicate_count, predicate_mappings)
+      expression, predicate_count = self._get_sympify_form(node.args["this"], predicate_count, predicate_mappings)
+      return f'({expression})', predicate_count
     elif isinstance(node, exp.And):
       assert "this" in node.args and "expression" in node.args
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
-      return f"({e1} & {e2})", p2
+      return f"{e1} & {e2}", p2
     elif isinstance(node, exp.Or):
       assert "this" in node.args and "expression" in node.args
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
-      return f"({e1} | {e2})", p2
+      return f"{e1} | {e2}", p2
+    elif isinstance(node, exp.Not):
+      expression, predicate_count = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
+      return f'~{expression}', predicate_count
     elif isinstance(node, exp.GT) or \
             isinstance(node, exp.LT) or \
             isinstance(node, exp.GTE) or \
@@ -242,7 +246,6 @@ class Query(object):
             isinstance(node, exp.Like) or \
             isinstance(node, exp.NEQ) or \
             isinstance(node, exp.In) or \
-            isinstance(node, exp.Not) or \
             isinstance(node, exp.Column):
       predicate_name = self._get_predicate_name(predicate_count)
       predicate_mappings[predicate_name] = node
@@ -253,12 +256,18 @@ class Query(object):
 
   def _get_or_clause_representation(self, or_expression, predicate_mappings):
     connected_by_ors = list(or_expression.args)
-    predicates_in_ors = []
+    filtering_predicate_list = []
     if len(connected_by_ors) <= 1:
-      predicates_in_ors.append(predicate_mappings[str(or_expression)])
+      filtering_predicate_list.append(or_expression)
     else:
-      for s in connected_by_ors:
-        predicates_in_ors.append(predicate_mappings[str(s)])
+      for fp in connected_by_ors:
+        filtering_predicate_list.append(fp)
+    predicates_in_ors = []
+    for fp in filtering_predicate_list:
+      if str(fp)[0] == '~':
+        predicates_in_ors.append(exp.Not(this=predicate_mappings[str(fp)[1:]]))
+      else:
+        predicates_in_ors.append(predicate_mappings[str(fp)])
     return predicates_in_ors
 
 
