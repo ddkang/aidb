@@ -79,7 +79,25 @@ class UdfTestQuery:
     if filter_predicate:
       filter_predicate = filter_predicate.sql()  
     assert filter_predicate == self.dataframe_sql.filter_predicate
-          
+
+
+@dataclass
+class QueryFilteringPredicatesParsing:
+  query_str: str
+  correct_fp: str
+
+  def _test_filtering_predicates(self, config):
+    query = Query(self.query_str, config)
+    and_connected = []
+    filtering_predicates = query.filtering_predicates
+    for fp in filtering_predicates:
+      and_connected.append(' OR '.join([p.sql() for p in fp]))
+    and_connected = [f'({fp})' for fp in and_connected]
+    parsed_fp = ' AND '.join(and_connected)
+    if parsed_fp != self.correct_fp:
+      raise AssertionError(f"Failed to parse query: '{self.query_str}'. \n"
+                           f"Parsed fp: '{parsed_fp}', but the expected type is '{self.correct_fp}'.")
+
           
 class QueryParsingTests(IsolatedAsyncioTestCase):
 
@@ -740,7 +758,6 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       queries[f'test_query_{i}']._test_equality(config)
 
 
-
   async def test_invalid_udf_query(self):
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, 'data/jackson')
@@ -765,6 +782,70 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
       assert query.is_udf_query == True
       with self.assertRaises(Exception):
        query.check_udf_query_validity()
+
+
+  async def test_filtering_predicates(self):
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+    config = aidb_engine._config
+
+    queries = {
+      'test_query_0': QueryFilteringPredicatesParsing(
+        '''
+        SELECT *
+        FROM objects00
+        WHERE x_min > 600 OR objects00.frame > 700 AND objects00.frame < 1000 OR x_max = 1
+        ''',
+        "(objects00.x_min > 600 OR blobs_00.frame > 700 OR objects00.x_max = 1) "
+        "AND (objects00.x_min > 600 OR blobs_00.frame < 1000 OR objects00.x_max = 1)"
+      ),
+      'test_query_1': QueryFilteringPredicatesParsing(
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (y_min < 300 OR y_max > 700) AND (frame >= 500 AND frame <= 600) OR x_min = 100
+        ''',
+        "(blobs_00.frame >= 500 OR objects00.x_min = 100) "
+        "AND (blobs_00.frame <= 600 OR objects00.x_min = 100) "
+        "AND (objects00.y_min < 300 OR objects00.y_max > 700 OR objects00.x_min = 100)"
+      ),
+      'test_query_2': QueryFilteringPredicatesParsing(
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_min < 200 OR y_max > 800) AND frame < 400 OR NOT (x_max = 900)
+        ''',
+        "(blobs_00.frame < 400 OR NOT objects00.x_max = 900) "
+        "AND (objects00.x_min < 200 OR objects00.y_max > 800 OR NOT objects00.x_max = 900)"
+      ),
+      'test_query_3': QueryFilteringPredicatesParsing(
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_max > 500 OR (y_min < 250 AND y_max > 750)) AND NOT (frame >= 300 OR frame <= 800)   
+        ''',
+        "(NOT blobs_00.frame >= 300) "
+        "AND (NOT blobs_00.frame <= 800) "
+        "AND (objects00.x_max > 500 OR objects00.y_min < 250) "
+        "AND (objects00.x_max > 500 OR objects00.y_max > 750)"
+      ),
+      'test_query_4': QueryFilteringPredicatesParsing(
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (frame >= 100 AND frame <= 300) OR (x_min < 100 AND y_min > 600) AND NOT (x_max = y_max)
+        ''',
+        "(blobs_00.frame >= 100 OR objects00.x_min < 100) "
+        "AND (blobs_00.frame >= 100 OR objects00.y_min > 600) "
+        "AND (blobs_00.frame <= 300 OR objects00.x_min < 100) "
+        "AND (blobs_00.frame <= 300 OR objects00.y_min > 600) "
+        "AND (blobs_00.frame >= 100 OR NOT objects00.x_max = objects00.y_max) "
+        "AND (blobs_00.frame <= 300 OR NOT objects00.x_max = objects00.y_max)"
+      )
+    }
+    for i in range(len(queries)):
+      queries[f'test_query_{i}']._test_filtering_predicates(config)
 
 
 if __name__ == '__main__':
