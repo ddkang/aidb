@@ -239,8 +239,8 @@ class BaseEngine():
   def _get_where_str(self, filtering_predicates):
     and_connected = []
     for fp in filtering_predicates:
-      and_connected.append(' OR '.join(
-        [p.sql() for p in fp]))
+      and_connected.append(' OR '.join([p.sql() for p in fp]))
+    and_connected = [f'({or_connected})' for or_connected in and_connected]
     return ' AND '.join(and_connected)
 
 
