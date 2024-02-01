@@ -56,7 +56,8 @@ async def test_jackson_number_objects(i):
 
   for aidb_query, exact_query in queries:
     logger.info(f'Running query {aidb_query} in approx select engine')
-    aidb_res = aidb_engine.execute(aidb_query)
+    seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2 ** 32 - 1)
+    aidb_res = aidb_engine.execute(aidb_query, __seed=seed)
 
     logger.info(f'Running query {exact_query} in ground truth database')
     async with gt_engine.begin() as conn:

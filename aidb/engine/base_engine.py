@@ -1,6 +1,8 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
+import inspect
+import numpy as np
 import pandas as pd
 
 from aidb.config.config import Config
@@ -80,10 +82,11 @@ class BaseEngine():
     self._config.add_inference_service(service.name, service)
 
 
-  def bind_inference_service(self, service_name: str, binding: InferenceBinding, verbose: bool=False):
+  def bind_inference_service(self, service_name: str, binding: InferenceBinding, copy_map: Dict[str, str]={}, verbose: bool=False):
     bound_service = CachedBoundInferenceService(
       self._config.inference_services[service_name],
       binding,
+      copy_map,
       self._sql_engine,
       self._config.columns,
       self._config.tables,
@@ -236,8 +239,8 @@ class BaseEngine():
   def _get_where_str(self, filtering_predicates):
     and_connected = []
     for fp in filtering_predicates:
-      and_connected.append(' OR '.join(
-        [p.sql() for p in fp]))
+      and_connected.append(' OR '.join([p.sql() for p in fp]))
+    and_connected = [f'({or_connected})' for or_connected in and_connected]
     return ' AND '.join(and_connected)
 
 
@@ -358,3 +361,132 @@ class BaseEngine():
       else:
         raise Exception(f'Can\'t join table {rep_table_name} and {table_name}')
     return f'FROM {rep_table_name}\n' + '\n'.join(join_strs)
+
+
+  # ---------------------
+  # User Defined Function
+  # ---------------------
+  def register_user_defined_function(self, function_name, function):
+    self._config.add_user_defined_function(function_name, function)
+
+
+  def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
+    function_name = str.lower(function_name)
+
+    if inspect.iscoroutinefunction(self._config.user_defined_functions[function_name]):
+      list_function_results = asyncio_run(self._config.user_defined_functions[function_name](res_df[args_list]))
+    else:
+      list_function_results = self._config.user_defined_functions[function_name](res_df[args_list])
+
+    if len(list_function_results) != len(res_df):
+      raise Exception('The length of the UDF outputs should match that of the inputs.')
+
+    # Function return format
+    # 1. Dataframe -> directly return
+    # 2. List:
+    #    a. Nested List -> convert the inner lists to Dataframes, return a list of Dataframes
+    #    b. List of Dataframes -> directly return
+    #    c. others -> convert the entire list to a Dataframe
+    # 3. pd.Series or np.ndarray -> convert it to a Dataframe
+    if isinstance(list_function_results, pd.DataFrame):
+      return list_function_results
+    elif isinstance(list_function_results, list):
+      if isinstance(list_function_results[0], list):
+        return [pd.DataFrame(function_result) for function_result in list_function_results]
+      elif isinstance(list_function_results[0], pd.DataFrame):
+        return list_function_results
+      else:
+        return pd.DataFrame(list_function_results)
+    elif isinstance(list_function_results, pd.Series) or isinstance(list_function_results, np.ndarray):
+      return pd.DataFrame(list_function_results)
+    else:
+      raise Exception('Unsupported data type')
+
+
+  def _get_udf_result(self, res_df, dataframe_sql):
+    '''
+    this function get results of user defined function
+    the output of UDF has the following situations:
+    1. single value, e.g. sum, max function
+    2. zero row, e.g. no object in an image
+    3. multiple rows, e.g. several objects in an image
+    4. multiple columns in one row, e.g. output of object detection model has columns 'x_min, y_min, x_max, y_max
+    '''
+    expanded_columns_mapping = {}
+    for udf in dataframe_sql['udf_mapping']:
+
+      udf_results = self._call_user_function(res_df, udf['function_name'], udf['col_names'])
+      # if the result is a list of DataFrames, concatenate all the DataFrames into a single DataFrame.
+      if isinstance(udf_results, list):
+        repeat_counts = [len(df.dropna()) for df in udf_results]
+        res_df = pd.DataFrame(np.repeat(res_df.values, repeat_counts, axis=0), columns=res_df.columns)
+        udf_results = pd.concat(udf_results, axis=0).convert_dtypes().dropna()
+
+      # expand dataframe for multiple columns output
+      if len(udf_results.columns) == len(udf['result_col_name']):
+        udf_results.columns = udf['result_col_name']
+      elif len(udf['result_col_name']) == 1:
+        expanded_column_names = [f"{udf['result_col_name'][0]}__{i}" for i in range(len(udf_results.columns))]
+        udf_results.columns = expanded_column_names
+        expanded_columns_mapping[udf['result_col_name'][0]] = ', '.join(expanded_column_names)
+      else:
+        raise Exception(f"The number of column alias in query doesn't match the number of output columns of "
+                        f"function{udf['function_name']}")
+
+      # concatenate input_df with UDF result dataframe
+      for col in udf_results.columns:
+        res_df[col] = udf_results[col].values
+
+      res_df.dropna(inplace=True)
+    return res_df, expanded_columns_mapping
+
+
+  def execute_user_defined_function(
+      self,
+      res_df: pd.DataFrame,
+      dataframe_sql: Dict,
+      query: Query,
+      additional_select_col: List[str] = []
+  ) -> pd.DataFrame:
+    '''
+    This function receive the query result from database, and then applies user defined function to query result.
+    After getting function results, this function execute query which is extracted from original query and return final
+    result.
+    Args:
+      res_df: Query result from normal db.
+      dataframe_sql: Extracted information of udf query, used to execute udf and run sql query over udf results
+      query: original query
+      additional_select_col: used to specifically choose '__weight' and '__mass' columns,
+        which are not included in the standard query
+
+    Returns:
+      res_list_of_tuple: query result
+
+    Raises:
+      ImportError: If duckdb is not installed
+    '''
+
+    if res_df.empty:
+      return []
+
+    # duckdb is used to run sql query over dataframe
+    # FIXME(ttt-77): remove this dependency and implement it by ourselves
+    try:
+      import duckdb
+    except ImportError:
+      raise Exception('Package duckdb is needed for query with UDF. Please install it with version 0.9.2 first,')
+
+    processed_udf_result_df, expanded_columns_mapping = self._get_udf_result(res_df, dataframe_sql)
+
+    select_str = ', '.join(dataframe_sql['select_col'] + additional_select_col)
+    for k,v in expanded_columns_mapping.items():
+      select_str = select_str.replace(k, v)
+    where_condition = query.convert_and_connected_fp_to_exp(dataframe_sql['filter_predicate'])
+    if where_condition:
+      where_str = f'WHERE {where_condition.sql()}'
+    else:
+      where_str = ''
+    df_query = f'''SELECT {select_str} FROM processed_udf_result_df {where_str}'''
+
+    new_results_df = duckdb.sql(df_query).df()
+    return new_results_df

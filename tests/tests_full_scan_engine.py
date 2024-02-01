@@ -2,6 +2,7 @@ import os
 import time
 import unittest
 
+from collections import Counter
 from unittest import IsolatedAsyncioTestCase
 from sqlalchemy.sql import text
 
@@ -14,10 +15,10 @@ from multiprocessing import Process
 
 setup_test_logger('full_scan_engine')
 
-DB_URL = "sqlite+aiosqlite://"
+POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
+SQLITE_URL = 'sqlite+aiosqlite://'
+MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
-
-# DB_URL = "mysql+aiomysql://aidb:aidb@localhost"
 class FullScanEngineTests(IsolatedAsyncioTestCase):
 
   async def test_jackson_number_objects(self):
@@ -27,12 +28,48 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
 
     p = Process(target=run_server, args=[str(data_dir)])
     p.start()
-    time.sleep(3)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-
-    register_inference_services(aidb_engine, data_dir)
+    time.sleep(1)
 
     queries = [
+      (
+        'full_scan',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (frame >= 100 AND frame <= 300) OR (x_min < 100 AND y_min > 600) AND NOT (frame >= 2000)
+        ''',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (frame >= 100 AND frame <= 300) OR (x_min < 100 AND y_min > 600) AND NOT (frame >= 2000)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT frame
+        FROM objects00
+        WHERE objects00.frame > 200 OR objects00.frame = 700 AND objects00.frame = 1000 OR objects00.frame = 1
+        ''',
+        '''
+        SELECT frame
+        FROM objects00
+        WHERE objects00.frame > 200 OR objects00.frame = 700 AND objects00.frame = 1000 OR objects00.frame = 1
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_max > 500 OR (y_min < 250 AND y_max > 750)) AND NOT (frame >= 300 OR frame <= 800)   
+        ''',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_max > 500 OR (y_min < 250 AND y_max > 750)) AND NOT (frame >= 300 OR frame <= 800)   
+        '''
+      ),
       (
         'full_scan',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
@@ -60,27 +97,65 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;''',
 
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;'''
       ),
+      (
+        'full_scan',
+        '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;''',
+        '''SELECT color AS col1, table2.x_min AS col2, table2.y_min AS col3
+           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame;'''
+      ),
+      (
+        'full_scan',
+        '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+           JOIN blobs_00 table3 ON table2.frame = table3.frame;''',
+        '''SELECT color AS col1, table2.x_min AS col2, table3.frame AS col3
+           FROM colors02 table1 LEFT JOIN objects00 table2 ON table1.frame = table2.frame
+           JOIN blobs_00 table3 ON table2.frame = table3.frame;'''
+      ),
+      (
+        'full_scan',
+        '''SELECT color, x_min AS col2, colors02.frame AS col3
+           FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+           WHERE color = 'blue' AND x_min > 600;''',
+        '''SELECT color, x_min AS col2, colors02.frame AS col3
+           FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
+           WHERE color = 'blue' AND x_min > 600;'''
+      )
     ]
 
-    for query_type, aidb_query, exact_query in queries:
-      logger.info(f'Running query {exact_query} in ground truth database')
-      # Run the query on the ground truth database
-      async with gt_engine.begin() as conn:
-        gt_res = await conn.execute(text(exact_query))
-        gt_res = gt_res.fetchall()
-      # Run the query on the aidb database
-      logger.info(f'Running query {aidb_query} in aidb database')
-      aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: equality check should be implemented
-      assert len(gt_res) == len(aidb_res)
-    del gt_engine
+    db_url_list = [MYSQL_URL, SQLITE_URL, POSTGRESQL_URL]
+    for db_url in db_url_list:
+      dialect = db_url.split('+')[0]
+      logger.info(f'Test {dialect} database')
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
+
+      register_inference_services(aidb_engine, data_dir)
+
+      for query_type, aidb_query, exact_query in queries:
+        logger.info(f'Running query {exact_query} in ground truth database')
+        # Run the query on the ground truth database
+        try:
+          async with gt_engine.begin() as conn:
+            gt_res = await conn.execute(text(exact_query))
+            gt_res = gt_res.fetchall()
+        finally:
+          await gt_engine.dispose()
+        # Run the query on the aidb database
+        logger.info(f'Running query {aidb_query} in aidb database')
+        aidb_res = aidb_engine.execute(aidb_query)
+        assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
+      del gt_engine
+      del aidb_engine
     p.terminate()
+
 
   async def test_multi_table_input(self):
     dirname = os.path.dirname(__file__)
@@ -97,22 +172,29 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       )
     ]
 
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
+    db_url_list = [MYSQL_URL, SQLITE_URL, POSTGRESQL_URL]
+    for db_url in db_url_list:
+      dialect = db_url.split('+')[0]
+      logger.info(f'Test {dialect} database')
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
 
-    register_inference_services(aidb_engine, data_dir)
+      register_inference_services(aidb_engine, data_dir)
 
-    for query_type, aidb_query, exact_query in queries:
-      logger.info(f'Running query {exact_query} in ground truth database')
-      # Run the query on the ground truth database
-      async with gt_engine.begin() as conn:
-        gt_res = await conn.execute(text(exact_query))
-        gt_res = gt_res.fetchall()
-      # Run the query on the aidb database
-      logger.info(f'Running query {aidb_query} in aidb database')
-      aidb_res = aidb_engine.execute(aidb_query)
-      # TODO: equality check should be implemented
-      assert len(gt_res) == len(aidb_res)
-    del gt_engine
+      for query_type, aidb_query, exact_query in queries:
+        logger.info(f'Running query {exact_query} in ground truth database')
+        # Run the query on the ground truth database
+        try:
+          async with gt_engine.begin() as conn:
+            gt_res = await conn.execute(text(exact_query))
+            gt_res = gt_res.fetchall()
+        finally:
+          await gt_engine.dispose()
+        # Run the query on the aidb database
+        logger.info(f'Running query {aidb_query} in aidb database')
+        aidb_res = aidb_engine.execute(aidb_query)
+        assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
+      del gt_engine
     p.terminate()
 
 

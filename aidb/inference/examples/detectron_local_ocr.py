@@ -17,6 +17,7 @@ finally:
   from detectron2 import model_zoo
   from detectron2.engine import DefaultPredictor
   from detectron2.config import get_cfg
+from typing import List
 
 from aidb.inference.cached_inference_service import CachedInferenceService
 
@@ -63,7 +64,8 @@ class DetectronLocalOCR(CachedInferenceService):
       margin_y1 = min(im.shape[0], y1+30)
       cropped_im = im[margin_y0:margin_y1, margin_x0:margin_x1]
       ocr_text = pytesseract.image_to_string(cropped_im)
-    return pd.DataFrame([{'ocr_text': ocr_text}])
+    output = {"ocr_text": [ocr_text]}
+    return pd.DataFrame(output)
 
 
   def infer_batch(self, inputs: pd.DataFrame) -> pd.DataFrame:
