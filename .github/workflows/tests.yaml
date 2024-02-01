@@ -38,7 +38,9 @@ jobs:
         python-version: 3.8  # Specify the Python version you need
 
     - name: Install dependencies
-      run: pip install -r requirements.txt
+      run: | 
+        pip install -r requirements.txt
+        find requirements/*/ -name "requirements-*.txt" -print0 | xargs -0 -I {} pip install -r {}
 
     - name: Download test data
       run: git clone https://github.com/ttt-77/AIDB_data.git tests/data

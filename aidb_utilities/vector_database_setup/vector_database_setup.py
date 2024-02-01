@@ -4,20 +4,32 @@ from typing import Union, NewType, Optional
 
 from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_topk_and_blob_mapping, VECTOR_ID_COLUMN
 from aidb.utils.db import create_sql_engine, infer_dialect
-from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
-from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 
 IndexPath = NewType('index_path', str)
 
 class VectorDatabaseSetup:
+  @staticmethod
+  def from_type(vector_database_type: str):
+    if vector_database_type.upper() == 'FAISS':
+      from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+      return FaissVectorDatabase
+    elif vector_database_type.upper() == 'CHROMA':
+      from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
+      return ChromaVectorDatabase
+    elif vector_database_type.upper() == 'WEAVIATE':
+      from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
+      return WeaviateVectorDatabase
+    else:
+      raise ValueError(f'{vector_database_type} is not a supported database type. We support FAISS, Chroma and Weaviate.')
+
+
   def __init__(
       self,
       connection_uri: str,
       blob_table_name: str,
       vd_type: str,
       index_name: str,
-      auth: Union[IndexPath, WeaviateAuth]
+      auth: IndexPath
   ):
     self._dialect = infer_dialect(connection_uri)
     self._sql_engine = create_sql_engine(connection_uri)
@@ -58,14 +70,8 @@ class VectorDatabaseSetup:
 
 
   def _create_vector_database_index(self, data: pd.DataFrame):
-    vector_database = {
-      'FAISS': FaissVectorDatabase,
-      'CHROMA': ChromaVectorDatabase,
-      'WEAVIATE': WeaviateVectorDatabase
-    }
-
     try:
-      user_vector_database = vector_database[self.vd_type](self.auth)
+      user_vector_database = VectorDatabaseSetup.from_type(self.vd_type)(self.auth)
     except KeyError:
       raise ValueError(f'{self.vd_type} is not a supported database type. We support FAISS, Chroma and Weaviate.')
 
