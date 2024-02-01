@@ -1,4 +1,9 @@
+import os
+
 from setuptools import find_packages, setup
+
+from aidb_utilities.extra_dependencies_handler import (
+    EXTRA_DEPENDENCIES_MAPPING, get_extra_dependencies)
 
 with open('requirements.txt') as f:
   required = f.read().splitlines()
@@ -16,6 +21,10 @@ setup(
   packages=find_packages(include=["aidb", "aidb.*", "aidb_utilities", "aidb_utilities.*"]),
   python_requires=">=3.9",
   install_requires=required,
+  extras_require={
+      name: get_extra_dependencies(mapping, name)
+      for name, mapping in EXTRA_DEPENDENCIES_MAPPING.items()
+  },
   classifiers=[
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
