@@ -1,4 +1,0 @@
-gdown
-uvicorn
-networkx
-pytest

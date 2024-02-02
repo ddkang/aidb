@@ -39,8 +39,7 @@ jobs:
 
     - name: Install dependencies
       run: | 
-        pip install -r requirements.txt
-        find requirements/*/ -name "requirements-*.txt" -print0 | xargs -0 -I {} pip install -r {}
+        pip install .[mysql,postgresql,sqlite,test,chromadb,faiss-cpu,weaviate-client] --use-feature=in-tree-build
 
     - name: Download test data
       run: git clone https://github.com/ttt-77/AIDB_data.git tests/data
