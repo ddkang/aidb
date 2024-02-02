@@ -1,3 +1,4 @@
+#Main requirements
 nest-asyncio>=1.5.7
 numba>=0.58.0
 pandas>=2.0.3
@@ -10,3 +11,26 @@ flatten-json
 tqdm>=4.66.1
 Pillow>=10.1.0
 boto3
+
+# Extra dependencies for sql
+[mysql]
+aiomysql>=0.2.0
+[postgresql]
+asyncpg>=0.28.0
+[sqlite]
+aiosqlite>=0.19.0
+
+# Extra dependencies for testing
+[test]
+gdown
+uvicorn
+networkx
+pytest
+
+# Extra dependencies for vectordb
+[chromadb]
+chromadb>=0.4.11
+[faiss-cpu]
+faiss-cpu>=1.7.4
+[weaviate-client]
+weaviate-client>=3.24.1
