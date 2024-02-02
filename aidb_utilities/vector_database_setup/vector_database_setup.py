@@ -6,6 +6,7 @@ from aidb.utils.constants import BLOB_TABLE_NAMES_TABLE, table_name_for_rep_and_
 from aidb.utils.db import create_sql_engine, infer_dialect
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
+from aidb.vector_database.marqo_vector_database import MarqoAuth, MarqoVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
 
 IndexPath = NewType('index_path', str)
@@ -17,7 +18,7 @@ class VectorDatabaseSetup:
       blob_table_name: str,
       vd_type: str,
       index_name: str,
-      auth: Union[IndexPath, WeaviateAuth]
+      auth: Union[IndexPath, WeaviateAuth, MarqoAuth]
   ):
     self._dialect = infer_dialect(connection_uri)
     self._sql_engine = create_sql_engine(connection_uri)
@@ -61,7 +62,8 @@ class VectorDatabaseSetup:
     vector_database = {
       'FAISS': FaissVectorDatabase,
       'CHROMA': ChromaVectorDatabase,
-      'WEAVIATE': WeaviateVectorDatabase
+      'WEAVIATE': WeaviateVectorDatabase,
+      'MARQO': MarqoVectorDatabase,
     }
 
     try:
