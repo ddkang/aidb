@@ -91,7 +91,7 @@ class Query(object):
         extracted_query = Query(node.sql(), self.config)
         if depth != 0 :
           if extracted_query.is_approx_agg_query or extracted_query.is_approx_select_query:
-            raise Exception("We don't support using approx query as a subquery")
+            raise Exception("AIDB does not support using approx query as a subquery")
 
         all_queries.append((Query(node.sql(), self.config), depth))
 
@@ -223,17 +223,21 @@ class Query(object):
       return None, predicate_count
     elif isinstance(node, exp.Paren) or isinstance(node, exp.Where):
       assert "this" in node.args
-      return self._get_sympify_form(node.args["this"], predicate_count, predicate_mappings)
+      expression, predicate_count = self._get_sympify_form(node.args["this"], predicate_count, predicate_mappings)
+      return f'({expression})', predicate_count
     elif isinstance(node, exp.And):
       assert "this" in node.args and "expression" in node.args
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
-      return f"({e1} & {e2})", p2
+      return f"{e1} & {e2}", p2
     elif isinstance(node, exp.Or):
       assert "this" in node.args and "expression" in node.args
       e1, p1 = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
       e2, p2 = self._get_sympify_form(node.args['expression'], p1, predicate_mappings)
-      return f"({e1} | {e2})", p2
+      return f"{e1} | {e2}", p2
+    elif isinstance(node, exp.Not):
+      expression, predicate_count = self._get_sympify_form(node.args['this'], predicate_count, predicate_mappings)
+      return f'~{expression}', predicate_count
     elif isinstance(node, exp.GT) or \
             isinstance(node, exp.LT) or \
             isinstance(node, exp.GTE) or \
@@ -242,7 +246,6 @@ class Query(object):
             isinstance(node, exp.Like) or \
             isinstance(node, exp.NEQ) or \
             isinstance(node, exp.In) or \
-            isinstance(node, exp.Not) or \
             isinstance(node, exp.Column):
       predicate_name = self._get_predicate_name(predicate_count)
       predicate_mappings[predicate_name] = node
@@ -253,12 +256,18 @@ class Query(object):
 
   def _get_or_clause_representation(self, or_expression, predicate_mappings):
     connected_by_ors = list(or_expression.args)
-    predicates_in_ors = []
+    filtering_predicate_list = []
     if len(connected_by_ors) <= 1:
-      predicates_in_ors.append(predicate_mappings[str(or_expression)])
+      filtering_predicate_list.append(or_expression)
     else:
-      for s in connected_by_ors:
-        predicates_in_ors.append(predicate_mappings[str(s)])
+      for fp in connected_by_ors:
+        filtering_predicate_list.append(fp)
+    predicates_in_ors = []
+    for fp in filtering_predicate_list:
+      if str(fp)[0] == '~':
+        predicates_in_ors.append(exp.Not(this=predicate_mappings[str(fp)[1:]]))
+      else:
+        predicates_in_ors.append(predicate_mappings[str(fp)])
     return predicates_in_ors
 
 
@@ -379,7 +388,7 @@ class Query(object):
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
     udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
 
-    for node, _, _ in copied_expression.walk():
+    for node, parent, _ in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
       if isinstance(node, exp.Column):
@@ -400,6 +409,8 @@ class Query(object):
           node.set('table', exp.Identifier(this=table_name, quoted=False))
 
         elif isinstance(node.args['this'], exp.Star):
+          if isinstance(parent, exp.AggFunc):
+            continue
           select_exp_list = []
           for table_name in self.tables_in_query:
             for col_name, _ in self._tables[table_name].items():
@@ -528,6 +539,10 @@ class Query(object):
         if input_table in self.config.blob_tables:
           blob_tables.add(input_table)
 
+    for table in self.tables_in_query:
+      if table in self.config.blob_tables:
+        blob_tables.add(table)
+
     return list(blob_tables)
 
 
@@ -582,14 +597,18 @@ class Query(object):
     agg_type_with_cols = []
     for expression in select_exp:
       aggregate_expression = expression.find(exp.AggFunc)
-      if isinstance(aggregate_expression, exp.Avg):
-        agg_type_with_cols.append(exp.Avg)
-      elif isinstance(aggregate_expression, exp.Count):
-        agg_type_with_cols.append(exp.Count)
-      elif isinstance(aggregate_expression, exp.Sum):
-        agg_type_with_cols.append(exp.Sum)
+      if aggregate_expression is not None:
+        agg_col = aggregate_expression.args['this'].sql()
       else:
-        raise Exception('We only support approximation for Avg, Sum and Count query currently.')
+        agg_col = None
+      if isinstance(aggregate_expression, exp.Avg):
+        agg_type_with_cols.append((exp.Avg, agg_col))
+      elif isinstance(aggregate_expression, exp.Count):
+        agg_type_with_cols.append((exp.Count, agg_col))
+      elif isinstance(aggregate_expression, exp.Sum):
+        agg_type_with_cols.append((exp.Sum, agg_col))
+      else:
+        raise Exception('AIDB only support approximation for Avg, Sum and Count query currently.')
     return agg_type_with_cols
 
 
@@ -602,13 +621,7 @@ class Query(object):
 
     if self._expression.find(exp.Group) is not None:
       raise Exception(
-          '''We do not support GROUP BY for approximate aggregation queries. 
-          Try running without the error target and confidence.'''
-      )
-
-    if self._expression.find(exp.Join) is not None:
-      raise Exception(
-          '''We do not support Join for approximate aggregation queries. 
+          '''AIDB does not support GROUP BY for approximate aggregation queries. 
           Try running without the error target and confidence.'''
       )
 
@@ -619,6 +632,11 @@ class Query(object):
       raise Exception('Aggregation query should contain error target and confidence')
 
     return True
+
+
+  @cached_property
+  def is_aqp_join_query(self):
+    return self._expression.find(exp.Join) is not None and self._expression.find(exp.UserFunction) is not None
 
 
   @cached_property
@@ -642,7 +660,7 @@ class Query(object):
   @cached_property
   def is_approx_select_query(self):
     if self.precision_target is not None:
-      raise Exception("We haven't support approx select query with precision target.")
+      raise Exception("AIDB has not support approx select query with precision target.")
     return self.recall_target is not None
 
 
@@ -746,12 +764,18 @@ class Query(object):
       if isinstance(expression.parent, exp.UserFunction):
         if (expression.parent.args['this'] in self.config.user_defined_functions
             and expression.args['this'] in self.config.user_defined_functions):
-          raise Exception("We don't support nested user defined function currently")
+          raise Exception("AIDB does not support nested user defined function currently")
 
-    if self.is_approx_agg_query or self.is_approx_select_query or self.is_limit_query():
-      raise Exception('We only support user defined function for exact query currently.')
+    if self._expression.find(exp.AggFunc) is not None:
+      if not self.is_aqp_join_query:
+        raise Exception("AIDB does not support user defined function for exact aggregation query")
+
+    if  self.is_approx_select_query or self.is_limit_query():
+      raise Exception('AIDB only support user defined function for exact query '
+                      'and approximate aggregation query currently.')
+
     if len(self.all_queries_in_expressions) > 1:
-      raise Exception("We don't support user defined function with nested query currently")
+      raise Exception("AIDB does not support user defined function with nested query currently")
 
 
 
@@ -807,6 +831,9 @@ class Query(object):
 
 
       def add_column_with_alias(self, node, is_select_col = False, predefined_alias = None):
+        if isinstance(node, exp.AggFunc):
+          return
+
         if node not in self.added_select:
           self.added_select.add(node)
           if predefined_alias:
@@ -861,7 +888,7 @@ class Query(object):
 
     filter_predicates = []
 
-    # find user defined function in JOIN condition, if exists, add them into filter predicates, 
+    # find user defined function in JOIN condition, if exists, add them into filter predicates,
     # then remove this join condition
     if expression.find(exp.Join) is not None:
       for join_exp in expression.args['joins']:

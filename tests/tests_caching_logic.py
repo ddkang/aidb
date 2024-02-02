@@ -29,7 +29,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
     for db_url in db_url_list:
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
   
-      register_inference_services(aidb_engine, data_dir)
+      register_inference_services(aidb_engine, data_dir, batch_supported=False)
   
       queries = [
         (
@@ -59,7 +59,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
         # running the same query, so number of inference calls should remain same
-  
+        # temporarily commenting this out because we no longer call infer_one
         assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index]
       del gt_engine
       del aidb_engine

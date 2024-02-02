@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     types: [ opened, synchronize, reopened ]
+
+env:
+  AIDB_NUMBER_OF_TEST_RUNS: 2
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,9 +41,7 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Download test data
-      run: |
-        gdown https://drive.google.com/uc?id=1yCtgP-GTKcXtuqiuXlkmXO6Yq-nn52D0
-        unzip data_v2.zip -d tests/
+      run: git clone https://github.com/ttt-77/AIDB_data.git tests/data
 
     - name: Run db setup tests
       run: python3 -m tests.tests_db_setup
@@ -83,11 +85,15 @@ jobs:
     - name: Run Query Parsing Tests for nested queries
       run: python3 -m tests.test_query_parsing
 
-    # - name: Run aggregation query tests
-    #  run: python3 -m tests.test_aggregation
+    - name: Run aggregation query Gaussian tests
+      run: python3 -m tests.test_aggregation_gaussian
 
-    # - name: Run aggregation query Gaussian tests
-    #   run: python3 -m tests.test_aggregation_gaussian
+    - name: Run aggregation query Gaussian multiple keys tests
+      run: python3 -m tests.test_aggregation_gaussian_mk
 
-    # - name: Run aggregation query Gaussian multiple keys tests
-    #   run: python3 -m tests.test_aggregation_gaussian_mk
+    - name: Run approx aggregation join query tests
+      run: python3 -m tests.test_aggregation_join
+      
+    - name: Run aggregation query tests
+      run: python3 -m tests.test_aggregation
+

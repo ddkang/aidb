@@ -33,6 +33,45 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
     queries = [
       (
         'full_scan',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (frame >= 100 AND frame <= 300) OR (x_min < 100 AND y_min > 600) AND NOT (frame >= 2000)
+        ''',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (frame >= 100 AND frame <= 300) OR (x_min < 100 AND y_min > 600) AND NOT (frame >= 2000)
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT frame
+        FROM objects00
+        WHERE objects00.frame > 200 OR objects00.frame = 700 AND objects00.frame = 1000 OR objects00.frame = 1
+        ''',
+        '''
+        SELECT frame
+        FROM objects00
+        WHERE objects00.frame > 200 OR objects00.frame = 700 AND objects00.frame = 1000 OR objects00.frame = 1
+        '''
+      ),
+      (
+        'full_scan',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_max > 500 OR (y_min < 250 AND y_max > 750)) AND NOT (frame >= 300 OR frame <= 800)   
+        ''',
+        '''
+        SELECT *
+        FROM objects00
+        WHERE (x_max > 500 OR (y_min < 250 AND y_max > 750)) AND NOT (frame >= 300 OR frame <= 800)   
+        '''
+      ),
+      (
+        'full_scan',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;''',
         '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 100;'''
       ),
@@ -58,10 +97,10 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
       ),
       (
         'full_scan',
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;''',
 
-        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame 
+        '''SELECT * FROM objects00 join colors02 on objects00.frame = colors02.frame
            and objects00.object_id = colors02.object_id;'''
       ),
       (
@@ -89,7 +128,6 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
            FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
            WHERE color = 'blue' AND x_min > 600;'''
       )
-
     ]
 
     db_url_list = [MYSQL_URL, SQLITE_URL, POSTGRESQL_URL]
@@ -112,8 +150,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # TODO: equality check should be implemented
         assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
       del gt_engine
       del aidb_engine
     p.terminate()
@@ -154,8 +192,8 @@ class FullScanEngineTests(IsolatedAsyncioTestCase):
         # Run the query on the aidb database
         logger.info(f'Running query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
-        # TODO: equality check should be implemented
         assert len(gt_res) == len(aidb_res)
+        assert sorted(gt_res) == sorted(aidb_res)
       del gt_engine
     p.terminate()
 
