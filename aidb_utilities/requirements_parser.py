@@ -10,8 +10,8 @@ def read_requirements():
         for line in f:
             line = line.strip()
 
-            if line.startswith("[") and line.endswith("]"):
-                current_section = line[1:-1].lower()
+            if line.startswith('--extra'):
+                current_section = line.split('--extra')[1].strip().lower()
                 if current_section not in requirements:
                     requirements[current_section] = []
             elif line and not line.startswith("#"):

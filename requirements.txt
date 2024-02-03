@@ -13,24 +13,24 @@ Pillow>=10.1.0
 boto3
 
 # Extra dependencies for sql
-[mysql]
+--extra mysql
 aiomysql>=0.2.0
-[postgresql]
+--extra postgresql
 asyncpg>=0.28.0
-[sqlite]
+--extra sqlite
 aiosqlite>=0.19.0
 
 # Extra dependencies for testing
-[test]
+--extra test
 gdown
 uvicorn
 networkx
 pytest
 
 # Extra dependencies for vectordb
-[chromadb]
+--extra chromadb
 chromadb>=0.4.11
-[faiss-cpu]
+--extra faiss-cpu
 faiss-cpu>=1.7.4
-[weaviate-client]
+--extra weaviate-client
 weaviate-client>=3.24.1
