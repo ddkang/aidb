@@ -39,7 +39,7 @@ jobs:
 
     - name: Install dependencies
       run: | 
-        pip install ai-db[mysql,postgresql,sqlite,test,chromadb,faiss-cpu,weaviate-client]
+        pip install -r requirements.txt
 
     - name: Download test data
       run: git clone https://github.com/ttt-77/AIDB_data.git tests/data
