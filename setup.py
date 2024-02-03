@@ -1,7 +1,10 @@
+import os
+
 from setuptools import find_packages, setup
 
-with open('requirements.txt') as f:
-  required = f.read().splitlines()
+from aidb_utilities.requirements_parser import get_main_and_extras
+
+main_requirements, extras_require = get_main_and_extras()
 
 setup(
   # Metadata
@@ -15,7 +18,8 @@ setup(
   # Packages
   packages=find_packages(include=["aidb", "aidb.*", "aidb_utilities", "aidb_utilities.*"]),
   python_requires=">=3.9",
-  install_requires=required,
+  install_requires=main_requirements,
+  extras_require=extras_require,
   classifiers=[
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",

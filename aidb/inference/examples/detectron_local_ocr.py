@@ -3,13 +3,22 @@ Input: document segmentation model weights (model_final.pth), csv with paths to 
 
 Output: csv with OCR'd text.
 """
-from detectron2 import model_zoo
-from detectron2.engine import DefaultPredictor
-from detectron2.config import get_cfg
 import numpy as np
 import pandas as pd
-import pdf2image
-import pytesseract
+
+try:
+  import pdf2image
+  import pytesseract
+  from detectron2 import model_zoo
+  from detectron2.config import get_cfg
+  from detectron2.engine import DefaultPredictor
+except ImportError as e:
+  missing_module = str(e).split()[-1]  # Extract the missing module name
+  print(f"Error: The module '{missing_module}' is not installed.")
+  print("Please install the required modules by running:")
+  print("pip install pdf2image pytesseract detectron2")
+  exit(1)
+
 from typing import List
 
 from aidb.inference.cached_inference_service import CachedInferenceService

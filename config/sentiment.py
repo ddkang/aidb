@@ -2,7 +2,7 @@ import os
 
 from aidb.config.config_types import AIDBListType
 from aidb.inference.examples.huggingface_inference_service import HuggingFaceNLP
-from aidb.vector_database.weaviate_vector_database import WeaviateAuth
+from aidb.vector_database.weaviate_utils import WeaviateAuth
 
 
 DB_URL = 'sqlite+aiosqlite://'

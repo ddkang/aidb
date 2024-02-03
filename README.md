@@ -15,7 +15,16 @@ git clone https://github.com/ddkang/aidb.git
 cd aidb
 pip install -r requirements.txt
 
+# We support PostgreSQL, MySQL, and SQLite
+# Change "sqlite" to "postgresql" or "mysql" if you'd like to use those
+pip install -r requirements/sql/requirements-sqlite.txt
+
+# For vector database, we support Faiss, ChromaDB and Weaviate
+# Change "faiss" to "chromadb" or "weaviate" if you'd like to use those
+pip install -r requirements/vectordb/requirements-faiss.txt
+
 # Optional if you'd like to run the examples below
+pip install -r requirements/test/requirements-test.txt
 gdown https://drive.google.com/uc?id=1SyHRaJNvVa7V08mw-4_Vqj7tCynRRA3x
 unzip data.zip -d tests/
 

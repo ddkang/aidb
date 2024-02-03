@@ -5,8 +5,8 @@ import unittest
 from aidb_utilities.vector_database_setup.vector_database_setup import VectorDatabaseSetup
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
-from aidb.vector_database.weaviate_vector_database import WeaviateAuth, WeaviateVectorDatabase
-from tests.tests_data_store import AidbDataStoreTests
+from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
+from aidb.vector_database.weaviate_utils import WeaviateAuth
 
 from unittest import IsolatedAsyncioTestCase
 

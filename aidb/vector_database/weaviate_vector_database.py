@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 import weaviate
@@ -8,19 +7,7 @@ from aidb.utils.logger import logger
 from aidb.vector_database.vector_database import VectorDatabase
 from weaviate.util import generate_uuid5
 from weaviate import AuthApiKey, AuthClientPassword
-
-@dataclass
-class WeaviateAuth:
-  """
-  :param url: weaviate url
-  :param username: weaviate username
-  :param pwd: weaviate password
-  :param api_key: weaviate api key, user should choose input either username/pwd or api_key
-  """
-  url: Optional[str] = field(default=None)
-  username: Optional[str] = field(default=None)
-  pwd: Optional[str] = field(default=None)
-  api_key: Optional[str] = field(default=None)
+from aidb.vector_database.weaviate_utils import WeaviateAuth
 
 
 class WeaviateVectorDatabase(VectorDatabase):
