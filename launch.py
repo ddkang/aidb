@@ -12,6 +12,7 @@ from aidb.utils.asyncio import asyncio_run
 
 def setup_blob_tables(config):
   input_blobs = pd.read_csv(config.blobs_csv_file)
+  input_blobs = input_blobs.fillna("")
   base_table_setup = BaseTablesSetup(f"{config.DB_URL}/{config.DB_NAME}")
   base_table_setup.insert_blob_meta_data(config.blob_table_name, input_blobs, config.blobs_keys_columns)
 
