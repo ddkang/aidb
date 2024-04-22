@@ -42,7 +42,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: ${{ github.event.inputs.python_version }}  # Specify the Python version you need
+        python-version: ${{ inputs.python_version }}  # Specify the Python version you need
 
     - name: Install dependencies
       run: pip install -r requirements.txt
