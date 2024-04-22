@@ -7,7 +7,7 @@ on:
         description: 'Python version to run the tests'
         default: 3.11
         required: false
-        type: float
+        type: number
   # push:
   #   branches: [ main ]
   # pull_request:
