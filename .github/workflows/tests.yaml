@@ -1,10 +1,17 @@
 name: Run Tests
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    types: [ opened, synchronize, reopened ]
+  workflow_call:
+    inputs:
+      python_version:
+        description: 'Python version to run the tests'
+        default: 3.11
+        required: false
+        type: float
+  # push:
+  #   branches: [ main ]
+  # pull_request:
+  #   types: [ opened, synchronize, reopened ]
 
 env:
   AIDB_NUMBER_OF_TEST_RUNS: 2
@@ -35,7 +42,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.12  # Specify the Python version you need
+        python-version: ${{ github.event.inputs.python_version }}  # Specify the Python version you need
 
     - name: Install dependencies
       run: pip install -r requirements.txt
