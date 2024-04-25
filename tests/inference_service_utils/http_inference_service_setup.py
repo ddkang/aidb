@@ -63,7 +63,7 @@ def run_server(data_dir: str, port=8000):
       grouped = result_df.groupby(name_to_input_cols[service_name])
       res_df_list = []
       for _, group in grouped:
-        group = group.drop(columns=name_to_input_cols[service_name]).dropna()
+        # group = group.drop(columns=name_to_input_cols[service_name]).dropna()
         res_df_list.append(group.to_dict(orient='list'))
 
       return res_df_list
