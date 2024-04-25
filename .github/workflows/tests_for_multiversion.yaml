@@ -1,0 +1,24 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  test_py38:
+    uses: ./.github/workflows/tests.yaml
+    with:
+      python_version: 3.8
+
+  test_py311:
+    uses: ./.github/workflows/tests.yaml
+    with:
+      python_version: 3.11
+  
+  test_py312:
+    uses: ./.github/workflows/tests.yaml
+    with:
+      python_version: 3.12
+    
