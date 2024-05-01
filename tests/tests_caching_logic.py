@@ -110,17 +110,17 @@ class CachingLogic(IsolatedAsyncioTestCase):
         assert len(gt_res) == len(aidb_res)
         # running the same query, so number of inference calls should remain same
         # temporarily commenting this out because we no longer call infer_one
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services["objects00"].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
         logger.info(f'Running cached query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
         # cleared cache, so the call count should accumulate as the first run
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services["objects00"].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
         asyncio_run(clear_ML_cache(aidb_engine))
         logger.info(f'Running uncached query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][1], f"Wrong query count: Expected {calls[index][1]}, Actual {aidb_engine._config.inference_services["objects00"].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][1], f"Wrong query count: Expected {calls[index][1]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
       del gt_engine
       del aidb_engine
     p.terminate()
