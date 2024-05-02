@@ -3,12 +3,14 @@ import importlib
 
 import pandas as pd
 
-from aidb_utilities.command_line_setup.command_line_setup import command_line_utility
-from aidb_utilities.aidb_setup.aidb_factory import AIDB
-from aidb_utilities.db_setup.blob_table import BaseTablesSetup
-from aidb_utilities.db_setup.create_tables import create_output_tables
 from aidb.utils.asyncio import asyncio_run
+from aidb_utilities.aidb_setup.aidb_factory import AIDB
+from aidb_utilities.command_line_setup.command_line_setup import \
+    command_line_utility
+from aidb_utilities.db_setup.blob_table import BaseTablesSetup
 from aidb_utilities.db_setup.clear_cache import clear_ML_cache
+from aidb_utilities.db_setup.create_tables import create_output_tables
+
 
 def setup_blob_tables(config):
   input_blobs = pd.read_csv(config.blobs_csv_file)

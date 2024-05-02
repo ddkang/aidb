@@ -1,16 +1,19 @@
-from multiprocessing import Process
 import os
-from sqlalchemy.sql import text
 import time
 import unittest
+from multiprocessing import Process
 from unittest import IsolatedAsyncioTestCase
 
-from aidb.utils.logger import logger
-from tests.inference_service_utils.inference_service_setup import register_inference_services
-from tests.inference_service_utils.http_inference_service_setup import run_server
-from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
+from sqlalchemy.sql import text
+
 from aidb.utils.asyncio import asyncio_run
+from aidb.utils.logger import logger
 from aidb_utilities.db_setup.clear_cache import clear_ML_cache
+from tests.inference_service_utils.http_inference_service_setup import \
+    run_server
+from tests.inference_service_utils.inference_service_setup import \
+    register_inference_services
+from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 setup_test_logger('caching_logic')
 
@@ -63,18 +66,18 @@ class CachingLogic(IsolatedAsyncioTestCase):
         assert len(gt_res) == len(aidb_res)
         # running the same query, so number of inference calls should remain same
         # temporarily commenting this out because we no longer call infer_one
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0]
         logger.info(f'Running cached query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
         # run again, because cache exists, there should be no new calls
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0], f"Wrong query count: Expected {calls[index][0]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0]
         asyncio_run(clear_ML_cache(aidb_engine))
         logger.info(f'Running uncached query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
         # cleared cache, so should accumulate new calls same as the first call
-        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][1], f"Wrong query count: Expected {calls[index][1]}, Actual {aidb_engine._config.inference_services['objects00'].infer_one.calls}"
+        assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][1]
       del gt_engine
       del aidb_engine
     p.terminate()
