@@ -1,7 +1,6 @@
 from collections import deque
 
 import networkx as nx
-
 from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.sql import delete
 
@@ -18,10 +17,9 @@ async def clear_ML_cache(engine: Engine):
   for inference_binding in engine._config.inference_bindings:
     if isinstance(inference_binding, CachedBoundInferenceService):
       async with inference_binding._engine.begin() as conn:
-        fk_ref_graph = nx.DiGraph()
-        fk_ref_graph.add_nodes_from(inference_binding.get_tables(inference_binding.binding.output_columns))
-        fk_ref_graph.add_node(inference_binding._cache_table_name)
         tables_to_delete = inference_binding.get_tables(inference_binding.binding.output_columns) + [inference_binding._cache_table_name]
+        fk_ref_graph = nx.DiGraph()
+        fk_ref_graph.add_nodes_from(tables_to_delete)
         for table_name in tables_to_delete:
           if table_name == inference_binding._cache_table_name:
             table = inference_binding._cache_table
@@ -31,7 +29,7 @@ async def clear_ML_cache(engine: Engine):
             if isinstance(constraint, ForeignKeyConstraint):
               for fk in constraint.elements:
                 fk_ref_table_name = fk.column.table.name
-                if fk_ref_graph.has_node(fk_ref_table_name):
+                if fk_ref_table_name in fk_ref_graph:
                   fk_ref_graph.add_edge(table_name,fk_ref_table_name)
         
         table_order = nx.topological_sort(fk_ref_graph)
