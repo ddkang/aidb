@@ -8,7 +8,6 @@ from sqlalchemy.sql import text
 
 from aidb.utils.asyncio import asyncio_run
 from aidb.utils.logger import logger
-from aidb_utilities.db_setup.clear_cache import clear_ML_cache
 from tests.inference_service_utils.http_inference_service_setup import \
     run_server
 from tests.inference_service_utils.inference_service_setup import \
@@ -72,7 +71,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
         assert len(gt_res) == len(aidb_res)
         # run again, because cache exists, there should be no new calls
         assert aidb_engine._config.inference_services["objects00"].infer_one.calls == calls[index][0]
-        asyncio_run(clear_ML_cache(aidb_engine))
+        asyncio_run(aidb_engine.clear_ml_cache())
         logger.info(f'Running uncached query {aidb_query} in aidb database')
         aidb_res = aidb_engine.execute(aidb_query)
         assert len(gt_res) == len(aidb_res)
