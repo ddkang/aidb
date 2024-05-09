@@ -50,12 +50,13 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
     finally:
       self.__del__()
 
-  async def clear_ml_cache(self, service_name_list: list[str] | None = None):
+  async def clear_ml_cache(self, service_name_list = None):
     '''
     Clear the cache and output table if the ML model has changed.
     For each cached inference service, build the reference graph of the tables based on fk constraints,
     and then delete the tables following the graph's topological order to maintain integrity during deletion.
-    service_name_list: the name of all the changed services. 
+
+    service_name_list: the name of all the changed services. Should be a list of str or None.
     If the service name list is not given, the output for all the services will be cleared.
     '''
     async def clear_service_cache(inference_binding):
@@ -91,4 +92,9 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
       service_name_set = set(service_name_list)
     for inference_binding in self._config.inference_bindings:
       if service_name_list is None or inference_binding.service.name in service_name_set:
+        logger.debug(f"Clearing cache for service {inference_binding.service.name}")
         await clear_service_cache(inference_binding)
+        if service_name_list is not None:
+          service_name_set.remove(inference_binding.service.name)
+  
+    logger.warning(f"Service binding {service_name_set} are not found.")
