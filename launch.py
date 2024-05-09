@@ -8,7 +8,6 @@ from aidb_utilities.aidb_setup.aidb_factory import AIDB
 from aidb_utilities.command_line_setup.command_line_setup import \
     command_line_utility
 from aidb_utilities.db_setup.blob_table import BaseTablesSetup
-from aidb_utilities.db_setup.clear_cache import clear_ML_cache
 from aidb_utilities.db_setup.create_tables import create_output_tables
 
 
@@ -24,7 +23,7 @@ if __name__ == '__main__':
   parser.add_argument("--setup-blob-table", action='store_true')
   parser.add_argument("--setup-output-tables", action='store_true')
   parser.add_argument("--verbose", action='store_true')
-  parser.add_argument("--clear-cache", action='store_true')
+  parser.add_argument("--clear-cache", nargs='*')
   args = parser.parse_args()
 
   config = importlib.import_module(args.config)
@@ -37,7 +36,7 @@ if __name__ == '__main__':
 
   aidb_engine = AIDB.from_config(args.config, args.verbose)
   
-  if args.clear_cache:
-    asyncio_run(clear_ML_cache(aidb_engine))
+  if args.clear_cache is not None:
+    asyncio_run(aidb_engine.clear_ml_cache(None if len(args.clear_cache) == 0 else args.clear_cache))
   
   command_line_utility(aidb_engine)

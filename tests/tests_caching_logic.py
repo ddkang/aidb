@@ -81,5 +81,54 @@ class CachingLogic(IsolatedAsyncioTestCase):
       del aidb_engine
     p.terminate()
 
+  async def test_only_one_service_deleted(self):
+    '''
+    Testing whether cache for other service remains when only one service is deleted.
+    Do query on two different services first. Then delete cache for one service.
+    Finally do query on these services again and check whether the call count changes.
+    '''
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, 'data/jackson')
+
+    p = Process(target=run_server, args=[str(data_dir)])
+    p.start()
+    time.sleep(1)
+    db_url_list = [POSTGRESQL_URL]
+
+    for db_url in db_url_list:
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir)
+  
+      register_inference_services(aidb_engine, data_dir, batch_supported=False)
+  
+      queries = [
+          '''SELECT * FROM objects00 WHERE object_name='car' AND frame < 300;''',
+          '''SELECT * FROM lights01 WHERE light_1='red' AND frame < 300;'''
+      ]
+  
+      # no service calls before executing query
+      assert aidb_engine._config.inference_services["objects00"].infer_one.calls == 0
+      assert aidb_engine._config.inference_services["lights01"].infer_one.calls == 0
+
+      for index, aidb_query in enumerate(queries):
+        # Run the query on the aidb database
+        logger.info(f'Running initial query {aidb_query} in aidb database')
+        aidb_engine.execute(aidb_query)
+      
+      initial_objects00_calls = aidb_engine._config.inference_services["objects00"].infer_one.calls
+      initial_lights01_calls = aidb_engine._config.inference_services["lights01"].infer_one.calls
+
+      asyncio_run(aidb_engine.clear_ml_cache(["objects00"]))
+      for index, aidb_query in enumerate(queries):
+        # Run the query on the aidb database
+        logger.info(f'Running query {aidb_query} in aidb database after clearing cache for one service')
+        aidb_engine.execute(aidb_query)
+      
+      assert initial_objects00_calls != aidb_engine._config.inference_services["objects00"].infer_one.calls
+      assert initial_lights01_calls == aidb_engine._config.inference_services["lights01"].infer_one.calls
+      
+      del gt_engine
+      del aidb_engine
+    p.terminate()
+
 if __name__ == '__main__':
   unittest.main()
