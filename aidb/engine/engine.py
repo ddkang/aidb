@@ -96,5 +96,6 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
         await clear_service_cache(inference_binding)
         if service_name_list is not None:
           service_name_set.remove(inference_binding.service.name)
-  
-    logger.warning(f"Service binding {service_name_set} are not found.")
+    
+    if service_name_list is not None and len(service_name_set) != 0:
+      logger.warning(f"Service binding {service_name_set} are not found.")
