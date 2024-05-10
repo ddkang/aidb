@@ -52,7 +52,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
       initial_infer_one_calls = aidb_engine._config.inference_services["objects00"].infer_one.calls
 
       # May have cache before test so clear them
-      aidb_engine.clear_ml_cache()
+      asyncio_run(aidb_engine.clear_ml_cache())
   
       calls = [[initial_infer_one_calls + 20, initial_infer_one_calls + 40], 
                [initial_infer_one_calls + 47, initial_infer_one_calls + 74]]
@@ -121,7 +121,7 @@ class CachingLogic(IsolatedAsyncioTestCase):
       initial_infer_one_calls = aidb_engine._config.inference_services["counts03"].infer_one.calls
 
       # May have cache before test so clear them
-      aidb_engine.clear_ml_cache()
+      asyncio_run(aidb_engine.clear_ml_cache())
 
       calls = [[initial_infer_one_calls + 20, initial_infer_one_calls + 40], 
                [initial_infer_one_calls + 60, initial_infer_one_calls + 60]]
