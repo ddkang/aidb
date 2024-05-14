@@ -53,49 +53,22 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
   async def clear_ml_cache(self, service_name_list = None):
     '''
     Clear the cache and output table if the ML model has changed.
-    For each cached inference service, build the reference graph of the tables based on fk constraints,
-    and then delete the tables following the graph's topological order to maintain integrity during deletion.
-
-    service_name_list: the name of all the changed services. Should be a list of str or None.
+    Delete the tables following the inference services' topological order to maintain integrity during deletion.
+    service_name_list: the name of all the changed services. A list of str or None.
     If the service name list is not given, the output for all the services will be cleared.
     '''
-    async def clear_service_cache(inference_binding):
-      if isinstance(inference_binding, CachedBoundInferenceService):
-        async with inference_binding._engine.begin() as conn:
-          tables_to_delete = inference_binding.get_tables(inference_binding.binding.output_columns) + [inference_binding._cache_table_name]
-          fk_ref_graph = nx.DiGraph()
-          fk_ref_graph.add_nodes_from(tables_to_delete)
-          for table_name in tables_to_delete:
-            if table_name == inference_binding._cache_table_name:
-              table = inference_binding._cache_table
-            else:
-              table = inference_binding._tables[table_name]._table
-            for constraint in table.constraints:
-              if isinstance(constraint, ForeignKeyConstraint):
-                for fk in constraint.elements:
-                  fk_ref_table_name = fk.column.table.name
-                  if fk_ref_table_name in fk_ref_graph:
-                    fk_ref_graph.add_edge(table_name,fk_ref_table_name)
-          
-          table_order = nx.topological_sort(fk_ref_graph)
-          for table_name in table_order:
-            if table_name == inference_binding._cache_table_name:
-              table = inference_binding._cache_table
-            else:
-              table = inference_binding._tables[table_name]._table
-            await conn.execute(delete(table))
-          
-      else:
-        logger.debug(f"Service binding for {inference_binding.service.name} is not cached")
-    
-    if service_name_list is not None:
-      service_name_set = set(service_name_list)
-    for inference_binding in self._config.inference_bindings:
-      if service_name_list is None or inference_binding.service.name in service_name_set:
-        logger.debug(f"Clearing cache for service {inference_binding.service.name}")
-        await clear_service_cache(inference_binding)
-        if service_name_list is not None:
-          service_name_set.remove(inference_binding.service.name)
-    
-    if service_name_list is not None and len(service_name_set) != 0:
-      logger.warning(f"Service binding {service_name_set} are not found.")
+    async with self._sql_engine.begin() as conn:
+      service_ordering = self._config.inference_topological_order
+      if service_name_list is None:
+        service_name_list = [bounded_service.service.name for bounded_service in service_ordering]
+      service_name_list = set(service_name_list)
+      for bounded_service in reversed(service_ordering):
+        if isinstance(bounded_service, CachedBoundInferenceService):
+          if bounded_service.service.name in service_name_list:
+            for input_column in bounded_service.binding.input_columns:
+              service_name_list.add(input_column.split('.')[0])
+            asyncio_run(conn.execute(delete(bounded_service._cache_table)))
+            for output_column in bounded_service.binding.output_columns:
+              asyncio_run(conn.execute(delete(bounded_service._tables[output_column.split('.')[0]]._table)))
+        else:
+          logger.debug(f"Service binding for {bounded_service.service.name} is not cached")
