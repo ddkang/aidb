@@ -31,15 +31,11 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
       else:
         return a == b
     
-    def tuple_is_close(tuple_a, tuple_b):
-      return all(element_is_close(a, b) for a, b in zip(tuple_a, tuple_b))
-    
-    def entry_is_in_gt_res(entry, gt_res):
-      return any(tuple_is_close(entry, gt_res_entry) for gt_res_entry in gt_res)
-    
     aidb_res = set(aidb_res)
     gt_res = set(gt_res)
-    return all(entry_is_in_gt_res(aidb_res_entry, gt_res) for aidb_res_entry in aidb_res)
+    return all(any(
+        all(element_is_close(aidb_elem, gt_elem) for aidb_elem, gt_elem in zip(aidb_entry, gt_entry)) 
+        for gt_entry in gt_res) for aidb_entry in aidb_res)
 
   async def test_jackson_number_objects(self):
 
