@@ -62,13 +62,22 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
       if service_name_list is None:
         service_name_list = [bounded_service.service.name for bounded_service in service_ordering]
       service_name_list = set(service_name_list)
+      
+      # Get all the services that need to be cleared because of foreign key constraints
+      for bounded_service in service_ordering:
+        if bounded_service.service.name in service_name_list:
+          for in_edge in self._config.table_graph.in_edges(bounded_service.service.name):
+            service_name_list.add(in_edge[0])
+      
+      # Clear the services in reversed topological order
       for bounded_service in reversed(service_ordering):
         if isinstance(bounded_service, CachedBoundInferenceService):
           if bounded_service.service.name in service_name_list:
-            for input_column in bounded_service.binding.input_columns:
-              service_name_list.add(input_column.split('.')[0])
             asyncio_run(conn.execute(delete(bounded_service._cache_table)))
+            output_tables_to_be_deleted = set()
             for output_column in bounded_service.binding.output_columns:
-              asyncio_run(conn.execute(delete(bounded_service._tables[output_column.split('.')[0]]._table)))
+              output_tables_to_be_deleted.add(output_column.split('.')[0])
+            for table_name in output_tables_to_be_deleted:
+              asyncio_run(conn.execute(delete(bounded_service._tables[table_name]._table)))
         else:
           logger.debug(f"Service binding for {bounded_service.service.name} is not cached")
