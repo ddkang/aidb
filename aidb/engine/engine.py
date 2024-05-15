@@ -64,11 +64,12 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
       service_name_list = set(service_name_list)
       
       # Get all the services that need to be cleared because of foreign key constraints
+      inference_graph = self._config.inference_graph
       for bounded_service in service_ordering:
         if bounded_service.service.name in service_name_list:
           for input_column in bounded_service.binding.input_columns:
-            for in_edge in self._config.inference_graph.in_edges(input_column):
-              service_name_list.add(in_edge.bound_service.service.name)
+            for in_edge in inference_graph.in_edges(input_column):
+              service_name_list.add(inference_graph.get_edge_data(*in_edge)['bound_service'])
       
       # Clear the services in reversed topological order
       for bounded_service in reversed(service_ordering):
