@@ -33,9 +33,17 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     
     aidb_res = set(aidb_res)
     gt_res = set(gt_res)
-    return all(any(
-        all(element_is_close(aidb_elem, gt_elem) for aidb_elem, gt_elem in zip(aidb_entry, gt_entry)) 
-        for gt_entry in gt_res) for aidb_entry in aidb_res)
+    # Iterate through each entry in aidb_res and check its existence in gt_res
+    for aidb_entry in aidb_res:
+      entry_exists_in_gt_res = False
+      for gt_entry in gt_res:
+        # Check whether the two entries are equal regarding the float error
+        if all(element_is_close(aidb_elem, gt_elem) for aidb_elem, gt_elem in zip(aidb_entry, gt_entry)):
+          entry_exists_in_gt_res = True
+          break
+      if not entry_exists_in_gt_res:
+        return False
+    return True
 
   async def test_jackson_number_objects(self):
 
