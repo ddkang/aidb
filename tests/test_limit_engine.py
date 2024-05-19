@@ -98,6 +98,10 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
         logger.info(f'There are {len(aidb_res)} elements in limit engine results '
               f'and {len(gt_res)} elements in ground truth results')
+        if len(aidb_res) < 100:
+          assert len(aidb_res) == len(gt_res)
+        else:
+          assert len(aidb_res) == 100
         assert self._subset_check(aidb_res, gt_res)
 
       del gt_engine
