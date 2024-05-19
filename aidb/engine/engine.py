@@ -1,3 +1,5 @@
+from collections import deque
+
 import networkx as nx
 from sqlalchemy.schema import ForeignKeyConstraint
 from sqlalchemy.sql import delete
@@ -50,36 +52,71 @@ class Engine(LimitEngine, NonSelectQueryEngine, ApproxSelectEngine, ApproximateA
     finally:
       self.__del__()
 
-  async def clear_ml_cache(self, service_name_list = None):
+  async def clear_ml_cache(self, services_to_clear = None):
     '''
     Clear the cache and output table if the ML model has changed.
-    Delete the tables following the inference services' topological order to maintain integrity during deletion.
-    service_name_list: the name of all the changed services. A list of str or None.
+    1. Collect the output tables directly related to the selected services.
+    2. Collect the output tables that need to be cleared considering the fk and service constraints.
+    3. Delete the cache tables. 
+    4. Delete the output tables in the reversed topological order of table_graph.
+
+    services_to_clear: the name of all the changed services. A list of str or None.
     If the service name list is not given, the output for all the services will be cleared.
+    Note that the output for some other services may be also cleared because of fk constraints.
     '''
+    if services_to_clear is None:
+      services_to_clear = [bound_service.service.name for bound_service in self._config.inference_bindings]
+    services_to_clear = set(services_to_clear)
+    
+    # The services that has output columns in the table
+    table_related_service = {table_name: set() for table_name in self._config.tables.keys()}
+    # The output tables of each service
+    output_tables = {service_name: set() for service_name in self._config.inference_services.keys()}
+    tables_to_clear = set()
+
+    for bound_service in self._config.inference_bindings:
+      if isinstance(bound_service, CachedBoundInferenceService):
+        # Construct the table to service map and the output table list
+        service_name = bound_service.service.name
+        for output_column in bound_service.binding.output_columns:
+          output_tables[service_name].add(output_column.split('.')[0])
+        for output_table_name in output_tables[service_name]:
+          table_related_service[output_table_name].add(service_name)
+        # Collect the output tables directly related to service_to_clear
+        if service_name in services_to_clear:
+          tables_to_clear.update(output_tables[service_name])
+      else:
+        logger.debug(f"Service binding for {bound_service.service.name} is not cached")
+    
+    # Collect the output tables that need to be cleared considering the fk and service constraints
+    # Do a bfs on the reversed table graph
+    table_graph = self._config.table_graph
+    table_queue = deque(tables_to_clear)
+    
+    def add_table_to_queue(table):
+      if table not in tables_to_clear:
+        tables_to_clear.add(table)
+        table_queue.append(table)
+
+    while len(table_queue) > 0:
+      table_name = table_queue.popleft()
+      # Add tables considering fk constraints
+      for in_edge in table_graph.in_edges(table_name):
+        add_table_to_queue(in_edge[0])
+      # Add tables considering service constraints
+      services_to_clear.update(table_related_service[table_name])
+      for service_name in table_related_service[table_name]:
+        for table_to_add in output_tables[service_name]:
+          add_table_to_queue(table_to_add)
+  
     async with self._sql_engine.begin() as conn:
-      service_ordering = self._config.inference_topological_order
-      if service_name_list is None:
-        service_name_list = [bounded_service.service.name for bounded_service in service_ordering]
-      service_name_list = set(service_name_list)
-      
-      # Get all the services that need to be cleared because of foreign key constraints
-      inference_graph = self._config.inference_graph
-      for bounded_service in service_ordering:
-        if bounded_service.service.name in service_name_list:
-          for input_column in bounded_service.binding.input_columns:
-            for in_edge in inference_graph.in_edges(input_column):
-              service_name_list.add(inference_graph.get_edge_data(*in_edge)['bound_service'])
-      
-      # Clear the services in reversed topological order
-      for bounded_service in reversed(service_ordering):
-        if isinstance(bounded_service, CachedBoundInferenceService):
-          if bounded_service.service.name in service_name_list:
-            asyncio_run(conn.execute(delete(bounded_service._cache_table)))
-            output_tables_to_be_deleted = set()
-            for output_column in bounded_service.binding.output_columns:
-              output_tables_to_be_deleted.add(output_column.split('.')[0])
-            for table_name in output_tables_to_be_deleted:
-              asyncio_run(conn.execute(delete(bounded_service._tables[table_name]._table)))
-        else:
-          logger.debug(f"Service binding for {bounded_service.service.name} is not cached")
+      # Delete cache tables
+      for bound_service in self._config.inference_bindings:
+        if bound_service.service.name in services_to_clear:
+          asyncio_run(conn.execute(delete(bound_service._cache_table)))
+
+      # Delete output tables
+      table_order = nx.topological_sort(table_graph)
+      for table_name in table_order:
+        if table_name in tables_to_clear:
+          asyncio_run(conn.execute(delete(self._config.tables[table_name]._table)))

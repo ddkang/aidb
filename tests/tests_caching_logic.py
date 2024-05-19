@@ -129,31 +129,21 @@ class CachingLogic(IsolatedAsyncioTestCase):
       # each query calls 20 inference.
       # For the first two queries, all the inference is needed.
       # The third query need to infer again but the fourth don't.
-      for index, (query_type, aidb_query, exact_query) in enumerate(queries):
-        logger.info(f'Running query {exact_query} in ground truth database')
-        # Run the query on the ground truth database
-        async with gt_engine.begin() as conn:
-          gt_res = await conn.execute(text(exact_query))
-          gt_res = gt_res.fetchall()
-        logger.info(f'Running initial query {aidb_query} in aidb database')
-        # Run the query on the aidb database
-        aidb_res = aidb_engine.execute(aidb_query)
-        assert len(gt_res) == len(aidb_res)
-        assert aidb_engine._config.inference_services["counts03"].infer_one.calls == calls[0][index]
-
-      asyncio_run(aidb_engine.clear_ml_cache(["lights01"]))
-      
-      for index, (query_type, aidb_query, exact_query) in enumerate(queries):
-        logger.info(f'Running query {exact_query} in ground truth database')
-        # Run the query on the ground truth database
-        async with gt_engine.begin() as conn:
-          gt_res = await conn.execute(text(exact_query))
-          gt_res = gt_res.fetchall()
-        logger.info(f'Running query {aidb_query} in aidb database after cache deleted')
-        # Run the query on the aidb database
-        aidb_res = aidb_engine.execute(aidb_query)
-        assert len(gt_res) == len(aidb_res)
-        assert aidb_engine._config.inference_services["counts03"].infer_one.calls == calls[1][index]
+      for round in range(2):
+        for index, (query_type, aidb_query, exact_query) in enumerate(queries):
+          logger.info(f'Running query {exact_query} in ground truth database')
+          # Run the query on the ground truth database
+          async with gt_engine.begin() as conn:
+            gt_res = await conn.execute(text(exact_query))
+            gt_res = gt_res.fetchall()
+          logger.info(f'Running query {aidb_query} in aidb database')
+          # Run the query on the aidb database
+          aidb_res = aidb_engine.execute(aidb_query)
+          assert len(gt_res) == len(aidb_res)
+          # Check the call number
+          assert aidb_engine._config.inference_services["counts03"].infer_one.calls == calls[round][index]
+        # Clear the cache for one of the services and retain the other one
+        asyncio_run(aidb_engine.clear_ml_cache(["lights01"]))
       
       del gt_engine
       del aidb_engine
