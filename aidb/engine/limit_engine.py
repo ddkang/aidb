@@ -27,15 +27,13 @@ class LimitEngine(TastiEngine):
     return pd.Series(proxy_score_all_blobs, index=score_for_all_df.index)
 
 
-  async def _execute_limit_query(self, query: Query, proxy_score_for_all_blobs = None):
+  async def _execute_limit_query(self, query: Query):
     '''
-    Execute service inference based on proxy score, stop when the limit number meets.
-    The proxy_score_for_all_blobs param provides user defined proxy scores directly when doing tests.
+    execute service inference based on proxy score, stop when the limit number meets
     '''
-    if proxy_score_for_all_blobs is None:
-      # generate proxy score for each blob
-      score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
-      proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
+    # generate proxy score for each blob
+    score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
+    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
 
     # sorted blob id based on proxy score
     id_score = [(i, s) for i, s in zip(proxy_score_for_all_blobs.index, proxy_score_for_all_blobs.values)]
