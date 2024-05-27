@@ -120,14 +120,14 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
           assert len(rand_proxy_aidb_res) == len(gt_res)
         else:
           assert len(rand_proxy_aidb_res) == 100
-        # TODO: check this using the new check
+        # TODO: change this using the new subset check function
         assert len(set(rand_proxy_aidb_res) - set(gt_res)) == 0
 
         if len(accurate_proxy_aidb_res) < 100:
           assert len(accurate_proxy_aidb_res) == len(gt_res)
         else:
           assert len(accurate_proxy_aidb_res) == 100
-        # TODO: check this using the new check
+        # TODO: change this using the new subset check function
         assert len(set(accurate_proxy_aidb_res) - set(gt_res)) == 0
 
         # Check call count
