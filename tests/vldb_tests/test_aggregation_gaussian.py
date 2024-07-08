@@ -15,8 +15,13 @@ from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 
 setup_test_logger('aggregation_gaussian')
 
-ground_truth_dir = './tests/vldb_tests/data/gaussian/ground_truth'
-inference_dir = './tests/vldb_tests/data/gaussian/inference'
+MEAN = float(os.environ.get('MEAN', 0))
+STD = float(os.environ.get('STD', 0))
+SAMPLE_SIZE = int(os.environ.get('SAMPLE_SIZE', 10000))
+PORT = int(os.environ.get('PORT', 8000))
+
+ground_truth_dir = f'./tests/vldb_tests/data/gaussian_{SAMPLE_SIZE}/ground_truth'
+inference_dir = f'./tests/vldb_tests/data/gaussian_{SAMPLE_SIZE}/inference'
 
 if not os.path.exists(ground_truth_dir):
     os.makedirs(ground_truth_dir)
@@ -79,17 +84,17 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
 
 
   async def test_agg_query(self):
-    generate_csv_file(0, 1000, 1000000)
+    generate_csv_file(MEAN, STD, SAMPLE_SIZE)
     count_list = [0] * len(queries)
-    for i in range(_NUMBER_OF_RUNS):
-      dirname = os.path.dirname(__file__)
-      data_dir = os.path.join(dirname, 'data/gaussian')
+    dirname = os.path.dirname(__file__)
+    data_dir = os.path.join(dirname, f'data/gaussian_{SAMPLE_SIZE}')
 
-      p = Process(target=run_server, args=[str(data_dir)])
-      p.start()
-      time.sleep(1)
-      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
-      register_inference_services(aidb_engine, data_dir)
+    p = Process(target=run_server, args=[str(data_dir)])
+    p.start()
+    time.sleep(1)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir, port=PORT)
+    register_inference_services(aidb_engine, data_dir)
+    for i in range(_NUMBER_OF_RUNS):
       k = 0
       for query_type, aidb_query, aggregate_query in queries:
         logger.info(f'Running query {aggregate_query} in ground truth database')
@@ -106,9 +111,9 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
         k += 1
 
       logger.info(f'Time of runs: {i + 1}, Successful count: {count_list}')
-      del gt_engine
-      del aidb_engine
-      p.terminate()
+    del gt_engine
+    del aidb_engine
+    p.terminate()
 
 
 if __name__ == '__main__':
