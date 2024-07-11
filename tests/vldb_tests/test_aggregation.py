@@ -63,7 +63,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       count_list = [0] * len(approx_query_list)
       k = 0
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, port=PORT)
-      register_inference_services(aidb_engine, data_dir)
+      register_inference_services(aidb_engine, data_dir, port=PORT)
       for aidb_query, aggregate_query in zip(approx_query_list, exact_query_list):
         for i in range(_NUMBER_OF_RUNS):
           logger.info(f'Running query {aggregate_query} in ground truth database')
