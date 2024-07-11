@@ -1,0 +1,10 @@
+SELECT COUNT(*) FROM entity00 WHERE type = 'ORG';
+SELECT COUNT(*) FROM entity00 WHERE type = 'GPE';
+SELECT COUNT(*) FROM entity00 WHERE type = 'PERSON' AND blob_id > 100000;
+SELECT COUNT(*) FROM entity00 WHERE type = 'CARDINAL' OR type = 'DATE';
+SELECT COUNT(*) FROM entity00 WHERE type = 'GPE' AND blob_id < 100000;
+SELECT AVG(score) FROM sentiment01;
+SELECT AVG(score), COUNT(*) FROM sentiment01 WHERE label = 'POSITIVE';
+SELECT AVG(score), COUNT(*) FROM sentiment01 WHERE label = 'NEGATIVE';
+SELECT COUNT(*) FROM sentiment01 WHERE label = 'NEUTRAL';
+SELECT SUM(score) FROM sentiment01 WHERE label = 'POSITIVE';

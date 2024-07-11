@@ -1,0 +1,10 @@
+SELECT AVG(num_textboxes) FROM arxiv00;
+SELECT COUNT(*) FROM arxiv00;
+SELECT AVG(num_textboxes) FROM arxiv00 WHERE num_textboxes > 10;
+SELECT SUM(num_textboxes) FROM arxiv00;
+SELECT AVG(num_textboxes) FROM arxiv00 WHERE pdf_id > 10000;
+SELECT AVG(score) FROM sentiment01;
+SELECT AVG(score), COUNT(*) FROM sentiment01 WHERE label = 'POSITIVE';
+SELECT AVG(score), COUNT(*) FROM sentiment01 WHERE label = 'NEGATIVE';
+SELECT COUNT(*) FROM sentiment01 WHERE label = 'NEUTRAL';
+SELECT SUM(score) FROM sentiment01 WHERE label = 'POSITIVE';
