@@ -44,7 +44,7 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
     dirname = os.path.dirname(__file__)
     data_dir = os.path.join(dirname, f'data/{DATASET}')
 
-    p = Process(target=run_server, args=[str(data_dir)])
+    p = Process(target=run_server, args=[str(data_dir), PORT])
     p.start()
     time.sleep(1)
     db_url_list = [SQLITE_URL]
