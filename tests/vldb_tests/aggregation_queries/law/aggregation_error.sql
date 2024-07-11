@@ -1,0 +1,5 @@
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';

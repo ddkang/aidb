@@ -80,7 +80,6 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
           if error_target is None: error_target = 0
           if self._equality_check(aidb_res, gt_res, error_target):
             count_list[k] += 1
-          logger.info(f'call: {aidb_engine._config.inference_services["objects00"].infer_one.calls}')
         k+=1
         logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
       
