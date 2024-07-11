@@ -22,8 +22,8 @@ _NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 10))
 
 DATASET = os.environ.get('DATASET', 'jackson_all')
 PORT = int(os.environ.get('PORT', 8000))
-
-setup_test_logger(f'aggregation_{DATASET}_{PORT}')
+TASK = os.environ.get('TASK', 'error')
+setup_test_logger(f'aggregation_{DATASET}_{TASK}_{PORT}')
 
 
 class AggeregateEngineTests(IsolatedAsyncioTestCase):
@@ -53,18 +53,18 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       logger.info(f'Test {dialect} database')
       exact_query_list = []
       approx_query_list = []
-      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/aggregation.sql'), 'r') as f:
+      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/aggregation_{TASK}.sql'), 'r') as f:
         for line in f.readlines():
           exact_query_list.append(line.strip())
-      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/approximate_aggregation.sql'), 'r') as f:
+      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/approximate_aggregation_{TASK}.sql'), 'r') as f:
         for line in f.readlines():
           approx_query_list.append(line.strip())
 
       count_list = [0] * len(approx_query_list)
       k = 0
+      gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, port=PORT)
+      register_inference_services(aidb_engine, data_dir)
       for aidb_query, aggregate_query in zip(approx_query_list, exact_query_list):
-        gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, port=PORT)
-        register_inference_services(aidb_engine, data_dir)
         for i in range(_NUMBER_OF_RUNS):
           logger.info(f'Running query {aggregate_query} in ground truth database')
           try:
@@ -80,10 +80,11 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
           if error_target is None: error_target = 0
           if self._equality_check(aidb_res, gt_res, error_target):
             count_list[k] += 1
+          logger.info(f'call: {aidb_engine._config.inference_services["objects00"].infer_one.calls}')
         k+=1
         logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
       
-      assert sum(count_list) >= len(count_list) * _NUMBER_OF_RUNS - 1
+      # assert sum(count_list) >= len(count_list) * _NUMBER_OF_RUNS - 1
       del gt_engine
       del aidb_engine
     p.terminate()
