@@ -232,7 +232,6 @@ class ApproximateAggregateEngine(FullScanEngine):
     conf = 1 - alpha
     estimator = self._get_estimator(agg_type)
     pilot_estimate = estimator.estimate(extracted_sample_results, sample_size, conf)
-
     if agg_type == exp.Avg:
       p_lb = statsmodels.stats.proportion.proportion_confint(
         len(extracted_sample_results),
@@ -259,16 +258,41 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     fixed_cols = sample_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
     for index, (agg_type, _) in enumerate(query.aggregation_type_list_in_query):
-      selected_index_col = sample_results.iloc[:, [index]]
-      extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
-      num_samples.append(
-        self._calculate_required_num_samples(
-          extracted_sample_results,
-          _NUM_PILOT_SAMPLES,
-          agg_type,
-          alpha,
-          error_target
+      if agg_type == exp.Avg:
+        adjusted_error_target = error_target / ( 2 - error_target)
+        num_samples.append(
+          self._calculate_required_num_samples(
+            fixed_cols,
+            _NUM_PILOT_SAMPLES,
+            exp.Count,
+            alpha,
+            adjusted_error_target
+          )
         )
-      )
+        
+        sample_results['sum_col'] = sample_results.iloc[:, index] * sample_results[NUM_ITEMS_COL_NAME]
+        extracted_sample_results = pd.concat([sample_results[['sum_col']], fixed_cols], axis=1)
+        num_samples.append(
+          self._calculate_required_num_samples(
+            extracted_sample_results,
+            _NUM_PILOT_SAMPLES,
+            exp.Sum,
+            alpha,
+            adjusted_error_target
+          )
+        )
+        print('num_samples:', num_samples)
+      else:
+        selected_index_col = sample_results.iloc[:, [index]]
+        extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
+        num_samples.append(
+          self._calculate_required_num_samples(
+            extracted_sample_results,
+            _NUM_PILOT_SAMPLES,
+            agg_type,
+            alpha,
+            error_target
+          )
+        )
 
     return max(max(num_samples), 100)
