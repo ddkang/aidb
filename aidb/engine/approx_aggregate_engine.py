@@ -1,3 +1,4 @@
+import math
 import pandas as pd
 import scipy
 from sqlalchemy.sql import text
@@ -259,6 +260,10 @@ class ApproximateAggregateEngine(FullScanEngine):
 
     fixed_cols = sample_results[[NUM_ITEMS_COL_NAME, WEIGHT_COL_NAME, MASS_COL_NAME]]
     for index, (agg_type, _) in enumerate(query.aggregation_type_list_in_query):
+      if agg_type == exp.Avg:
+        adjusted_error_target = min(1 - math.sqrt(1 - error_target), math.sqrt(error_target + 1) - 1)
+      else:
+        adjusted_error_target = error_target
       selected_index_col = sample_results.iloc[:, [index]]
       extracted_sample_results = pd.concat([selected_index_col, fixed_cols], axis=1)
       num_samples.append(
@@ -267,7 +272,7 @@ class ApproximateAggregateEngine(FullScanEngine):
           _NUM_PILOT_SAMPLES,
           agg_type,
           alpha,
-          error_target
+          adjusted_error_target
         )
       )
 
