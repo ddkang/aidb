@@ -14,15 +14,16 @@ BUDGET = 10000
 
 class ApproxSelectEngine(TastiEngine):
   # TODO: design a better algorithm, this function is same as the function in Limit Engine
-  def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
+  def approx_select_score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
     '''
     convert query result to score, return a Dataframe contains score column, the index is blob index
     if A and B, then the score is min(score A, score B)
     if A or B, then the score is max(score A, score B)
     '''
+    #TODO: refactor score calculation
     proxy_score_all_blobs = np.zeros(len(score_for_all_df))
     for idx, (index, row) in enumerate(score_for_all_df.iterrows()):
-      min_score = 1
+      min_score = float('inf')
       for or_connected in score_connected:
         max_score = 0
         for score_name in or_connected:
@@ -137,6 +138,14 @@ class ApproxSelectEngine(TastiEngine):
       recall_target * sum(z),
       satisfied_sampled_results
     )
+    grouped = satisfied_sampled_results.groupby(level=0)
+    aggregated = grouped.agg(sum_mass=(MASS_COL_NAME, 'sum'), __proxy_score=(PROXY_SCORE_COL_NAME, 'mean'))
+    samples_above_cutoff = aggregated[aggregated[PROXY_SCORE_COL_NAME] >= estimated_tau]
+    samples_below_cutoff = aggregated[aggregated[PROXY_SCORE_COL_NAME] < estimated_tau]
+
+    estimated_z1 = list(samples_above_cutoff['sum_mass']) + [0] * (total_length - len(samples_above_cutoff))
+    estimated_z2 = list(samples_below_cutoff['sum_mass']) + [0] * (total_length - len(samples_below_cutoff))
+    
     positive_length = len(satisfied_sampled_results[satisfied_sampled_results[PROXY_SCORE_COL_NAME] >= estimated_tau])
 
     estimated_z1 = list(z[:positive_length]) + [0] * (total_length - len(z[:positive_length]))
@@ -159,7 +168,7 @@ class ApproxSelectEngine(TastiEngine):
       modified_recall_target * sum(z),
       satisfied_sampled_results
     )
-
+    logger.info(f'modified_recall: {modified_recall_target}')
     logger.info(f'modified_tau: {modified_tau}')
     return modified_tau
 
@@ -171,7 +180,7 @@ class ApproxSelectEngine(TastiEngine):
     # generate proxy score for each blob
     score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
 
-    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
+    proxy_score_for_all_blobs = self.approx_select_score_fn(score_for_all_df, score_connected)
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
 
@@ -188,14 +197,10 @@ class ApproxSelectEngine(TastiEngine):
           conn
       )
 
-      satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
-      sorted_satisfied_sampled_results = satisfied_sampled_results.sort_values(by=PROXY_SCORE_COL_NAME, ascending=False)
-
-      no_result_length = BUDGET - len(sampled_df.loc[list(set(all_sampled_results.index))])
+      joined_satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
+      sorted_satisfied_sampled_results = joined_satisfied_sampled_results.sort_values(by=PROXY_SCORE_COL_NAME, ascending=False)
 
       all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
-
-      total_length = no_result_length + len(all_sampled_results)
 
       recall_target = query.recall_target
       confidence = query.confidence / 100
@@ -203,20 +208,20 @@ class ApproxSelectEngine(TastiEngine):
           sorted_satisfied_sampled_results,
           recall_target,
           confidence,
-          total_length
+          BUDGET
       )
 
       pilot_sample_index = sorted_satisfied_sampled_results.index
       additional_sample_index = dataset[dataset[PROXY_SCORE_COL_NAME] >= tau_modified].index
 
-      all_selected_blob = list(set(pilot_sample_index).union(set(additional_sample_index)))
+      additional_selected_blob = list(set(additional_sample_index) - set(pilot_sample_index))
+      logger.info(f'num_samples: {len(additional_selected_blob)}')
 
-      logger.info(f'num_samples: {len(all_selected_blob)}')
-
-      all_satisfied_sampled_results, _ = await self.get_inference_results(
+      new_satisfied_sampled_results, _ = await self.get_inference_results(
           query,
-          all_selected_blob,
+          additional_selected_blob,
           conn
       )
+      all_satisfied_sampled_results = pd.concat([satisfied_sampled_results, new_satisfied_sampled_results], ignore_index=True)
 
     return all_satisfied_sampled_results

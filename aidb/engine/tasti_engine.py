@@ -60,7 +60,7 @@ class TastiEngine(FullScanEngine):
 
     # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
     # FIXME: fix it if there is a better design
-    score_df = score_df.groupby(level=0).mean()
+    score_df = score_df.groupby(level=0).sum()
     score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
