@@ -371,7 +371,7 @@ class BaseEngine():
 
 
   def _call_user_function(self, res_df: pd.DataFrame, function_name: str, args_list: List[str]):
-    function_name = str.lower(function_name)
+    function_name = str.upper(function_name)
 
     if inspect.iscoroutinefunction(self._config.user_defined_functions[function_name]):
       list_function_results = asyncio_run(self._config.user_defined_functions[function_name](res_df[args_list]))
