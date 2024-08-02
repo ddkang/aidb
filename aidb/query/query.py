@@ -369,6 +369,7 @@ class Query(object):
     copied_expression = self._expression.copy()
     table_alias_to_name, column_alias_to_name = self.table_and_column_aliases_in_query
     udf_output_to_alias_mapping, alias_to_udf_mapping = self.udf_outputs_aliases
+    
     for node in copied_expression.walk():
       if isinstance(node, exp.Expression) and self._check_in_subquery(node):
         continue
@@ -388,17 +389,16 @@ class Query(object):
             table_name = self._get_table_of_column(col_name)
 
           node.set('table', exp.Identifier(this=table_name, quoted=False))
-
-        elif node.is_star:
-          if isinstance(node.parent, exp.AggFunc):
-            continue
-          select_exp_list = []
-          for table_name in self.tables_in_query:
-            for col_name, _ in self._tables[table_name].items():
-              new_table = exp.Identifier(this=table_name, quoted=False)
-              new_column = exp.Identifier(this=col_name, quoted=False)
-              select_exp_list.append(exp.Column(this=new_column, table=new_table))
-          copied_expression.set('expressions', select_exp_list)
+      elif isinstance(node, exp.Star):
+        if isinstance(node.parent, exp.AggFunc):
+          continue
+        select_exp_list = []
+        for table_name in self.tables_in_query:
+          for col_name, _ in self._tables[table_name].items():
+            new_table = exp.Identifier(this=table_name, quoted=False)
+            new_column = exp.Identifier(this=col_name, quoted=False)
+            select_exp_list.append(exp.Column(this=new_column, table=new_table))
+        copied_expression.set('expressions', select_exp_list)
       
       # remove alias
       if isinstance(node, exp.Table):
