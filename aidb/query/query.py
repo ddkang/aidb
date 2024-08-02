@@ -408,7 +408,6 @@ class Query(object):
           if isinstance(parent, exp.Select):
               idx = parent.args['expressions'].index(node)
               parent.args['expressions'][idx] = node.this
-
     return Query(copied_expression.sql(), self.config)
 
 
@@ -428,10 +427,10 @@ class Query(object):
           col_name = node.args['this'].args['this']
           table_name = node.args['table'].args['this']
           normalized_column_set.add(f'{table_name}.{col_name}')
-        elif isinstance(node.args['this'], exp.Star):
-          for table_name in self.tables_in_query:
-            for col_name, _ in self._tables[table_name].items():
-              normalized_column_set.add(f'{table_name}.{col_name}')
+      elif isinstance(node, exp.Star):
+        for table_name in self.tables_in_query:
+          for col_name, _ in self._tables[table_name].items():
+            normalized_column_set.add(f'{table_name}.{col_name}')
     return normalized_column_set
 
 
@@ -695,15 +694,13 @@ class Query(object):
   def add_offset_keyword(self, offset):
     expression = self._expression.copy()
     if offset != 0:
-      offset_node = exp.Offset(this=exp.Literal(this=offset, is_string=False))
-      expression.set('offset', offset_node)
+      expression = expression.offset(offset)
     return Query(expression.sql(), self.config)
 
 
   def add_limit_keyword(self, limit):
     expression = self._expression.copy()
-    limit_node = exp.Limit(this=exp.Literal(this=limit, is_string=False))
-    expression.set('limit', limit_node)
+    expression = expression.limit(limit)
     return Query(expression.sql(), self.config)
 
   @staticmethod
