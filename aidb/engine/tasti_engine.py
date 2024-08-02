@@ -56,11 +56,13 @@ class TastiEngine(FullScanEngine):
     score_query_str, score_connected = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(score_query_str), conn))
+    score_df = pd.merge(inp_df, score_df, on=VECTOR_ID_COLUMN, how='left')
+    score_df.fillna(0, inplace=True)
     score_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
-
+    score_df = score_df['score']
     # One index may appear multi times, like there are two objects in one blob, we get average value for this blob
     # FIXME: fix it if there is a better design
-    score_df = score_df.groupby(level=0).sum()
+    # score_df = score_df.groupby(level=0).sum()
     score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
@@ -71,6 +73,12 @@ class TastiEngine(FullScanEngine):
     '''
     Convert WHERE filtering predicate into 0/1 score, record the relation between different filtering predicate
     '''
+    where_condition = query.convert_and_connected_fp_to_exp(query.filtering_predicates)
+    if where_condition:
+      where_str = f'WHERE {where_condition.sql()}'
+    else:
+      where_str = ''
+      
     filering_predicate_score_map = dict()
     and_connected = []
     score_count = 0
@@ -92,6 +100,12 @@ class TastiEngine(FullScanEngine):
     Convert filtering condition into select clause, so we can use select result to compute proxy score for all blobs
     '''
     filering_predicate_score_map, score_connected = self._get_filter_predicate_score_map(query)
+    where_condition = query.convert_and_connected_fp_to_exp(query.filtering_predicates)
+    if where_condition:
+      where_str = f'WHERE {where_condition.sql()}'
+    else:
+      where_str = ''
+      
     score_list = []
 
     for fp in filering_predicate_score_map:
@@ -100,16 +114,19 @@ class TastiEngine(FullScanEngine):
     select_str = ', '.join(score_list)
     cols = list(filering_predicate_score_map.keys())
     tables = self._get_tables(cols)
+    tables = query.tables_in_query
     # some representative blobs may not have outputs from service, so left join is better
     join_str = self._get_left_join_str(rep_table_name, tables)
     score_query_str = f'''
-                      SELECT {select_str}
-                      {join_str};
+                      SELECT {rep_table_name}.{VECTOR_ID_COLUMN}, COUNT(*) AS score
+                      {join_str}
+                      {where_str}
+                      GROUP BY {rep_table_name}.{VECTOR_ID_COLUMN};
                       '''
     return score_query_str, score_connected
 
 
-  async def propagate_score_for_all_vector_ids(self, score_df: pd.DataFrame, return_binary_score = False) -> pd.DataFrame:
+  async def propagate_score_for_all_vector_ids(self, score_df: pd.Series, return_binary_score = False) -> pd.DataFrame:
     topk_query_str = f'SELECT * FROM {self.topk_table_name}'
     async with self._sql_engine.begin() as conn:
       topk_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(topk_query_str), conn))
@@ -117,9 +134,9 @@ class TastiEngine(FullScanEngine):
 
     topk = len(topk_df.columns) // 2
     topk_indices = np.arange(topk)
-    score_df_cols = score_df.columns
+    # score_df_cols = score_df.columns
     all_dists = np.zeros((len(topk_df), topk))
-    all_scores = np.zeros((len(topk_df), len(score_df_cols), topk))
+    all_scores = np.zeros((len(topk_df), topk))
 
     for idx, (index, row) in enumerate(topk_df.iterrows()):
       reps = [int(row[f'topk_reps_{i}']) for i in topk_indices]
@@ -130,26 +147,25 @@ class TastiEngine(FullScanEngine):
         dists = [1] * topk
 
       all_dists[idx, :] = dists
-      for col_idx, col_name in enumerate(score_df_cols):
-        all_scores[idx, col_idx, :] = score_df[col_name].loc[reps].values
-
+      # for col_idx, col_name in enumerate(score_df_cols):
+      all_scores[idx, :] = score_df.loc[reps].values
     # to avoid division by zero error
     all_dists += 1e-8
 
     if return_binary_score:
       weights = 1.0 / all_dists
-      weights = weights[:, np.newaxis, :]
-      votes_1 = np.sum(all_scores * weights, axis=2)
-      votes_0 = np.sum((1 - all_scores) * weights, axis=2)
+      # weights = weights[:, :]
+      votes_1 = np.sum(all_scores * weights, axis=1)
+      votes_0 = np.sum((1 - all_scores) * weights, axis=1)
       # majority vote
       y_pred = (votes_1 > votes_0).astype(int)
     else:
       weights = np.sum(all_dists, axis=1).reshape(-1, 1) - all_dists
       weights = weights / weights.sum(axis=1).reshape(-1, 1)
-      weights = weights[:, np.newaxis, :]
-      y_pred = np.sum(all_scores * weights, axis=2)
+      # weights = weights[:, np.newaxis, :]
+      y_pred = np.sum(all_scores * weights, axis=1)
 
-    return pd.DataFrame(y_pred, columns=score_df_cols, index=topk_df.index)
+    return pd.Series(y_pred, index=topk_df.index)
 
 
   def _create_tasti_table(self, topk:int,  conn: sqlalchemy.engine.base.Connection):

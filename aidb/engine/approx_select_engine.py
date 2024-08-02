@@ -66,7 +66,8 @@ class ApproxSelectEngine(TastiEngine):
     query_after_adding_join = query_after_adding_vector_id_column.add_join(
         f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}'
     )
-
+    print(69, query_after_adding_join)
+    
     table_columns = [f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}']
     sampled_df = pd.DataFrame({VECTOR_ID_COLUMN: sampled_index})
 
@@ -88,13 +89,13 @@ class ApproxSelectEngine(TastiEngine):
           sampled_df,
           query_after_adding_join
       )
-
+      print(91, sample_query_add_filter_key.sql_str)
       res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_query_add_filter_key.sql_str), conn))
       # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
       # So we need to drop duplicated columns
       res_df = res_df.loc[:, ~res_df.columns.duplicated()]
       res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
-
+      print(res_df)
     return res_df, all_df
 
 
@@ -178,9 +179,9 @@ class ApproxSelectEngine(TastiEngine):
       raise Exception('Approx select query should contain Confidence and should not contain Budget.')
 
     # generate proxy score for each blob
-    score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
+    proxy_score_for_all_blobs, score_connected = await self.get_proxy_scores_for_all_blobs(query)
 
-    proxy_score_for_all_blobs = self.approx_select_score_fn(score_for_all_df, score_connected)
+    # proxy_score_for_all_blobs = self.approx_select_score_fn(score_for_all_df, score_connected)
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
 
