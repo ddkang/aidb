@@ -391,4 +391,4 @@ class Config:
   def add_user_defined_function(self, function_name: str, function: Callable):
     self.clear_cached_properties()
     logger.info(f'Added user defined function {function_name}')
-    self.user_defined_functions[str.lower(function_name)] = function
+    self.user_defined_functions[str.upper(function_name)] = function
