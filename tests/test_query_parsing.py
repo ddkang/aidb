@@ -247,11 +247,11 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     ),
     "test_query_8": TestQuery(
         '''
-        SELECT color, userfunction(x_min, y_min, x_max, y_max)
+        SELECT color, USERFUNCTION(x_min, y_min, x_max, y_max)
         FROM colors02 JOIN objects00 table2 ON colors02.frame = table2.frame
         WHERE table2.frame > 10000 OR y_max < 800;
         ''',
-        ("SELECT colors02.color, userfunction(objects00.x_min, objects00.y_min, "
+        ("SELECT colors02.color, USERFUNCTION(objects00.x_min, objects00.y_min, "
          "objects00.x_max, objects00.y_max) "
          "FROM colors02 JOIN objects00 ON colors02.frame = objects00.frame "
          "WHERE objects00.frame > 10000 OR objects00.y_max < 800"),
@@ -352,14 +352,14 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     data_dir = os.path.join(dirname, 'data/jackson')
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
 
-    aidb_engine.register_user_defined_function('sum_function', None)
-    aidb_engine.register_user_defined_function('is_equal', None)
-    aidb_engine.register_user_defined_function('power_function', None)
-    aidb_engine.register_user_defined_function('max_function', None)
-    aidb_engine.register_user_defined_function('multiply_function', None)
-    aidb_engine.register_user_defined_function('function1', None)
-    aidb_engine.register_user_defined_function('function2', None)
-    aidb_engine.register_user_defined_function('colors_inference', None)
+    aidb_engine.register_user_defined_function('SUM_FUNCTION', None)
+    aidb_engine.register_user_defined_function('IS_EQUAL', None)
+    aidb_engine.register_user_defined_function('POWER_FUNCTION', None)
+    aidb_engine.register_user_defined_function('MAX_FUNCTION', None)
+    aidb_engine.register_user_defined_function('MULTIPLY_FUNCTION', None)
+    aidb_engine.register_user_defined_function('FUNCTION1', None)
+    aidb_engine.register_user_defined_function('FUNCTION2', None)
+    aidb_engine.register_user_defined_function('COLORS_INFERENCE', None)
 
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config
@@ -368,7 +368,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # user defined function in SELECT clause
     "test_query_0" : UdfTestQuery( 
         '''
-        SELECT x_min, function1(x_min, y_min), y_max, function2()
+        SELECT x_min, FUNCTION1(x_min, y_min), y_max, FUNCTION2()
         FROM objects00
         WHERE x_min > 600
         ''',
@@ -378,11 +378,11 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                 ['col__0', 'col__1'],
-                'function1',
+                'FUNCTION1',
                 ['function__0']),
              UdfMapping( 
                 [],
-                'function2',
+                'FUNCTION2',
                 ['function__1'])
             ],
             ['col__0', 'function__0', 'col__2', 'function__1'],
@@ -393,7 +393,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # test function with constant parameters
     "test_query_1": UdfTestQuery(
         '''
-        SELECT x_min, function1(y_min, 2, 3)
+        SELECT x_min, FUNCTION1(y_min, 2, 3)
         FROM objects00
         WHERE x_min > 600
         ''',
@@ -403,7 +403,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping( 
                 ['col__1', 'col__2', 'col__3'],
-                'function1',
+                'FUNCTION1',
                 ['function__0'])
             ],
             ['col__0', 'function__0'],
@@ -415,8 +415,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     "test_query_2": UdfTestQuery(
         '''
         SELECT objects00.frame, x_min, y_max, color
-        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        FROM objects00 JOIN colors02 ON IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE
         WHERE color = 'blue'
         ''',
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
@@ -426,11 +426,11 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                 ['col__0', 'col__4'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__0']),
             UdfMapping(
                 ['col__5', 'col__6'],
-                'is_equal', 
+                'IS_EQUAL', 
                 ['function__1'])
             ],
             ['col__0', 'col__1', 'col__2', 'col__3'],
@@ -443,8 +443,8 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         '''
         SELECT objects00.frame, x_min, y_max, color
         FROM objects00 JOIN colors02
-        WHERE is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE AND sum_function(x_max, y_min) > 1500
+        WHERE IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE AND SUM_FUNCTION(x_max, y_min) > 1500
         ''',
         "SELECT objects00.frame AS col__0, objects00.x_min AS col__1, objects00.y_max AS col__2, "
         "colors02.color AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
@@ -453,15 +453,15 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                 ['col__0', 'col__4'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__0']),
             UdfMapping(
                 ['col__5', 'col__6'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__1']),
             UdfMapping(
                 ['col__7', 'col__8'],
-                'sum_function', 
+                'SUM_FUNCTION', 
                 ['function__2'])
             ],
             ['col__0', 'col__1', 'col__2', 'col__3'],
@@ -472,10 +472,10 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # user defined function in SELECT, JOIN, WHERE clause
     "test_query_4": UdfTestQuery(
         '''
-        SELECT multiply_function(x_min, y_max), color
-        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
-        WHERE sum_function(x_min, y_min) > 1500
+        SELECT MULTIPLY_FUNCTION(x_min, y_max), color
+        FROM objects00 JOIN colors02 ON IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE
+        WHERE SUM_FUNCTION(x_min, y_min) > 1500
         ''',
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
@@ -484,19 +484,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                   ['col__0', 'col__1'],
-                  'multiply_function',
+                  'MULTIPLY_FUNCTION',
                   ['function__0']),
              UdfMapping(
                   ['col__3', 'col__4'],
-                  'is_equal',
+                  'IS_EQUAL',
                   ['function__1']),
              UdfMapping(
                   ['col__5', 'col__6'],
-                  'is_equal',
+                  'IS_EQUAL',
                   ['function__2']),
              UdfMapping(
                   ['col__0', 'col__7'],
-                  'sum_function',
+                  'SUM_FUNCTION',
                   ['function__3'])
             ],
             ['function__0', 'col__2'],
@@ -508,9 +508,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     "test_query_5": UdfTestQuery(
         '''
         SELECT x_min, y_max, color
-        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
-        WHERE sum_function(x_min, y_min) > 1500 OR color = 'blue'
+        FROM objects00 JOIN colors02 ON IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE
+        WHERE SUM_FUNCTION(x_min, y_min) > 1500 OR color = 'blue'
         ''',
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
@@ -519,15 +519,15 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                 ['col__3', 'col__4'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__0']),
             UdfMapping(        
                 ['col__5', 'col__6'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__1']),
             UdfMapping(
                 ['col__0', 'col__7'],
-                'sum_function',
+                'SUM_FUNCTION',
                 ['function__2'])
             ], 
             ['col__0', 'col__1', 'col__2'],
@@ -539,9 +539,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     "test_query_6": UdfTestQuery(
         '''
         SELECT x_min, y_max, color
-        FROM objects00 JOIN colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
-        WHERE sum_function(x_min, y_min) > multiply_function(x_min, y_min)
+        FROM objects00 JOIN colors02 ON IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE
+        WHERE SUM_FUNCTION(x_min, y_min) > MULTIPLY_FUNCTION(x_min, y_min)
         ''',
         "SELECT objects00.x_min AS col__0, objects00.y_max AS col__1, colors02.color AS col__2, "
         "objects00.frame AS col__3, colors02.frame AS col__4, objects00.object_id AS col__5, colors02.object_id AS col__6, "
@@ -550,19 +550,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping( 
                 ['col__3', 'col__4'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__0']),
             UdfMapping( 
                 ['col__5', 'col__6'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__1']),
             UdfMapping( 
                 ['col__0', 'col__7'],
-                'sum_function',
+                'SUM_FUNCTION',
                 ['function__2']),
             UdfMapping( 
                 ['col__0', 'col__7'],
-                'multiply_function',
+                'MULTIPLY_FUNCTION',
                 ['function__3'])
             ],
             ['col__0', 'col__1', 'col__2'], 
@@ -573,7 +573,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # test user defined function with alias
     "test_query_7": UdfTestQuery(
         '''
-        SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min, y_max
+        SELECT COLORS_INFERENCE(frame, object_id) AS (output1, output2, output3), x_min, y_max
         FROM objects00
         WHERE (x_min > 600 AND output1 LIKE 'blue') OR (y_max < 1000 AND x_max < 1000)
         ''',
@@ -584,7 +584,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping( 
                 ['col__0', 'col__1'],
-                'colors_inference',
+                'COLORS_INFERENCE',
                 ['output1', 'output2', 'output3'])
             ],
             ['output1', 'output2', 'output3', 'col__2', 'col__3'],
@@ -593,7 +593,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     ),
     "test_query_8": UdfTestQuery(
         '''
-        SELECT colors_inference(frame, object_id) AS (output1, output2, output3), x_min AS col1, y_max AS col2
+        SELECT COLORS_INFERENCE(frame, object_id) AS (output1, output2, output3), x_min AS col1, y_max AS col2
         FROM objects00
         WHERE (col1 > 600 AND output1 LIKE 'blue') OR (col2 < 1000 AND x_max < 1000)
         ''',
@@ -604,7 +604,7 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping( 
                 ['col__0', 'col__1'], 
-                'colors_inference',
+                'COLORS_INFERENCE',
                 ['output1', 'output2', 'output3'])
             ], 
             ['output1', 'output2', 'output3', 'col__2', 'col__3'],
@@ -615,9 +615,9 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # single output user defined function with alias
     "test_query_9": UdfTestQuery(
         '''
-        SELECT max_function(y_max, y_min) AS output1, power_function(x_min, 2) AS output2, y_min, color
+        SELECT MAX_FUNCTION(y_max, y_min) AS output1, POWER_FUNCTION(x_min, 2) AS output2, y_min, color
         FROM objects00 join colors02
-        WHERE is_equal(objects00.frame, colors02.frame) = TRUE AND is_equal(objects00.object_id, colors02.object_id)
+        WHERE IS_EQUAL(objects00.frame, colors02.frame) = TRUE AND IS_EQUAL(objects00.object_id, colors02.object_id)
             = TRUE AND (x_min > 600 OR (x_max >600 AND y_min > 800)) AND output1 > 1000 AND output2 > 640000
         ''',
         "SELECT objects00.y_max AS col__0, objects00.y_min AS col__1, objects00.x_min AS col__2, 2 AS col__3, "
@@ -628,19 +628,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
            [UdfMapping(
                ['col__0', 'col__1'],
-               'max_function',
+               'MAX_FUNCTION',
                ['output1']),
             UdfMapping(        
                ['col__2', 'col__3'],
-               'power_function',
+               'POWER_FUNCTION',
                ['output2']),
             UdfMapping(
                ['col__5', 'col__6'],
-               'is_equal',
+               'IS_EQUAL',
                ['function__2']),
             UdfMapping(
                ['col__7', 'col__8'],
-               'is_equal',
+               'IS_EQUAL',
                ['function__3']),
            ], 
            ['output1', 'output2', 'col__1', 'col__4'],
@@ -651,18 +651,18 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     # test user defined functions both within the database and within AIDB
     "test_query_10": UdfTestQuery(
         '''
-        SELECT multiply_function(x_min, y_min), database_multiply_function(x_min, y_min), x_max, y_max
+        SELECT MULTIPLY_FUNCTION(x_min, y_min), DATABASE_MULTIPLY_FUNCTION(x_min, y_min), x_max, y_max
         FROM objects00
         WHERE x_min > 600 AND y_max < 1000
         ''',
-        "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, database_multiply_function(objects00.x_min, "
+        "SELECT objects00.x_min AS col__0, objects00.y_min AS col__1, DATABASE_MULTIPLY_FUNCTION(objects00.x_min, "
         "objects00.y_min) AS col__2, objects00.x_max AS col__3, objects00.y_max AS col__4 "
         "FROM objects00 "
         "WHERE (objects00.x_min > 600) AND (objects00.y_max < 1000)",
         DataframeSql(
             [UdfMapping(
                 ['col__0', 'col__1'], 
-                'multiply_function',
+                'MULTIPLY_FUNCTION',
                 ['function__0'])
             ],
             ['function__0', 'col__2', 'col__3', 'col__4'],
@@ -673,12 +673,12 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
   
     "test_query_11": UdfTestQuery(
         '''
-        SELECT database_add_function(y_max, x_min), multiply_function(y_min, y_max), color
-        FROM objects00 join colors02 ON is_equal(objects00.frame, colors02.frame) = TRUE
-            AND is_equal(objects00.object_id, colors02.object_id) = TRUE
+        SELECT DATABASE_ADD_FUNCTION(y_max, x_min), MULTIPLY_FUNCTION(y_min, y_max), color
+        FROM objects00 join colors02 ON IS_EQUAL(objects00.frame, colors02.frame) = TRUE
+            AND IS_EQUAL(objects00.object_id, colors02.object_id) = TRUE
         WHERE x_min > 600 OR (x_max >600 AND y_min > 800)
         ''',
-        "SELECT database_add_function(objects00.y_max, objects00.x_min) AS col__0, objects00.y_min AS col__1, "
+        "SELECT DATABASE_ADD_FUNCTION(objects00.y_max, objects00.x_min) AS col__0, objects00.y_min AS col__1, "
         "objects00.y_max AS col__2, colors02.color AS col__3, objects00.frame AS col__4, colors02.frame AS col__5, "
         "objects00.object_id AS col__6, colors02.object_id AS col__7 "
         "FROM objects00 CROSS JOIN colors02 "
@@ -686,15 +686,15 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
         DataframeSql(
             [UdfMapping(
                 ['col__1', 'col__2'],
-                'multiply_function',
+                'MULTIPLY_FUNCTION',
                 ['function__0']),
              UdfMapping(
                 ['col__4', 'col__5'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__1']),
              UdfMapping(
                 ['col__6', 'col__7'],
-                'is_equal',
+                'IS_EQUAL',
                 ['function__2']),
             ],
                 ['col__0', 'function__0', 'col__3'],
@@ -704,24 +704,24 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     
     "test_query_12": UdfTestQuery(
         '''
-        SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max)
+        SELECT frame, DATABASE_MULTIPLY_FUNCTION(x_min, y_min), SUM_FUNCTION(x_max, y_max)
         FROM objects00
-        WHERE (multiply_function(x_min, y_min) > 400000 AND database_add_function(y_max, x_min) < 1600)
-            OR database_multiply_function(x_min, y_min) > 500000
+        WHERE (MULTIPLY_FUNCTION(x_min, y_min) > 400000 AND DATABASE_ADD_FUNCTION(y_max, x_min) < 1600)
+            OR DATABASE_MULTIPLY_FUNCTION(x_min, y_min) > 500000
         ''',
-        "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
+        "SELECT objects00.frame AS col__0, DATABASE_MULTIPLY_FUNCTION(objects00.x_min, objects00.y_min) AS col__1, "
         "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
         "FROM objects00 "
-        "WHERE (database_add_function(objects00.y_max, objects00.x_min) < 1600 OR "
-        "database_multiply_function(objects00.x_min, objects00.y_min) > 500000)",
+        "WHERE (DATABASE_ADD_FUNCTION(objects00.y_max, objects00.x_min) < 1600 OR "
+        "DATABASE_MULTIPLY_FUNCTION(objects00.x_min, objects00.y_min) > 500000)",
         DataframeSql(
             [UdfMapping(
                 ['col__2', 'col__3'],
-                'sum_function',
+                'SUM_FUNCTION',
                 ['function__0']),
              UdfMapping(
                 ['col__4', 'col__5'],
-                'multiply_function',
+                'MULTIPLY_FUNCTION',
                 ['function__1']),
             ],
               ['col__0', 'col__1', 'function__0'],
@@ -731,22 +731,22 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     
     "test_query_13": UdfTestQuery(
         '''
-        SELECT frame, database_multiply_function(x_min, y_min), sum_function(x_max, y_max) AS output1
+        SELECT frame, DATABASE_MULTIPLY_FUNCTION(x_min, y_min), SUM_FUNCTION(x_max, y_max) AS output1
         FROM objects00
-        WHERE (multiply_function(x_min, y_min) > 400000 AND output1 < 1600)
-            OR database_multiply_function(x_min, y_min) > 500000
+        WHERE (MULTIPLY_FUNCTION(x_min, y_min) > 400000 AND output1 < 1600)
+            OR DATABASE_MULTIPLY_FUNCTION(x_min, y_min) > 500000
         ''',
-        "SELECT objects00.frame AS col__0, database_multiply_function(objects00.x_min, objects00.y_min) AS col__1, "
+        "SELECT objects00.frame AS col__0, DATABASE_MULTIPLY_FUNCTION(objects00.x_min, objects00.y_min) AS col__1, "
         "objects00.x_max AS col__2, objects00.y_max AS col__3, objects00.x_min AS col__4, objects00.y_min AS col__5 "
         "FROM objects00",
         DataframeSql(
             [UdfMapping(
                 ['col__2', 'col__3'],
-                'sum_function',
+                'SUM_FUNCTION',
                 ['output1']),
               UdfMapping(
                 ['col__4', 'col__5'],
-                'multiply_function',
+                'MULTIPLY_FUNCTION',
                 ['function__1']),
               ],
                 ['col__0', 'col__1', 'output1'], 
@@ -763,19 +763,19 @@ class QueryParsingTests(IsolatedAsyncioTestCase):
     data_dir = os.path.join(dirname, 'data/jackson')
     gt_engine, aidb_engine = await setup_gt_and_aidb_engine(DB_URL, data_dir)
 
-    aidb_engine.register_user_defined_function('function1', None)
-    aidb_engine.register_user_defined_function('function2', None)
+    aidb_engine.register_user_defined_function('FUNCTION1', None)
+    aidb_engine.register_user_defined_function('FUNCTION2', None)
 
     register_inference_services(aidb_engine, data_dir)
     config = aidb_engine._config
 
     invalid_query_str = [
-      '''SELECT function1(AVG(x_min), AVG(y_min)) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%;''',
-      '''SELECT function1(x_min) FROM objects00 RECALL_TARGET 90% CONFIDENCE 95%;''',
-      '''SELECT function1(x_min) FROM objects00 LIMIT 100;''',
-      '''SELECT function1(x_min) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
-      '''SELECT function1(function2(x_min)) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
-      '''SELECT function1(SUM(x_min), SUM(y_max)) FROM objects00;'''
+      '''SELECT FUNCTION1(AVG(x_min), AVG(y_min)) FROM objects00 ERROR_TARGET 10% CONFIDENCE 95%;''',
+      '''SELECT FUNCTION1(x_min) FROM objects00 RECALL_TARGET 90% CONFIDENCE 95%;''',
+      '''SELECT FUNCTION1(x_min) FROM objects00 LIMIT 100;''',
+      '''SELECT FUNCTION1(x_min) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
+      '''SELECT FUNCTION1(FUNCTION2(x_min)) FROM objects00 WHERE y_min > (SELECT AVG(y_min) FROM objects00);''',
+      '''SELECT FUNCTION1(SUM(x_min), SUM(y_max)) FROM objects00;'''
     ]
     for query_str in invalid_query_str:
       query = Query(query_str, config)
