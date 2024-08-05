@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM entity00 WHERE type='ORG';

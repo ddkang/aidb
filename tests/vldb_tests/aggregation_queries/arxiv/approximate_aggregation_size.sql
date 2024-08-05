@@ -1,0 +1,1 @@
+SELECT AVG(num_textboxes) FROM arxiv00 ERROR_TARGET 5% CONFIDENCE 95%;

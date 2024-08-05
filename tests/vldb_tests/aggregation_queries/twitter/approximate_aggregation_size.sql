@@ -1,0 +1,1 @@
+SELECT SUM(entity_start) FROM entity00  ERROR_TARGET 5% CONFIDENCE 95%;

@@ -1,0 +1,1 @@
+SELECT entity_id FROM entity00 where type LIKE 'PERSON'

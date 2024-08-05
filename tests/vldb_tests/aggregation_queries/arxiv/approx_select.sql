@@ -1,0 +1,1 @@
+SELECT pdf_id, page_id FROM arxiv00 WHERE num_textboxes >= 30

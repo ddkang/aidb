@@ -1,0 +1,1 @@
+SELECT frame FROM objects00 where y_min > 0
