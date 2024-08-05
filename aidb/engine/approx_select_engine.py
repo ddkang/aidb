@@ -13,26 +13,6 @@ BUDGET = 10000
 
 
 class ApproxSelectEngine(TastiEngine):
-  # TODO: design a better algorithm, this function is same as the function in Limit Engine
-  def approx_select_score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
-    '''
-    convert query result to score, return a Dataframe contains score column, the index is blob index
-    if A and B, then the score is min(score A, score B)
-    if A or B, then the score is max(score A, score B)
-    '''
-    #TODO: refactor score calculation
-    proxy_score_all_blobs = np.zeros(len(score_for_all_df))
-    for idx, (index, row) in enumerate(score_for_all_df.iterrows()):
-      min_score = float('inf')
-      for or_connected in score_connected:
-        max_score = 0
-        for score_name in or_connected:
-          max_score = max(max_score, row[score_name])
-        min_score = min(min_score, max_score)
-      proxy_score_all_blobs[idx] = min_score
-    return pd.Series(proxy_score_all_blobs, index=score_for_all_df.index)
-
-
   async def get_inference_results(self, query:Query, sampled_index: List[int], conn):
     # TODO: rewrite query, use full scan to execute query
     bound_service_list = query.inference_engines_required_for_query
@@ -66,37 +46,23 @@ class ApproxSelectEngine(TastiEngine):
     query_after_adding_join = query_after_adding_vector_id_column.add_join(
         f'JOIN {self.blob_mapping_table_name} ON {join_conditions_str}'
     )
-    print(69, query_after_adding_join)
     
     table_columns = [f'{self.blob_mapping_table_name}.{VECTOR_ID_COLUMN}']
     sampled_df = pd.DataFrame({VECTOR_ID_COLUMN: sampled_index})
 
-    query_no_where = query_after_adding_join.base_sql_no_where
-    all_query_add_filter_key, _ = self.add_filter_key_into_query(
-        table_columns,
-        sampled_df,
-        query_no_where
-    )
-
     async with self._sql_engine.begin() as conn:
-      all_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(all_query_add_filter_key.sql_str), conn))
-      # drop duplicated columns, this will happen when 'select *'
-      all_df = all_df.loc[:, ~all_df.columns.duplicated()]
-      all_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
-
       sample_query_add_filter_key, _ = self.add_filter_key_into_query(
           table_columns,
           sampled_df,
           query_after_adding_join
       )
-      print(91, sample_query_add_filter_key.sql_str)
       res_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(sample_query_add_filter_key.sql_str), conn))
       # We need to add '__vector_id' in SELECT clause. When 'SELECT *', there will be two '__vector_id' columns.
       # So we need to drop duplicated columns
       res_df = res_df.loc[:, ~res_df.columns.duplicated()]
       res_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
-      print(res_df)
-    return res_df, all_df
+      
+    return res_df
 
 
   def get_sampled_proxy_blob(self, proxy_score_for_all_blobs, defensive_mixing: int = 0.1):
@@ -179,9 +145,7 @@ class ApproxSelectEngine(TastiEngine):
       raise Exception('Approx select query should contain Confidence and should not contain Budget.')
 
     # generate proxy score for each blob
-    proxy_score_for_all_blobs, score_connected = await self.get_proxy_scores_for_all_blobs(query)
-
-    # proxy_score_for_all_blobs = self.approx_select_score_fn(score_for_all_df, score_connected)
+    proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(query)
 
     dataset = self.get_sampled_proxy_blob(proxy_score_for_all_blobs)
 
@@ -192,7 +156,7 @@ class ApproxSelectEngine(TastiEngine):
     sampled_df = dataset.sample(BUDGET, replace=True, weights=WEIGHT_COL_NAME, random_state=seed)
 
     async with self._sql_engine.begin() as conn:
-      satisfied_sampled_results, all_sampled_results = await self.get_inference_results(
+      satisfied_sampled_results = await self.get_inference_results(
           query,
           list(sampled_df.index),
           conn
@@ -200,8 +164,6 @@ class ApproxSelectEngine(TastiEngine):
 
       joined_satisfied_sampled_results = satisfied_sampled_results.join(sampled_df, how='inner')
       sorted_satisfied_sampled_results = joined_satisfied_sampled_results.sort_values(by=PROXY_SCORE_COL_NAME, ascending=False)
-
-      all_sampled_results = all_sampled_results.join(sampled_df, how='inner')
 
       recall_target = query.recall_target
       confidence = query.confidence / 100
@@ -218,7 +180,7 @@ class ApproxSelectEngine(TastiEngine):
       additional_selected_blob = list(set(additional_sample_index) - set(pilot_sample_index))
       logger.info(f'num_samples: {len(additional_selected_blob)}')
 
-      new_satisfied_sampled_results, _ = await self.get_inference_results(
+      new_satisfied_sampled_results = await self.get_inference_results(
           query,
           additional_selected_blob,
           conn
