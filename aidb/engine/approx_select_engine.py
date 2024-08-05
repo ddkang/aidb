@@ -113,15 +113,10 @@ class ApproxSelectEngine(TastiEngine):
     estimated_z1 = list(samples_above_cutoff['sum_mass']) + [0] * (total_length - len(samples_above_cutoff))
     estimated_z2 = list(samples_below_cutoff['sum_mass']) + [0] * (total_length - len(samples_below_cutoff))
     
-    positive_length = len(satisfied_sampled_results[satisfied_sampled_results[PROXY_SCORE_COL_NAME] >= estimated_tau])
-
-    estimated_z1 = list(z[:positive_length]) + [0] * (total_length - len(z[:positive_length]))
-    estimated_z2 = list(z[positive_length:]) + [0] * (total_length - len(z[positive_length:]))
     z1_mean, z1_std = np.mean(estimated_z1), np.std(estimated_z1)
     z2_mean, z2_std = np.mean(estimated_z2), np.std(estimated_z2)
 
     delta = 1.0 - confidence
-
     _, ub = self._get_confidence_bounds(z1_mean, z1_std, len(estimated_z1), delta / 2)
     lb, _ = self._get_confidence_bounds(z2_mean, z2_std, len(estimated_z2), delta / 2)
 
