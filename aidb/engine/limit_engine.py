@@ -8,32 +8,12 @@ from aidb.query.query import Query
 from aidb.utils.constants import VECTOR_ID_COLUMN
 
 class LimitEngine(TastiEngine):
-  # TODO: design a better algorithm
-  def score_fn(self, score_for_all_df: pd.DataFrame, score_connected: List[List[str]]) -> pd.Series:
-    '''
-    convert query result to score, return a Dataframe contains score column, the index is blob index
-    if A and B, then the score is min(score A, score B)
-    if A or B, then the score is max(score A, score B)
-    '''
-    proxy_score_all_blobs = np.zeros(len(score_for_all_df))
-    for idx, (index, row) in enumerate(score_for_all_df.iterrows()):
-      min_score = 1
-      for or_connected in score_connected:
-        max_score = 0
-        for score_name in or_connected:
-          max_score = max(max_score, row[score_name])
-        min_score = min(min_score, max_score)
-      proxy_score_all_blobs[idx] = min_score
-    return pd.Series(proxy_score_all_blobs, index=score_for_all_df.index)
-
-
   async def _execute_limit_query(self, query: Query):
     '''
     execute service inference based on proxy score, stop when the limit number meets
     '''
     # generate proxy score for each blob
-    score_for_all_df, score_connected = await self.get_proxy_scores_for_all_blobs(query)
-    proxy_score_for_all_blobs = self.score_fn(score_for_all_df, score_connected)
+    proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(query)
 
     # sorted blob id based on proxy score
     id_score = [(i, s) for i, s in zip(proxy_score_for_all_blobs.index, proxy_score_for_all_blobs.values)]
