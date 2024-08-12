@@ -46,6 +46,10 @@ class TastiEngine(FullScanEngine):
     if self.rep_table_name not in self._config.tables or self.topk_table_name not in self._config.tables:
       await self.initialize_tasti()
 
+    async with self._sql_engine.begin() as conn:
+      reps_query_str = f'SELECT * FROM {self.rep_table_name}'
+      reps_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(reps_query_str), conn))
+
     for bound_service in bound_service_list:
       inp_query_str = self.get_input_query_for_inference_service_filtered_index(bound_service, self.rep_table_name)
       async with self._sql_engine.begin() as conn:
@@ -56,11 +60,10 @@ class TastiEngine(FullScanEngine):
     score_query_str = self.get_score_query_str(query, self.rep_table_name)
     async with self._sql_engine.begin() as conn:
       score_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(score_query_str), conn))
-    score_df = pd.merge(inp_df, score_df, on=VECTOR_ID_COLUMN, how='left')
+    score_df = pd.merge(reps_df, score_df, on=VECTOR_ID_COLUMN, how='left')
     score_df.fillna(0, inplace=True)
     score_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
     score_df = score_df['score']
-
     score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
 
     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
@@ -76,8 +79,9 @@ class TastiEngine(FullScanEngine):
       where_str = f'WHERE {where_condition.sql()}'
     else:
       where_str = ''
-      
-    tables = query.tables_in_query
+    filtering_predicates = [fp.sql() for and_connected in query.filtering_predicates for fp in and_connected]
+    tables = self._get_tables(filtering_predicates)
+
     # some representative blobs may not have outputs from service, so left join is better
     join_str = self._get_left_join_str(rep_table_name, tables)
     score_query_str = f'''
