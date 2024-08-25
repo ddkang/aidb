@@ -214,7 +214,7 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_select_join_str(self, bound_service: BoundInferenceService, vector_id_table: Optional[str] = None):
+  def _get_select_join_str(self, bound_service: BoundInferenceService, filtering_predicate_tables: Optional[List] = None, vector_id_table: Optional[str] = None):
     column_to_root_column = self._config.columns_to_root_column
     binding = bound_service.binding
     inp_cols = binding.input_columns
@@ -226,6 +226,9 @@ class BaseEngine():
 
     inp_cols_str = ', '.join(root_inp_cols)
     inp_tables = self._get_tables(root_inp_cols)
+    for table in filtering_predicate_tables:
+      if table not in inp_tables:
+        inp_tables.append(table)
     join_str = self._get_inner_join_query(inp_tables)
 
     select_join_str = f'''
@@ -259,16 +262,20 @@ class BaseEngine():
     inference_engines_required_for_filtering_predicates = user_query.inference_engines_required_for_filtering_predicates
     tables_in_filtering_predicates = user_query.tables_in_filtering_predicates
 
-    inp_tables, select_join_str = self._get_select_join_str(bound_service)
-
     # filtering predicates that can be satisfied by the currently executed inference engines
     filtering_predicates_satisfied = []
+    filtering_predicates_tables = []
+    print(266, filtering_predicates, inference_engines_required_for_filtering_predicates, tables_in_filtering_predicates)
     for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
                        tables_in_filtering_predicates):
-      if len(already_executed_inference_services.intersection(e)) == len(e) \
-        and len(set(inp_tables).intersection(t)) == len(t):
+      if len(already_executed_inference_services.intersection(e)) == len(e):
         filtering_predicates_satisfied.append(p)
-
+        for table in t:
+          if table not in filtering_predicates_tables:
+            filtering_predicates_tables.append(table)
+        
+    inp_tables, select_join_str = self._get_select_join_str(bound_service, filtering_predicates_tables)
+    print(278, filtering_predicates_tables, select_join_str)
     where_str = self._get_where_str(filtering_predicates_satisfied)
 
     if len(filtering_predicates_satisfied) > 0:
@@ -330,7 +337,7 @@ class BaseEngine():
     * param filtered_id_list: list of vector ids which will be selected in the query
     """
 
-    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table)
+    _, select_join_str = self._get_select_join_str(bound_service, vector_id_table=vector_id_table)
     if filtered_id_list == None:
       return select_join_str
 
