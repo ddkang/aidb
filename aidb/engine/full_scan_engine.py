@@ -22,17 +22,23 @@ class FullScanEngine(BaseEngine):
     # The query is irrelevant since we do a full scan anyway
     
     bound_service_list = query.inference_engines_required_for_query
-    supported_filtering_predicates = get_currently_supported_filtering_predicates_for_ordering(self._config, query)
-    engine_to_proxy_score = {}
-    bound_service_list = query.inference_engines_required_for_query
-    for engine, related_predicates in supported_filtering_predicates.items():
-      engine_fp = self._get_where_str(related_predicates)
-      adjusted_query = f'select * from {engine} WHERE {engine_fp}'
-      adjusted_query = Query(adjusted_query, self._config)
-      # proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(adjusted_query, return_binary_score=True)
-      # engine_to_proxy_score[engine] = proxy_score_for_all_blobs.sum() / len(proxy_score_for_all_blobs)
-      engine_to_proxy_score[engine] = 1
-    bound_service_list = reorder_inference_engine(engine_to_proxy_score, bound_service_list)
+    if self.tasti_index:
+      supported_filtering_predicates = get_currently_supported_filtering_predicates_for_ordering(self._config, query)
+      engine_to_proxy_score = {}
+      bound_service_list = query.inference_engines_required_for_query
+      for engine, related_predicates in supported_filtering_predicates.items():
+        where_str = self._get_where_str(related_predicates)
+        select_join_str = f'select * from {engine.service.name} '
+        if len(related_predicates) > 0:
+          adjusted_query = select_join_str + f'WHERE {where_str};'
+        else:
+          adjusted_query = select_join_str + ';'
+        print(33, adjusted_query)
+        adjusted_query = Query(adjusted_query, self._config)
+        proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(adjusted_query, return_binary_score=True)
+        engine_to_proxy_score[engine] = proxy_score_for_all_blobs.sum() / len(proxy_score_for_all_blobs)
+      print(34, engine_to_proxy_score)
+      bound_service_list = reorder_inference_engine(engine_to_proxy_score, bound_service_list)
     is_udf_query = query.is_udf_query
     if is_udf_query:
       query.check_udf_query_validity()
@@ -47,6 +53,7 @@ class FullScanEngine(BaseEngine):
       print(73, inp_query_str)
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
+      inp_df.to_csv(f'inp_df_{bound_service.service.name}.csv')
       print(76, inp_df)
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)

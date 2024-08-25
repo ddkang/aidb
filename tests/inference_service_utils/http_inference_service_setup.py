@@ -50,7 +50,7 @@ def run_server(data_dir: str, port=8000):
       service_name = inp.url.path.split('/')[-1]
       inp = await inp.json()
       df = name_to_df[service_name]
-
+      df = df.fillna('Missing')
       # Construct a DataFrame from the input
       inp_df = pd.DataFrame({col: [inp[col]] if not isinstance(inp[col], list) else inp[col]
                              for col in name_to_input_cols[service_name]})
@@ -64,8 +64,8 @@ def run_server(data_dir: str, port=8000):
       res_df_list = []
       for _, group in grouped:
         group = group.drop(columns=name_to_input_cols[service_name]).dropna()
+        group = group.replace('Missing', None)
         res_df_list.append(group.to_dict(orient='list'))
-
       return res_df_list
 
 

@@ -73,7 +73,6 @@ class BaseEngine():
       pp.install_extras(
         exclude=['django', 'ipython', 'ipython_repr_pretty'])
       pp.pprint(config)
-      print(config.blob_tables)
 
     return config
 
@@ -214,7 +213,7 @@ class BaseEngine():
     return join_path_str
 
 
-  def _get_select_join_str(self, bound_service: BoundInferenceService, filtering_predicate_tables: Optional[List] = None, vector_id_table: Optional[str] = None):
+  def _get_select_join_str(self, bound_service: BoundInferenceService, filtering_predicate_tables: Optional[List] = [], vector_id_table: Optional[str] = None):
     column_to_root_column = self._config.columns_to_root_column
     binding = bound_service.binding
     inp_cols = binding.input_columns
@@ -265,7 +264,6 @@ class BaseEngine():
     # filtering predicates that can be satisfied by the currently executed inference engines
     filtering_predicates_satisfied = []
     filtering_predicates_tables = []
-    print(266, filtering_predicates, inference_engines_required_for_filtering_predicates, tables_in_filtering_predicates)
     for p, e, t in zip(filtering_predicates, inference_engines_required_for_filtering_predicates,
                        tables_in_filtering_predicates):
       if len(already_executed_inference_services.intersection(e)) == len(e):
@@ -275,7 +273,6 @@ class BaseEngine():
             filtering_predicates_tables.append(table)
         
     inp_tables, select_join_str = self._get_select_join_str(bound_service, filtering_predicates_tables)
-    print(278, filtering_predicates_tables, select_join_str)
     where_str = self._get_where_str(filtering_predicates_satisfied)
 
     if len(filtering_predicates_satisfied) > 0:
