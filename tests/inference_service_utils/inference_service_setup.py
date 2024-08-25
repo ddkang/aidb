@@ -35,6 +35,8 @@ def register_inference_services(engine: Engine, data_dir: str, port=8000, batch_
 
     if service_name in cost_dict:
       cost = cost_dict[service_name]
+    else:
+      cost = None
     service = HTTPInferenceService(
       service_name,
       False,
