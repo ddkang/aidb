@@ -53,8 +53,20 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
     queries = [
       (
-        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'positive';''',
-        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'positive';'''
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'POSITIVE';''',
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'POSITIVE';'''
+      ),
+      (
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'NEGATIVE';''',
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'NEGATIVE';'''
+      ),
+      (
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type IN ('ORG', 'CARDINAL', 'PERSON') AND label LIKE 'POSITIVE';''',
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type IN ('ORG', 'CARDINAL', 'PERSON') AND label LIKE 'POSITIVE';'''
+      ),
+      (
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type IN ('ORG', 'CARDINAL', 'PERSON') AND label LIKE 'NEGATIVE';''',
+        '''SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type IN ('ORG', 'CARDINAL', 'PERSON') AND label LIKE 'NEGATIVE';'''
       )
     ]
     db_url_list = [ SQLITE_URL]
@@ -65,7 +77,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
         logger.info(f'Running query {aidb_query} in limit engine')
 
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, tasti, port=8050)
-        cost_dict = {'entity00': 15, 'sentiment01': 2.25}
+        cost_dict = {'entity00': 0.0010, 'sentiment01': 0.0010}
         register_inference_services(aidb_engine, data_dir, port=8050, cost_dict=cost_dict)
         aidb_res = aidb_engine.execute(aidb_query)
 
@@ -79,6 +91,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
         logger.info(f'There are {len(aidb_res)} elements in limit engine results '
               f'and {len(gt_res)} elements in ground truth results')
+        logger.info(f'difference: {set(aidb_res) - set(gt_res)}')
         assert len(set(aidb_res) - set(gt_res)) == 0
 
       del gt_engine

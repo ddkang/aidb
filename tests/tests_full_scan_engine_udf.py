@@ -109,7 +109,7 @@ class FullScanEngineUdfTests(IsolatedAsyncioTestCase):
     p = Process(target=run_server, args=[str(data_dir), port])
     p.start()
     time.sleep(1)
-    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(SQLITE_URL, data_dir, port)
+    gt_engine, aidb_engine = await setup_gt_and_aidb_engine(SQLITE_URL, data_dir, port=port)
 
     register_inference_services(aidb_engine, data_dir, port)
 

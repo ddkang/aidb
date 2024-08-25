@@ -20,7 +20,12 @@ class FullScanEngine(BaseEngine):
     Executes a query by doing a full scan and returns the results.
     '''
     # The query is irrelevant since we do a full scan anyway
-    
+  
+    is_udf_query = query.is_udf_query
+    if is_udf_query:
+      query.check_udf_query_validity()
+      dataframe_sql, query = query.udf_query
+      
     bound_service_list = query.inference_engines_required_for_query
     if self.tasti_index:
       supported_filtering_predicates = get_currently_supported_filtering_predicates_for_ordering(self._config, query)
@@ -33,28 +38,23 @@ class FullScanEngine(BaseEngine):
           adjusted_query = select_join_str + f'WHERE {where_str};'
         else:
           adjusted_query = select_join_str + ';'
-        print(33, adjusted_query)
+
         adjusted_query = Query(adjusted_query, self._config)
         proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(adjusted_query, return_binary_score=True)
         engine_to_proxy_score[engine] = proxy_score_for_all_blobs.sum() / len(proxy_score_for_all_blobs)
-      print(34, engine_to_proxy_score)
-      bound_service_list = reorder_inference_engine(engine_to_proxy_score, bound_service_list)
-    is_udf_query = query.is_udf_query
-    if is_udf_query:
-      query.check_udf_query_validity()
-      dataframe_sql, query = query.udf_query
 
+      bound_service_list = reorder_inference_engine(engine_to_proxy_score, bound_service_list)
+      
     inference_services_executed = set()
     for bound_service in bound_service_list:
-      print(70, bound_service)
       inp_query_str = self.get_input_query_for_inference_service_filter_service(bound_service,
                                                                                 query,
                                                                                 inference_services_executed)
-      print(73, inp_query_str)
+
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
       inp_df.to_csv(f'inp_df_{bound_service.service.name}.csv')
-      print(76, inp_df)
+
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)
 
