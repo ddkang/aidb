@@ -73,6 +73,7 @@ class BaseEngine():
       pp.install_extras(
         exclude=['django', 'ipython', 'ipython_repr_pretty'])
       pp.pprint(config)
+      print(config.blob_tables)
 
     return config
 
