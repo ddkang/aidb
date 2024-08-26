@@ -1,6 +1,7 @@
+from collections import defaultdict
+
 from aidb.config.config import Config
 from aidb.query.query import Query
-from collections import defaultdict
 
 
 def get_currently_supported_filtering_predicates_for_ordering(config: Config, query: Query):
@@ -40,6 +41,7 @@ def reorder_inference_engine(engine_to_proxy_score, static_order):
       
   engine_scores.sort(key=lambda a: a[1])
   engines_with_proxy_score_0.sort(key=lambda a: a[1])
+  # TODO: Add support for cached engines
   ordered_engines = [e for e, s in engines_with_proxy_score_0] + [e for e, s in engine_scores]
   for e in static_order:
     if e not in ordered_engines:

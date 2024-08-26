@@ -19,7 +19,7 @@ from tests.utils import setup_gt_and_aidb_engine, setup_test_logger
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.tasti import Tasti
 
-setup_test_logger('limit_engine')
+setup_test_logger('order_optimization')
 
 POSTGRESQL_URL = 'postgresql+asyncpg://user:testaidb@localhost:5432'
 SQLITE_URL = 'sqlite+aiosqlite://'
@@ -74,7 +74,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
       for aidb_query, exact_query in queries:
-        logger.info(f'Running query {aidb_query} in limit engine')
+        logger.info(f'Running query {aidb_query} in full scan engine to test the optimization of ML ordering')
 
         gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, tasti, port=8050)
         cost_dict = {'entity00': 0.0010, 'sentiment01': 0.0010}

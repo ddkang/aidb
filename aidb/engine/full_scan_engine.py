@@ -1,14 +1,14 @@
-import pandas as pd
-from sqlalchemy.sql import text
-from typing import List
 from collections import defaultdict
+from typing import List
 
+import pandas as pd
 from aidb.engine.base_engine import BaseEngine
 from aidb.query.query import Query
+from aidb.utils.logger import logger
 from aidb.utils.order_optimization_utils import (
-  get_currently_supported_filtering_predicates_for_ordering, 
-  reorder_inference_engine
-)
+    get_currently_supported_filtering_predicates_for_ordering,
+    reorder_inference_engine)
+from sqlalchemy.sql import text
 
 RETRIEVAL_BATCH_SIZE = 10000
 
@@ -42,8 +42,9 @@ class FullScanEngine(BaseEngine):
         adjusted_query = Query(adjusted_query, self._config)
         proxy_score_for_all_blobs = await self.get_proxy_scores_for_all_blobs(adjusted_query, return_binary_score=True)
         engine_to_proxy_score[engine] = proxy_score_for_all_blobs.sum() / len(proxy_score_for_all_blobs)
-
+      logger.info(f'Proxy scores for all engines: {engine_to_proxy_score}')
       bound_service_list = reorder_inference_engine(engine_to_proxy_score, bound_service_list)
+      logger.info(f'The order of inference engines: {bound_service_list}')
       
     inference_services_executed = set()
     for bound_service in bound_service_list:
