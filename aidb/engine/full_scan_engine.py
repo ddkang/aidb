@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import List
 
 import pandas as pd
-from aidb.engine.base_engine import BaseEngine
+from aidb.engine.tasti_engine import TastiEngine
 from aidb.query.query import Query
 from aidb.utils.logger import logger
 from aidb.utils.order_optimization_utils import (
@@ -14,7 +14,7 @@ RETRIEVAL_BATCH_SIZE = 10000
 
 
           
-class FullScanEngine(BaseEngine):
+class FullScanEngine(TastiEngine):
   async def execute_full_scan(self, query: Query, **kwargs):
     '''
     Executes a query by doing a full scan and returns the results.
