@@ -25,7 +25,7 @@ class FullScanEngine(TastiEngine):
     if is_udf_query:
       query.check_udf_query_validity()
       dataframe_sql, query = query.udf_query
-      
+
     bound_service_list = query.inference_engines_required_for_query
     if self.tasti_index:
       supported_filtering_predicates = get_currently_supported_filtering_predicates_for_ordering(self._config, query)
