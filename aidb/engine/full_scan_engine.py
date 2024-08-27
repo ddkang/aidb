@@ -54,7 +54,6 @@ class FullScanEngine(TastiEngine):
 
       async with self._sql_engine.begin() as conn:
         inp_df = await conn.run_sync(lambda conn: pd.read_sql_query(text(inp_query_str), conn))
-      inp_df.to_csv(f'inp_df_{bound_service.service.name}.csv')
 
       # The bound inference service is responsible for populating the database
       await bound_service.infer(inp_df)
