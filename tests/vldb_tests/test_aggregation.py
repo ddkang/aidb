@@ -53,10 +53,14 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
       logger.info(f'Test {dialect} database')
       exact_query_list = []
       approx_query_list = []
-      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/aggregation_{TASK}.sql'), 'r') as f:
+      if TASK == 'size':
+        dataset_path = DATASET.split('_')[0]
+      else:
+        dataset_path = DATASET
+      with open(os.path.join(dirname, f'aggregation_queries/{dataset_path}/aggregation_{TASK}.sql'), 'r') as f:
         for line in f.readlines():
           exact_query_list.append(line.strip())
-      with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/approximate_aggregation_{TASK}.sql'), 'r') as f:
+      with open(os.path.join(dirname, f'aggregation_queries/{dataset_path}/approximate_aggregation_{TASK}.sql'), 'r') as f:
         for line in f.readlines():
           approx_query_list.append(line.strip())
 
@@ -80,8 +84,9 @@ class AggeregateEngineTests(IsolatedAsyncioTestCase):
           if error_target is None: error_target = 0
           if self._equality_check(aidb_res, gt_res, error_target):
             count_list[k] += 1
+          logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
         k+=1
-        logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
+        # logger.info(f'Time of runs: {i+1}, Successful count: {count_list}')
       
       # assert sum(count_list) >= len(count_list) * _NUMBER_OF_RUNS - 1
       del gt_engine
