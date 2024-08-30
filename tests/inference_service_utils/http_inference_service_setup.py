@@ -50,7 +50,6 @@ def run_server(data_dir: str, port=8000):
       service_name = inp.url.path.split('/')[-1]
       inp = await inp.json()
       df = name_to_df[service_name]
-
       # Construct a DataFrame from the input
       inp_df = pd.DataFrame({col: [inp[col]] if not isinstance(inp[col], list) else inp[col]
                              for col in name_to_input_cols[service_name]})
@@ -59,13 +58,13 @@ def run_server(data_dir: str, port=8000):
       # Note: We're using a left join to ensure that all inputs have corresponding outputs,
       #     with absent outputs represented as None
       result_df = pd.merge(inp_df, df, how='left', on=name_to_input_cols[service_name]).convert_dtypes()
+      output_cols = [col for col in df.columns if col not in name_to_input_cols[service_name]]
       # The outputs are grouped by input dataframe's primary key
       grouped = result_df.groupby(name_to_input_cols[service_name])
       res_df_list = []
       for _, group in grouped:
-        group = group.drop(columns=name_to_input_cols[service_name]).dropna()
+        group = group.drop(columns=name_to_input_cols[service_name]).dropna(subset=output_cols, how='all')
         res_df_list.append(group.to_dict(orient='list'))
-
       return res_df_list
 
 

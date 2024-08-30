@@ -473,6 +473,21 @@ class Query(object):
 
 
   @cached_property
+  def columns_in_filtering_predicate(self):
+    """
+    Columns needed to satisfy the columns present in each filtering predicate
+    for e.g. if predicates are [color=red, frame>20, object_class=car]
+    it returns [color, frame, object_class]
+    """
+    columns_required_for_filtering_predicates = defaultdict(set)
+    for connected_by_or_filtering_predicate in self.filtering_predicates:
+      for filtering_predicate in connected_by_or_filtering_predicate:
+        for column in filtering_predicate.find_all(exp.Column):
+          columns_required_for_filtering_predicates[filtering_predicate].add(column.sql())
+    return columns_required_for_filtering_predicates
+  
+  
+  @cached_property
   def inference_engines_required_for_query(self):
     """
     Inference services required for sql query, will return a list of inference service

@@ -5,13 +5,13 @@ from sqlalchemy.sql import text
 from typing import Dict, List, Optional
 
 from aidb.config.config_types import Table
-from aidb.engine.full_scan_engine import FullScanEngine
+from aidb.engine.base_engine import BaseEngine
 from aidb.query.query import Query
 from aidb.utils.constants import table_name_for_rep_and_topk_and_blob_mapping, VECTOR_ID_COLUMN
 from aidb.vector_database.tasti import Tasti
 
 
-class TastiEngine(FullScanEngine):
+class TastiEngine(BaseEngine):
   def __init__(
       self,
       connection_uri: str,
@@ -31,7 +31,7 @@ class TastiEngine(FullScanEngine):
     self.user_specified_vector_ids = user_specified_vector_ids
 
 
-  async def get_proxy_scores_for_all_blobs(self, query: Query, **kwargs):
+  async def get_proxy_scores_for_all_blobs(self, query: Query, return_binary_score= False, **kwargs):
     '''
     1. create rep table and topk table if not exist, store the results from vector database
     2. infer all bound services for all cluster representatives blobs
@@ -64,7 +64,7 @@ class TastiEngine(FullScanEngine):
     score_df.fillna(0, inplace=True)
     score_df.set_index(VECTOR_ID_COLUMN, inplace=True, drop=True)
     score_df = score_df['score']
-    score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df)
+    score_for_all_df = await self.propagate_score_for_all_vector_ids(score_df, return_binary_score)
 
     # FIXME: decide what to return for different usage: Limit engine, Aggregation, Full scan optimize.
     return score_for_all_df
@@ -118,6 +118,7 @@ class TastiEngine(FullScanEngine):
     all_dists += 1e-8
 
     if return_binary_score:
+      all_scores = np.where(all_scores == 0, 0, 1)
       weights = 1.0 / all_dists
       votes_1 = np.sum(all_scores * weights, axis=1)
       votes_0 = np.sum((1 - all_scores) * weights, axis=1)

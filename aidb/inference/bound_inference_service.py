@@ -216,9 +216,11 @@ class CachedBoundInferenceService(BoundInferenceService):
     # Drop duplicate inputs
     inputs_drop_duplicates = inputs.drop_duplicates()
     # Note: the input columns are assumed to be in order
+    logger.info(f'{self.service.name} Require {len(inputs_drop_duplicates)} inputs')
     async with self._engine.begin() as conn:
       inputs_not_in_cache, inputs_not_in_cache_primary_cols, inputs_in_cache_primary_df = \
           await self._get_inputs_not_in_cache_table(inputs_drop_duplicates, conn)
+      logger.info(f'Inferencing {len(inputs_not_in_cache)} inputs')
       records_to_insert_in_table = []
       bs = self.service.preferred_batch_size
       input_batches = [inputs_not_in_cache.iloc[i:i + bs] for i in range(0, len(inputs_not_in_cache), bs)]
