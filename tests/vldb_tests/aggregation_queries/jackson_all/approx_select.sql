@@ -1,1 +1,1 @@
-SELECT frame FROM objects00 where y_min > 0
+SELECT frame, object_id FROM color01 where color LIKE 'white'

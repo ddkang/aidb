@@ -1,0 +1,1 @@
+SELECT SUM(score) FROM sentiment02 WHERE score > 0 ERROR_TARGET 5% CONFIDENCE 95%;

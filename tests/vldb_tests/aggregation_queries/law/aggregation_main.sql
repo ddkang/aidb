@@ -1,0 +1,1 @@
+ SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;

@@ -1,5 +1,5 @@
-SELECT SUM(x_min) FROM objects00;
-SELECT SUM(x_min) FROM objects00;
-SELECT SUM(x_min) FROM objects00;
-SELECT SUM(x_min) FROM objects00;
-SELECT SUM(x_min) FROM objects00;
+SELECT COUNT(*) FROM color01 WHERE color LIKE 'grayish_blue';
+SELECT COUNT(*) FROM color01 WHERE color LIKE 'grayish_blue';
+SELECT COUNT(*) FROM color01 WHERE color LIKE 'grayish_blue';
+SELECT COUNT(*) FROM color01 WHERE color LIKE 'grayish_blue';
+SELECT COUNT(*) FROM color01 WHERE color LIKE 'grayish_blue';

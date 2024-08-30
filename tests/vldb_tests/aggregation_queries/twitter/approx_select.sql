@@ -1,1 +1,1 @@
-SELECT tweet_id, entity_id FROM entity00 WHERE type LIKE 'ORG'
+SELECT tweet_id FROM sentiment02 WHERE score >= 0

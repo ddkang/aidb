@@ -1,5 +1,5 @@
 SELECT SUM(entity_start) FROM entity00;
-SELECT SUM(entity_start) FROM entity00 WHERE type = 'CARDINAL';
-SELECT SUM(entity_start) FROM entity00 WHERE type = 'ORG';
-SELECT SUM(entity_start) FROM entity00 WHERE type = 'PERSON';
-SELECT SUM(entity_start) FROM entity00 WHERE type = 'GPE';
+SELECT COUNT(*) FROM entity00 WHERE entity_start >= 6;
+SELECT COUNT(*) FROM entity00 WHERE entity_start >= 13;
+SELECT COUNT(*) FROM entity00 WHERE entity_start >= 23;
+SELECT COUNT(*) FROM entity00 WHERE entity_start >= 36;

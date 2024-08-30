@@ -1,1 +1,1 @@
-SELECT entity_id FROM entity00 where type LIKE 'PERSON'
+SELECT blob_id FROM sentiment04 WHERE score<=0

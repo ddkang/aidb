@@ -1,5 +1,5 @@
-SELECT COUNT(*) FROM entity00 WHERE type='ORG';
-SELECT COUNT(*) FROM entity00 WHERE type='ORG';
-SELECT COUNT(*) FROM entity00 WHERE type='ORG';
-SELECT COUNT(*) FROM entity00 WHERE type='ORG';
-SELECT COUNT(*) FROM entity00 WHERE type='ORG';
+SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;
+SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;
+SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;
+SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;
+SELECT COUNT(*) FROM sentiment04 WHERE score <= 0;
