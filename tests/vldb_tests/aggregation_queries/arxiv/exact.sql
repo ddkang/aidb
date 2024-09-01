@@ -1,0 +1,1 @@
+SELECT DISTINCT a.pdf_id, page_id, num_textboxes, score, label FROM arxiv00 a JOIN sentiment01 s ON a.pdf_id = s.pdf_id WHERE s.label = 'POSITIVE' AND page_id > 15;

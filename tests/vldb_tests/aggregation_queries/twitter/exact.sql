@@ -1,0 +1,1 @@
+SELECT * FROM entity00 join sentiment01 on entity00.tweet_id = sentiment01.tweet_id WHERE type LIKE 'ORG' AND label LIKE 'POSITIVE';

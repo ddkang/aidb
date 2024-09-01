@@ -1,0 +1,1 @@
+SELECT e.blob_id, entity_id, entity, type, score FROM entity00 e JOIN sentiment01 s ON e.blob_id = s.blob_id WHERE type LIKE 'ORG' AND s.score > 0.05

@@ -1,0 +1,1 @@
+SELECT DISTINCT o.frame, l.light_1, o.x_min, c.color FROM objects00 o JOIN lights01 l ON o.frame = l.frame JOIN color01 c ON c.frame = o.frame and c.object_id = o.object_id WHERE l.light_1 LIKE 'red' and o.x_min > 1000 and c.color LIKE 'blue'
