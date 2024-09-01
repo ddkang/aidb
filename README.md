@@ -6,6 +6,28 @@
   <img src="assets/aidbuse.gif" style="width:550px;"/>
 </p>
 
+## Setup
+Install conda environment, python packages. Download required data.
+```batch
+source install.sh
+```
+## Experiments
+To evaluate AIDB's performance on approximate aggregation queries:
+```batch
+bash run_aggregation.sh
+```
+
+To evaluate AIDB's performance on approximate selection queries:
+```batch
+bash run_selection.sh
+```
+
+To evaluate AIDB's performance on exact queries:
+```batch
+bash run_exact.sh
+```
+
+You can modify the parameters in the shell files to adjust for different datasets or sensitivity analyses.
 ## Quick Start
 
 In order to start using AIDB, all you need to do is install the requirements, specify a configuration, and query!

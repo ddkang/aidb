@@ -22,7 +22,7 @@ _NUMBER_OF_RUNS = int(os.environ.get('AIDB_NUMBER_OF_TEST_RUNS', 10))
 
 DATASET = os.environ.get('DATASET', 'jackson_all')
 PORT = int(os.environ.get('PORT', 8000))
-TASK = os.environ.get('TASK', 'error')
+TASK = os.environ.get('TASK', 'main')
 setup_test_logger(f'aggregation_{DATASET}_{TASK}_{PORT}')
 
 
