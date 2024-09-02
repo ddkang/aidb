@@ -45,7 +45,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     # vector database configuration
     index_path = './'
     index_name = DATASET
-    embedding = np.load(f'./tests/data/embedding/{DATASET}_embeddings.npy')
+    embedding = np.load(f'./tests/vldb_tests/data/embedding/{DATASET}_embeddings.npy')
     embedding_df = pd.DataFrame({'id': range(embedding.shape[0]), 'values': embedding.tolist()})
 
     embedding_dim = embedding.shape[1]
