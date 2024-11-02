@@ -1,0 +1,31 @@
+{
+  "name": "SentimentAnalysis",
+  "schema": {
+      "type": "object",
+      "properties": {
+          "sentiment": {
+              "type": "array",
+              "description": "List of sentiment analysis of each sentence",
+              "items": {
+                  "type": "object",
+                  "properties": {
+                      "label": {
+                          "type": "string",
+                          "description": "The label of the sentiment",
+                          "enum": ["1-star", "2-star", "3-star", "4-star", "5-star"]
+                      },
+                      "score": {
+                          "type": "number",
+                          "description": "The sentiment score, ranging from 0 to 1"
+                      }
+                  },
+                  "required": ["label", "score"],
+                  "additionalProperties": false
+              }
+          }
+      },
+      "required": ["sentiment"],
+      "additionalProperties": false
+  },
+  "strict": true
+}

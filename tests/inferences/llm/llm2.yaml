@@ -1,0 +1,29 @@
+db_config:
+  url: 'sqlite+aiosqlite://'
+  name: 'aidb_test_amazon.sqlite'
+blob_tables:
+- name: 'blobs00'
+  keys: ['review_id']
+  path: 'tests/data/amazon.csv'
+output_tables:
+- name: 'sentiment'
+  columns: 
+    - summary: 
+        dtype: 'str'
+    - review_id: 
+        dtype: 'int'
+        refers_to: 'blobs00.review_id'
+        is_primary_key: True
+services: 
+  - name: 'sentiment_classification'
+    service: 'LLM'
+    service_config:
+      model: 'gpt-4o-mini-2024-07-18'
+      model_config: {'temperature': 0.3,'max_tokens': 10}
+      prompt: 'Please summary the review of amazon product: {{blobs00_review}}'
+      is_single: True
+      output_schema:
+        pydantic: {'summary': 'str'}
+    input_cols: ["blobs00.review", "blobs00.review_id"]
+    output_cols: ["sentiment.summary", "sentiment.review_id"]
+    copy: {"blobs00.review_id": "sentiment.review_id"}
