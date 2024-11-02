@@ -39,5 +39,4 @@ if __name__ == '__main__':
       config['db_config'], config['output_tables']))
 
   aidb_engine = AIDB.from_config(config, args.verbose)
-  results = aidb_engine.execute('select * from sentiment')
   command_line_utility(aidb_engine)

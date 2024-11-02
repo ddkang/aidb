@@ -44,7 +44,6 @@ class LLMInference(CachedInferenceService):
         ValueError: If the response content cannot be parsed.
     """
     try:
-      response = response['choices'][0]['message']['content']
       json_content = response['choices'][0]['message']['content']
       parsed_content = json.loads(json_content)
     except (KeyError, json.JSONDecodeError) as e:
@@ -81,6 +80,5 @@ class LLMInference(CachedInferenceService):
     except Exception as e:
       logging.error("Inference failed: %s", e)
       raise
-    response = '{"summary":"The reviewer praises Amazon\'s batteries for'
     inference_results = self._convert_response_to_output(response)
     return inference_results
