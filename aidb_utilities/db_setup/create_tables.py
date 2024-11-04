@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import sqlalchemy
 import sqlalchemy.ext.asyncio
@@ -9,7 +9,7 @@ from aidb.config.config_types import python_type_to_sqlalchemy_type
 from aidb.utils.db import create_sql_engine
 
 
-async def create_output_tables(db_config: Dict[str, str], output_tables: Dict):
+async def create_output_tables(db_config: Dict[str, str], output_tables: List[dict]):
   db_uri = f"{db_config['url']}/{db_config['name']}"
   engine = create_sql_engine(db_uri)
   async with engine.begin() as conn:
