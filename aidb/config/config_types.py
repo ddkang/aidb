@@ -10,19 +10,6 @@ import sqlalchemy
 AIDBListType = type('AIDBListType', (), {})
 
 
-def python_type_to_sqlalchemy_type(python_type):
-  if python_type == int:
-    return sqlalchemy.Integer
-  elif python_type == float:
-    return sqlalchemy.Float
-  elif python_type == str:
-    return sqlalchemy.String
-  elif python_type == bool:
-    return sqlalchemy.Boolean
-  else:
-    raise ValueError(f'Unknown python type {python_type}')
-
-
 Column = sqlalchemy.schema.Column
 Graph = nx.DiGraph
 
@@ -59,14 +46,14 @@ class Table:
 
 
 def python_type_to_sqlalchemy_type(python_type):
-  if python_type == int:
+  if python_type == int or python_type == 'int':
     return sqlalchemy.Integer
-  elif python_type == float:
+  elif python_type == float or python_type == 'float':
     return sqlalchemy.Float
   # TODO: think if this is the best way.
-  elif python_type == str or python_type == object:
+  elif python_type == str or python_type == object or python_type == 'str':
     return sqlalchemy.String
-  elif python_type == bool:
+  elif python_type == bool or python_type == 'bool':
     return sqlalchemy.Boolean
   else:
     raise ValueError(f'Unknown python type {python_type}')
