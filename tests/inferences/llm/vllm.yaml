@@ -1,0 +1,80 @@
+db_config:
+  url: 'sqlite+aiosqlite://'
+  name: 'aidb_test_llm_judge.sqlite'
+blob_tables:
+- name: 'blobs00'
+  keys: ['message_id']
+  path: 'tests/data/sampled_message.csv'
+output_tables:
+- name: 'chat_vicuna'
+  columns: 
+    - vicuna_response: 
+        dtype: 'str'
+    - message_id: 
+        dtype: 'int'
+        refers_to: 'blobs00.message_id'
+        is_primary_key: True
+- name: 'chat_llama'
+  columns: 
+    - llama_response: 
+        dtype: 'str'
+    - message_id: 
+        dtype: 'int'
+        refers_to: 'blobs00.message_id'
+        is_primary_key: True
+- name: 'judge'
+  columns:
+    - message_id: 
+        dtype: 'int'
+        refers_to: 'blobs00.message_id'
+        is_primary_key: True
+    - explanation:
+        dtype: 'str'
+    - better_model:
+        dtype: 'str'
+services: 
+  - name: 'judge'
+    service: 'LLM'
+    service_config:
+      model: 'gpt-4o'
+      prompt: | 
+        Please act as an impartial judge and evaluate the quality of the responses provided by two AI assistants to the user question displayed below. You should choose the assistant that follows the user's instructions and answers the user's question better. Your evaluation should consider factors such as the helpfulness, relevance, accuracy, depth, creativity, and level of detail of their responses. Begin your evaluation by comparing the two responses. Avoid any position biases and ensure that the order in which the responses were presented does not influence your decision. Do not allow the length of the responses to influence your evaluation. Do not favor certain names of the assistants. Be as objective as possible. After providing your explanation, output your final verdict by strictly following this format: \"[[A]]\" if assistant A is better, \"[[B]]\" if assistant B is better, and \"[[C]]\" for a tie. Question:{{blobs00_message}}, assistant A's answer {{chat_vicuna_vicuna_response}}, assistant B's answer {{chat_llama_llama_response}}
+      is_single: True
+      output_schema:
+        json: 'tests/inferences/llm/judge.json'
+    input_cols: ["blobs00.message", "blobs00.message_id", "chat_llama.llama_response", "chat_vicuna.vicuna_response"]
+    output_cols: ["judge.explanation","judge.better_model", "judge.message_id",]
+    copy: {"blobs00.message_id": "judge.message_id"}
+  - name: 'chat_service_vicuna'
+    service: 'VLLM'
+    service_config:
+      model_name: 'lmsys/vicuna-13b-v1.5'
+      prompt: '{{blobs00_message}}'
+      is_single: True
+      preferred_batch_size: 256
+      model_config:
+        download_dir: '/projects/illinois/eng/cs/ddkang/tengjun2/llm/model'
+      sampling_params:
+        max_tokens: 2048
+        min_tokens: 10
+        temperature: 0
+    input_cols: ["blobs00.message", "blobs00.message_id"]
+    output_cols: ["chat_vicuna.vicuna_response", "chat_vicuna.message_id",]
+    copy: {"blobs00.message_id": "chat_vicuna.message_id"}
+  - name: 'chat_service_llama'
+    service: 'VLLM'
+    service_config:
+      model_name: 'meta-llama/Llama-3.1-8B-Instruct'
+      prompt: '{{blobs00_message}}'
+      is_single: True
+      preferred_batch_size: 256
+      apply_chat_template: True
+      model_config:
+        download_dir: '/projects/illinois/eng/cs/ddkang/tengjun2/llm/model'
+      sampling_params:
+        max_tokens: 2048
+        min_tokens: 10
+        temperature: 0
+    input_cols: ["blobs00.message", "blobs00.message_id"]
+    output_cols: ["chat_llama.llama_response", "chat_llama.message_id",]
+    copy: {"blobs00.message_id": "chat_llama.message_id"}

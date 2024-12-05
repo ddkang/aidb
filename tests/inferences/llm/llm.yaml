@@ -1,0 +1,33 @@
+db_config:
+  url: 'sqlite+aiosqlite://'
+  name: 'aidb_test_amazon.sqlite'
+blob_tables:
+- name: 'blobs00'
+  keys: ['review_id']
+  path: 'tests/data/amazon.csv'
+output_tables:
+- name: 'sentiment'
+  columns: 
+    - label: 
+        dtype: 'str'
+    - score: 
+        dtype: 'float'
+    - review_id: 
+        dtype: 'int'
+        refers_to: 'blobs00.review_id'
+        is_primary_key: True
+    - sentence_id:
+        dtype: 'int'
+        is_primary_key: True
+services: 
+  - name: 'sentiment_classification'
+    service: 'LLM'
+    service_config:
+      model: 'gpt-4o-mini-2024-07-18'
+      prompt: 'Please classify the sentiment of the review of amazon product: {{blobs00_review}}'
+      is_single: False
+      output_schema:
+        path: './sentiment_classification.json'
+    input_cols: ["blobs00.review", "blobs00.review_id"]
+    output_cols: ["sentiment.label", "sentiment.score", "sentiment.sentence_id","sentiment.review_id",]
+    copy: {"blobs00.review_id": "sentiment.review_id"}
