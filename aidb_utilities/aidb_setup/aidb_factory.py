@@ -3,6 +3,7 @@ import pandas as pd
 from aidb.config.config_types import InferenceBinding
 from aidb.engine import Engine
 from aidb.inference.examples.llm_inference_service import LLMInference
+from aidb.inference.examples.vllm_inference_service import VLLMInference
 from aidb.vector_database.chroma_vector_database import ChromaVectorDatabase
 from aidb.vector_database.faiss_vector_database import FaissVectorDatabase
 from aidb.vector_database.weaviate_vector_database import WeaviateVectorDatabase
@@ -35,7 +36,8 @@ def get_tasti_config(tasti_config):
 
 def setup_inference(service_name, service, service_config):
   inference_dict ={
-    'LLM': LLMInference
+    'LLM': LLMInference,
+    'VLLM': VLLMInference
   }
   service_config['name'] = service_name
   return inference_dict[service.upper()](**service_config)

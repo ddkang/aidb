@@ -3,12 +3,12 @@ from typing import Dict, List, Tuple, Union
 import logging
 import pandas as pd
 from jinja2 import Template
-from litellm import completion
+from litellm import completion, BadRequestError
 
 from aidb.inference.http_inference_service import CachedInferenceService
 from aidb.inference.utils import parse_output_schema
 from aidb.utils.perf_utils import call_counter
-
+import re
 
 class LLMInference(CachedInferenceService):
   def __init__(
@@ -56,6 +56,26 @@ class LLMInference(CachedInferenceService):
       df = pd.concat(dfs, axis=1)
     return df
 
+  def _call_model(self, data):
+    if self.model_config is None:
+      response = completion(
+        model=self.model,
+        messages=[{"content": data, "role": "user"}],
+        response_format=self.output_schema
+      )
+    else:
+      response = completion(
+          model=self.model,
+          messages=[{"content": data, "role": "user"}],
+          response_format=self.output_schema,
+          **self.model_config
+      )
+
+    logging.info(f"prompt tokens: {response['usage']['prompt_tokens']}, completion tokens: {response['usage']['completion_tokens']}")
+    logging.info(f"gpt response {response}")
+    return response
+
+
   @call_counter
   def infer_one(self, input: pd.Series) -> pd.DataFrame:
     """
@@ -69,14 +89,15 @@ class LLMInference(CachedInferenceService):
     """
     context = {key.replace('.', '_'): value for key, value in input.items()}
     data = self.template.render(**context)
-
     try:
-      response = completion(
-          model=self.model,
-          messages=[{"content": data, "role": "user"}],
-          response_format=self.output_schema,
-          **self.model_config
-      )
+      response = self._call_model(data)
+    except BadRequestError as e:
+      pattern = re.compile(r"(.+?)\1+")
+      repeated_list = []
+      for match in pattern.finditer(data):
+        if len(match.group(0))/len(match.group(1)) > 50:
+          data = data.replace(match.group(1), '')
+      response = self._call_model(data)
     except Exception as e:
       logging.error("Inference failed: %s", e)
       raise
