@@ -59,8 +59,6 @@ ERROR_TARGET 10%
 CONFIDENCE 95%;
 ```
 
-You can see the mappings [here](https://github.com/ddkang/aidb/blob/main/config/sentiment.py#L15). We use the HuggingFace API to generate sentiments from the reviews.
-
 
 ### Image Example (local directory)
 
@@ -76,8 +74,6 @@ SELECT *
 FROM nsfw
 WHERE racy LIKE 'POSSIBLE';
 ```
-
-You can see the mappings [here](https://github.com/ddkang/aidb/blob/main/config/nsfw_detect.py#L10). We use the Google Vision API to generate the safety labels.
 
 
 
@@ -111,16 +107,3 @@ CONFIDENCE 95%;
 The `ERROR_TARGET` specifies the percent error _compared to running the query exactly._
 For example, if the true answer is 100, you will get answers between 95 and 105 (95% of the time).
 
-## Useful Links
-- [How to connect ML APIs](https://github.com/ddkang/aidb/blob/main/aidb/inference/examples/README.md)
-- [How to define configuration file](https://github.com/ddkang/aidb/tree/main/config)
-- [Connecting to Data Store](https://github.com/ddkang/aidb/tree/main/aidb_utilities/blob_store)
-
-## Contribute
-
-We have many improvements we'd like to implement. Please help us! For the time being, please [email](mailto:ddkang@g.illinois.edu) us, if you'd like to help contribute.
-
-
-## Contact Us
-
-Need help in setting up AIDB for your specific dataset or want a new feature? Please fill [this form](https://forms.gle/YyAXWxqzZPVBrvBR7).

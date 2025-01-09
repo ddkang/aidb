@@ -10,8 +10,6 @@ setup(
   description="Analyze your unstructured data",
   long_description=open("README.md").read(),
   long_description_content_type="text/markdown",
-  author="Daniel Kang",
-  author_email="daniel.d.kang@gmail.com",
   # Packages
   packages=find_packages(include=["aidb", "aidb.*", "aidb_utilities", "aidb_utilities.*"]),
   python_requires=">=3.9",
