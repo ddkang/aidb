@@ -14,6 +14,5 @@ conda install -y python=3.9
 pip install -r requirements.txt
 
 mkdir -p ./tests/paper_tests/data
-git clone https://github.com/ttt-77/AIDB_data.git ./tests/paper_tests/data
 gdown 'https://drive.google.com/uc?id=1IobfQq2AtpaB74PhW5nEHaZj_G8VIhPE'
 unzip embedding.zip -d ./tests/paper_tests/data
