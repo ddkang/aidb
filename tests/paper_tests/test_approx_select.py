@@ -40,8 +40,10 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     # vector database configuration
     index_path = './'
     index_name = f'{DATASET}_{RECALL_TARGET}_{PORT}'
-    embedding = np.load(f'./tests/vldb_tests/data/embedding/{DATASET}_embeddings.npy')
-    embedding_df = pd.DataFrame({'id': range(embedding.shape[0]), 'values': embedding.tolist()})
+    embedding = np.load(
+      f'./tests/paper_tests/data/embedding/{DATASET}_embeddings.npy')
+    embedding_df = pd.DataFrame(
+      {'id': range(embedding.shape[0]), 'values': embedding.tolist()})
 
     embedding_dim = embedding.shape[1]
     user_database = FaissVectorDatabase(index_path)
@@ -65,21 +67,23 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
     queries = []
     with open(os.path.join(dirname, f'aggregation_queries/{DATASET}/approx_select.sql'), 'r') as f:
       for line in f.readlines():
-        queries.append((f'{line} RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%', line))
-        
+        queries.append(
+          (f'{line} RECALL_TARGET {RECALL_TARGET}% CONFIDENCE 95%', line))
+
     db_url_list = [SQLITE_URL]
     for db_url in db_url_list:
       dialect = db_url.split('+')[0]
       logger.info(f'Test {dialect} database')
       count_list = [0] * len(queries)
-      
+
       gt_engine, aidb_engine = await setup_gt_and_aidb_engine(db_url, data_dir, tasti, port=PORT)
       register_inference_services(aidb_engine, data_dir, port=PORT)
       for i in range(_NUMBER_OF_RUNS):
         k = 0
         for aidb_query, exact_query in queries:
           logger.info(f'Running query {aidb_query} in approx select engine')
-          seed = (mp.current_process().pid * np.random.randint(100000, size=1)[0]) % (2**32 - 1)
+          seed = (mp.current_process().pid *
+                  np.random.randint(100000, size=1)[0]) % (2**32 - 1)
           aidb_res = aidb_engine.execute(aidb_query, __seed=seed)
 
           logger.info(f'Running query {exact_query} in ground truth database')
@@ -94,7 +98,7 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
             count_list[k] += 1
           k += 1
           logger.info(f'AIDB_res: {len(aidb_res)}, gt_res:{len(gt_res)}, Recall: {len(aidb_res) / len(gt_res)},'
-                       f' Times of trial:{i + 1}, Count: {count_list}')
+                      f' Times of trial:{i + 1}, Count: {count_list}')
 
       del gt_engine
       del aidb_engine

@@ -11,6 +11,10 @@ Install conda environment, python packages. Download required data.
 ```batch
 source install.sh
 ```
+
+## Download Data
+To download the data for AIDB experiments, visit [this link](https://anonymous.4open.science/r/AIDB_data-6627).
+
 ## Experiments
 To evaluate AIDB's performance on approximate aggregation queries:
 ```batch
