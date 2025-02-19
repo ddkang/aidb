@@ -19,6 +19,32 @@ MYSQL_URL = 'mysql+aiomysql://root:testaidb@localhost:3306'
 
 class LimitEngineTests(IsolatedAsyncioTestCase):
 
+  def _subset_check(self, aidb_res, gt_res, correctness_bound = 1e-9):
+    '''
+    Check whether aidb result is subset of ground truth result considering float error.
+    Assume that all the tuples in aidb_res and gt_res have same length and type.
+    '''
+
+    def element_is_close(a, b):
+      if isinstance(a, float):
+        return abs(a - b) < correctness_bound
+      else:
+        return a == b
+    
+    aidb_res = set(aidb_res)
+    gt_res = set(gt_res)
+    # Iterate through each entry in aidb_res and check its existence in gt_res
+    for aidb_entry in aidb_res:
+      entry_exists_in_gt_res = False
+      for gt_entry in gt_res:
+        # Check whether the two entries are equal regarding the float error
+        if all(element_is_close(aidb_elem, gt_elem) for aidb_elem, gt_elem in zip(aidb_entry, gt_entry)):
+          entry_exists_in_gt_res = True
+          break
+      if not entry_exists_in_gt_res:
+        return False
+    return True
+
   async def test_jackson_number_objects(self):
 
     dirname = os.path.dirname(__file__)
@@ -72,7 +98,11 @@ class LimitEngineTests(IsolatedAsyncioTestCase):
 
         logger.info(f'There are {len(aidb_res)} elements in limit engine results '
               f'and {len(gt_res)} elements in ground truth results')
-        assert len(set(aidb_res) - set(gt_res)) == 0
+        if len(aidb_res) < 100:
+          assert len(aidb_res) == len(gt_res)
+        else:
+          assert len(aidb_res) == 100
+        assert self._subset_check(aidb_res, gt_res)
 
       del gt_engine
       del aidb_engine
